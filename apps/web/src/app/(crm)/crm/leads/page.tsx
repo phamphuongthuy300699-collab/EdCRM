@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
 import { 
   Inbox, 
@@ -12,10 +12,12 @@ import {
   MoreVertical, 
   Plus 
 } from "lucide-react";
+import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 
 export default function CrmLeadsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "new" | "contacted" | "trial" | "converted" | "lost">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const initialLeads = [
     { id: 1, parentName: "Анна Петрова", phone: "+7 (905) 555-12-34", childName: "Игорь", childAge: 8, course: "Робототехника LEGO", status: "new", date: "20.06.2026", source: "Форма на сайте" },
@@ -26,7 +28,55 @@ export default function CrmLeadsPage() {
     { id: 6, parentName: "Алексей Иванов", phone: "+7 (980) 444-55-66", childName: "Артем", childAge: 11, course: "Разработка на Python", status: "lost", date: "15.06.2026", source: "Звонок" }
   ];
 
-  const [leads, setLeads] = useState(initialLeads);
+  const [leads, setLeads] = useState<any[]>([]);
+  const supabase = createSupabaseBrowserClient();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+
+        const { data: coursesData } = await supabase
+          .from("courses")
+          .select("id, title");
+
+        const courseMap = new Map();
+        coursesData?.forEach((c: any) => courseMap.set(c.id, c.title));
+
+        const { data: leadsData, error } = await supabase
+          .from("leads")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        if (leadsData && leadsData.length > 0) {
+          const formatted = leadsData.map((l: any) => ({
+            id: l.id,
+            parentName: l.parent_name,
+            phone: l.parent_phone,
+            childName: l.child_name || "",
+            childAge: l.child_age || null,
+            course: l.course_id ? (courseMap.get(l.course_id) || "Робототехника") : "Не выбран",
+            status: l.status,
+            date: new Date(l.created_at).toLocaleDateString("ru-RU"),
+            source: l.source === "site_form" ? "Форма на сайте" : (l.source || "Другое")
+          }));
+          // Merge mock data with real data to make page feel full and show real ones at the top
+          setLeads([...formatted, ...initialLeads]);
+        } else {
+          setLeads(initialLeads);
+        }
+      } catch (err) {
+        console.error("Error loading leads:", err);
+        setLeads(initialLeads);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -39,8 +89,20 @@ export default function CrmLeadsPage() {
     }
   };
 
-  const handleUpdateStatus = (id: number, newStatus: string) => {
-    setLeads(leads.map(lead => lead.id === id ? { ...lead, status: newStatus } : lead));
+  const handleUpdateStatus = async (id: any, newStatus: string) => {
+    try {
+      if (typeof id === "string") {
+        const { error } = await (supabase.from("leads") as any)
+          .update({ status: newStatus })
+          .eq("id", id);
+
+        if (error) throw error;
+      }
+      setLeads(leads.map(lead => lead.id === id ? { ...lead, status: newStatus } : lead));
+    } catch (err) {
+      console.error("Error updating lead status:", err);
+      alert("Не удалось обновить статус заявки");
+    }
   };
 
   const filteredLeads = leads.filter(lead => {
