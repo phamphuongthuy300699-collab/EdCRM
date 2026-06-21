@@ -10,7 +10,8 @@ import {
   UserCheck, 
   XCircle, 
   MoreVertical, 
-  Plus 
+  Plus,
+  Calendar
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 
@@ -240,62 +241,123 @@ export default function CrmLeadsPage() {
                   <td>{lead.date}</td>
                   <td style={{ color: "var(--color-text-muted)" }}>{lead.source}</td>
                   <td style={{ padding: "0 24px", textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                      <button 
-                        onClick={() => handleUpdateStatus(lead.id, "contacted")}
-                        title="Связались" 
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-border)",
-                          background: "white",
-                          color: "var(--color-text)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <PhoneCall size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateStatus(lead.id, "converted")}
-                        title="Конвертировать в ученика" 
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "none",
-                          background: "var(--color-success-soft)",
-                          color: "var(--color-success)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <UserCheck size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateStatus(lead.id, "lost")}
-                        title="Пометить потерянной" 
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "none",
-                          background: "var(--color-danger-soft)",
-                          color: "var(--color-danger)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <XCircle size={14} />
-                      </button>
-                    </div>
+                    {lead.status === "new" && (
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "contacted")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--color-primary)",
+                            background: "white",
+                            color: "var(--color-primary)",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          <PhoneCall size={12} />
+                          Позвонить
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "lost")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            background: "var(--color-danger-soft)",
+                            color: "var(--color-danger)",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Отклонить
+                        </button>
+                      </div>
+                    )}
+                    {lead.status === "contacted" && (
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "trial")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "1px solid #FEF3C7",
+                            background: "#FEF3C7",
+                            color: "#D97706",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          <Calendar size={12} />
+                          Назначить пробное
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "lost")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            background: "var(--color-danger-soft)",
+                            color: "var(--color-danger)",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Отклонить
+                        </button>
+                      </div>
+                    )}
+                    {lead.status === "trial" && (
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "converted")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            background: "var(--color-success)",
+                            color: "white",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          <UserCheck size={12} />
+                          Создать ученика
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateStatus(lead.id, "lost")}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            background: "var(--color-danger-soft)",
+                            color: "var(--color-danger)",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Отклонить
+                        </button>
+                      </div>
+                    )}
+                    {(lead.status === "converted" || lead.status === "lost") && (
+                      <span style={{ color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 600 }}>Действий не требуется</span>
+                    )}
                   </td>
                 </tr>
               ))}

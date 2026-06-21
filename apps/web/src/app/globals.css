@@ -18,6 +18,7 @@
   --color-success-soft: #DCFCE7;
 
   --color-warning: #F59E0B;
+  --color-warning-dark: #D97706;
   --color-warning-soft: #FEF3C7;
 
   --color-danger: #DC2626;
@@ -236,3 +237,74 @@ a {
 .badge-green { background: var(--color-success-soft); color: #166534; }
 .badge-red { background: var(--color-danger-soft); color: #991B1B; }
 .badge-gray { background: #F3F4F6; color: #4B5563; }
+
+/* Tech Grid & Engineering aesthetics */
+.bg-grid-blueprint {
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-image: 
+    linear-gradient(to right, rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+    linear-gradient(to right, rgba(37, 99, 235, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.015) 1px, transparent 1px);
+}
+
+.tech-blueprint-line {
+  stroke-dasharray: 6;
+  animation: tech-dash 15s linear infinite;
+}
+
+@keyframes tech-dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.badge-mission {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-dark);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* Assembly hover animations */
+.hero-visual-card:hover .part-cpu {
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+}
+.hero-visual-card:hover .part-wheel-left {
+  transform: translateX(0) !important;
+  opacity: 1 !important;
+}
+.hero-visual-card:hover .part-wheel-right {
+  transform: translateX(0) !important;
+  opacity: 1 !important;
+}
+.hero-visual-card:hover .part-sensor {
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+}
+.hero-visual-card:hover .part-lines {
+  opacity: 1 !important;
+}
+
+/* Robo-Helper Float animation */
+@keyframes robo-float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.robo-float {
+  animation: robo-float 3s ease-in-out infinite;
+}
+

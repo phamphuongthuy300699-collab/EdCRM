@@ -20,7 +20,7 @@ import {
 export default function CrmDashboard() {
   const stats = [
     { name: "Новые заявки", value: "8", icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: "+3 новые за сегодня" },
-    { name: "Просрочено оплат", value: "12 500 ₽", icon: CreditCard, color: "var(--color-danger)", bg: "var(--color-danger-soft)", desc: "4 неоплаченных счета" },
+    { name: "Просроченные счета", value: "12 500 ₽", icon: CreditCard, color: "var(--color-danger)", bg: "var(--color-danger-soft)", desc: "4 неоплаченных счета" },
     { name: "Занятия сегодня", value: "4", icon: Calendar, color: "var(--color-warning)", bg: "var(--color-warning-soft)", desc: "Ближайшее в 17:00" },
     { name: "Активные ученики", value: "37", icon: Users, color: "var(--color-success)", bg: "var(--color-success-soft)", desc: "Заполненность групп: 85%" }
   ];
@@ -95,6 +95,48 @@ export default function CrmDashboard() {
             </div>
           );
         })}
+      </div>
+
+      {/* Сегодня требует внимания */}
+      <div className="card-crm" style={{ 
+        background: "var(--color-warning-soft)", 
+        borderColor: "#F59E0B",
+        padding: "20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#D97706" }}>
+          <AlertTriangle size={20} />
+          <h3 style={{ fontSize: "15px", fontWeight: 700, fontFamily: "var(--font-geologica)" }}>
+            Сегодня требует внимания
+          </h3>
+        </div>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(4, 1fr)", 
+          gap: "20px", 
+          fontSize: "var(--font-small)",
+          fontWeight: 600,
+          color: "var(--color-text)" 
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+            <span style={{ color: "var(--color-primary)", fontSize: "1.1rem", fontWeight: 800 }}>8</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>новых заявок в очереди</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+            <span style={{ color: "var(--color-danger)", fontSize: "1.1rem", fontWeight: 800 }}>2</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>просроченных счета</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+            <span style={{ color: "#D97706", fontSize: "1.1rem", fontWeight: 800 }}>1</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>группа почти заполнена (7/8)</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "1.1rem", fontWeight: 800 }}>3</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>ребёнка пропустили занятия</span>
+          </div>
+        </div>
       </div>
 
       {/* Main Sections Grid */}

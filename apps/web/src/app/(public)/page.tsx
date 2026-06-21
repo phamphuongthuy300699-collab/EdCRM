@@ -34,6 +34,7 @@ export default function LandingPage() {
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [roboAdvice, setRoboAdvice] = useState("Я помогу подобрать идеальную группу по возрасту и уровню!");
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -82,6 +83,8 @@ export default function LandingPage() {
       title: "Робототехника (Lego Education)",
       age: "6–9 лет",
       desc: "Изучение механики и основ программирования роботов через конструирование.",
+      mission: "Собрать робота-уборщика, объезжающего препятствия",
+      results: ["первый рабочий механизм", "базовые алгоритмы", "защита мини-проекта"],
       icon: Cpu,
       price: "4 500 ₽ / мес"
     },
@@ -89,7 +92,9 @@ export default function LandingPage() {
       id: "1d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
       title: "Scratch и основы программирования",
       age: "7–11 лет",
-      desc: "Создание собственных игр, мультфильмов и интерактивных проектов.",
+      desc: "Создание собственных игр, мультфильмов and интерактивных проектов.",
+      mission: "Создать 2D-платформер с физикой прыжков и врагами",
+      results: ["своя игра на Scratch", "логические ветвления", "опыт геймдизайна"],
       icon: Gamepad2,
       price: "4 000 ₽ / мес"
     },
@@ -97,7 +102,9 @@ export default function LandingPage() {
       id: "python-kids",
       title: "Программирование на Python",
       age: "10–14 лет",
-      desc: "Освоение профессионального языка программирования на простых и понятных задачах.",
+      desc: "Освоение professional программирования на простых и понятных задачах.",
+      mission: "Написать ИИ-помощника для Telegram",
+      results: ["синтаксис Python", "работа с API", "деплой первого чат-бота"],
       icon: Code,
       price: "4 800 ₽ / мес"
     },
@@ -106,6 +113,8 @@ export default function LandingPage() {
       title: "Arduino и схемотехника",
       age: "10–15 лет",
       desc: "Проектирование электронных схем, умных устройств и программирование микроконтроллеров.",
+      mission: "Спроектировать систему автополива растений с датчиком влажности",
+      results: ["сборка схем без пайки", "программирование C/C++", "работа с сенсорами"],
       icon: Lightbulb,
       price: "5 200 ₽ / мес"
     }
@@ -115,7 +124,8 @@ export default function LandingPage() {
     { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах." },
     { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками." },
     { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере." },
-    { num: "04", title: "Тестируем и улучшаем", text: "Запускаем проект, находим ошибки и совершенствуем код." }
+    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде." },
+    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям." }
   ];
 
   const faqItems = [
@@ -129,16 +139,31 @@ export default function LandingPage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
       
       {/* 1. HERO SECTION */}
-      <section style={{
+      <section className="bg-grid-blueprint" style={{
         padding: "80px 0 120px 0",
-        background: "radial-gradient(50% 50% at 50% 50%, #F5F7FA 0%, #FFFFFF 100%)",
+        borderBottom: "1px solid var(--color-border)",
+        position: "relative",
         overflow: "hidden"
       }}>
+        {/* Soft engineering decorative circle in background */}
+        <div style={{
+          position: "absolute",
+          top: "-150px",
+          right: "-150px",
+          width: "500px",
+          height: "500px",
+          borderRadius: "50%",
+          border: "1.5px dashed rgba(37,99,235,0.06)",
+          pointerEvents: "none"
+        }} />
+
         <div className="container" style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1fr 1.1fr",
           alignItems: "center",
-          gap: "64px"
+          gap: "64px",
+          position: "relative",
+          zIndex: 10
         }}>
           {/* Hero Left Content */}
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -151,21 +176,22 @@ export default function LandingPage() {
               padding: "6px 12px",
               borderRadius: "20px",
               width: "fit-content",
-              fontWeight: 700,
+              fontWeight: 800,
               fontSize: "var(--font-xs)",
               textTransform: "uppercase",
               letterSpacing: "0.05em"
             }}>
-              Для детей от 6 до 14 лет в Липецке
+              Для детей 6–14 лет в Липецке
             </div>
 
             <h1 style={{
               fontSize: "var(--font-h1)",
               color: "var(--color-text)",
               lineHeight: 1.1,
-              fontFamily: "var(--font-geologica)"
+              fontFamily: "var(--font-geologica)",
+              maxWidth: "600px"
             }}>
-              Инженерное мышление и робототехника для детей
+              Ребёнок соберёт своего первого робота уже на пробном занятии
             </h1>
 
             <p style={{
@@ -174,19 +200,19 @@ export default function LandingPage() {
               maxWidth: "500px",
               lineHeight: 1.6
             }}>
-              Собираем роботов, изучаем код и создаем проекты в мини-группах с заботливыми наставниками.
+              Робототехника, Scratch, Python и Arduino в мини-группах до 8 детей под руководством заботливых инженеров-наставников.
             </p>
 
             <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
               <a href="#lead-form">
-                <Button variant="primary-site">
+                <Button variant="primary-site" style={{ background: "var(--color-accent)", height: "52px", padding: "0 28px" }}>
                   Записаться на пробный урок
                   <ArrowRight size={18} />
                 </Button>
               </a>
               <a href="#courses">
-                <Button variant="secondary-site">
-                  Посмотреть курсы
+                <Button variant="secondary-site" style={{ height: "52px", padding: "0 28px" }}>
+                  Посмотреть проекты
                 </Button>
               </a>
             </div>
@@ -199,95 +225,206 @@ export default function LandingPage() {
               borderTop: "1px solid var(--color-border)",
               paddingTop: "24px"
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)", fontWeight: 500 }}>
                 <Check size={18} style={{ color: "var(--color-success)" }} />
                 <span>Мини-группы до 8 человек</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)", fontWeight: 500 }}>
                 <Check size={18} style={{ color: "var(--color-success)" }} />
                 <span>Все оборудование включено</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)", fontWeight: 500 }}>
                 <Check size={18} style={{ color: "var(--color-success)" }} />
-                <span>Первый проект на 1-м уроке</span>
+                <span>Первый проект за 90 минут</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "var(--font-small)", fontWeight: 500 }}>
                 <Check size={18} style={{ color: "var(--color-success)" }} />
                 <span>Оплата помесячно, без долгов</span>
               </div>
             </div>
           </div>
 
-          {/* Hero Right Visuals */}
-          <div style={{ position: "relative" }}>
-            {/* Main Visual Frame */}
+          {/* Hero Right Visuals: Interactive Robot Assembly Simulator */}
+          <div style={{ position: "relative" }} className="hero-visual-card">
+            {/* Visual Blueprint Frame */}
             <div style={{
-              background: "#EEF2F6",
+              background: "white",
               borderRadius: "var(--radius-card-site)",
               width: "100%",
-              height: "460px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
+              boxShadow: "0 24px 60px rgba(37, 99, 235, 0.08)",
               border: "1px solid var(--color-border)",
               position: "relative",
               overflow: "hidden"
             }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                <Cpu size={80} style={{ color: "var(--color-primary)", opacity: 0.8 }} />
-                <span style={{ fontSize: "var(--font-body)", fontWeight: 700, color: "var(--color-text-muted)" }}>
-                  [ Фото учебной лаборатории ]
-                </span>
+              {/* Interactive Assembly SVG */}
+              <svg width="100%" height="420" viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", display: "block" }}>
+                {/* Dashed engineering circles in background of simulation */}
+                <circle cx="200" cy="170" r="110" stroke="rgba(37,99,235,0.06)" strokeWidth="1" />
+                <circle cx="200" cy="170" r="85" stroke="rgba(37,99,235,0.08)" strokeWidth="1" strokeDasharray="4 4" />
+                <circle cx="200" cy="170" r="60" stroke="rgba(37,99,235,0.1)" strokeWidth="1" />
+
+                {/* Grid guidelines */}
+                <line x1="200" y1="0" x2="200" y2="340" stroke="rgba(37,99,235,0.05)" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="0" y1="170" x2="400" y2="170" stroke="rgba(37,99,235,0.05)" strokeWidth="1" strokeDasharray="3 3" />
+
+                {/* Robot assembly parts */}
+                <g className="robot-assembly">
+                  {/* Fixed robot chassis */}
+                  <rect x="140" y="130" width="120" height="80" rx="16" fill="#1E293B" stroke="#2563EB" strokeWidth="3" />
+                  <rect x="155" y="145" width="90" height="50" rx="8" fill="#0F172A" />
+
+                  {/* Left wheel (slides in on hover) */}
+                  <g className="part-wheel-left" style={{
+                    transform: "translateX(-40px)",
+                    opacity: 0.4,
+                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}>
+                    <rect x="106" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
+                    <circle cx="117" cy="170" r="6" fill="#64748B" />
+                    <line x1="108" y1="145" x2="126" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    <line x1="108" y1="170" x2="126" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    <line x1="108" y1="195" x2="126" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                  </g>
+
+                  {/* Right wheel (slides in on hover) */}
+                  <g className="part-wheel-right" style={{
+                    transform: "translateX(40px)",
+                    opacity: 0.4,
+                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}>
+                    <rect x="272" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
+                    <circle cx="283" cy="170" r="6" fill="#64748B" />
+                    <line x1="274" y1="145" x2="292" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    <line x1="274" y1="170" x2="292" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    <line x1="274" y1="195" x2="292" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                  </g>
+
+                  {/* Sensor (slides down on hover) */}
+                  <g className="part-sensor" style={{
+                    transform: "translateY(-50px)",
+                    opacity: 0.3,
+                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}>
+                    <rect x="175" y="90" width="50" height="22" rx="4" fill="#475569" stroke="#94A3B8" strokeWidth="2" />
+                    <circle cx="190" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
+                    <circle cx="190" cy="101" r="2.5" fill="#10B981" />
+                    <circle cx="210" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
+                    <circle cx="210" cy="101" r="2.5" fill="#10B981" />
+                    <line x1="200" y1="112" x2="200" y2="130" stroke="#94A3B8" strokeWidth="2.5" />
+                  </g>
+
+                  {/* Green PCB Controller (slides down on hover) */}
+                  <g className="part-cpu" style={{
+                    transform: "translateY(-30px)",
+                    opacity: 0.3,
+                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}>
+                    <rect x="165" y="150" width="70" height="40" rx="5" fill="#065F46" stroke="#34D399" strokeWidth="2" />
+                    <circle cx="200" cy="170" r="8" fill="#A7F3D0" />
+                    <circle cx="200" cy="170" r="3" fill="#065F46" />
+                    <rect x="175" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
+                    <rect x="217" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
+                  </g>
+
+                  {/* Schematic orange links (appear on hover) */}
+                  <g className="part-lines" style={{
+                    opacity: 0,
+                    transition: "opacity 0.6s ease"
+                  }}>
+                    <path d="M128 170h37M235 170h37M200 112v38" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="3 3" />
+                    <circle cx="128" cy="170" r="3" fill="#F59E0B" />
+                    <circle cx="272" cy="170" r="3" fill="#F59E0B" />
+                    <circle cx="200" cy="112" r="3" fill="#F59E0B" />
+                  </g>
+                </g>
+              </svg>
+
+              {/* Hover Invitation Overlay */}
+              <div style={{
+                position: "absolute",
+                bottom: "12px",
+                left: 0,
+                right: 0,
+                textAlign: "center",
+                fontSize: "11px",
+                color: "var(--color-text-muted)",
+                fontWeight: 600,
+                pointerEvents: "none",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em"
+              }}>
+                Наведите курсор для сборки робота ⚙️
               </div>
             </div>
 
-            {/* Floating Card 1 */}
+            {/* Floating Info Card 1 */}
             <div className="card-site" style={{
               position: "absolute",
               bottom: "40px",
               left: "-32px",
-              padding: "16px 20px",
+              padding: "12px 18px",
               background: "white",
-              borderRadius: "16px",
+              borderRadius: "14px",
               display: "flex",
               alignItems: "center",
-              gap: "12px",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+              gap: "10px",
+              boxShadow: "0 10px 25px rgba(37, 99, 235, 0.12)",
+              zIndex: 20
             }}>
               <div style={{
                 background: "var(--color-success-soft)",
                 color: "var(--color-success)",
-                width: "40px",
-                height: "40px",
-                borderRadius: "10px",
+                width: "36px",
+                height: "36px",
+                borderRadius: "8px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center"
               }}>
-                <Smile size={20} />
+                <Smile size={18} />
               </div>
               <div>
-                <div style={{ fontWeight: 800, fontSize: "var(--font-small)" }}>Собрал первого робота</div>
-                <div style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>Данил, 8 лет</div>
+                <div style={{ fontWeight: 800, fontSize: "12px", color: "var(--color-text)" }}>Первый проект за 90 мин</div>
+                <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>Данил, 8 лет · собрал робота-сумо</div>
               </div>
             </div>
 
-            {/* Floating Card 2 */}
+            {/* Floating Info Card 2 */}
             <div className="card-site" style={{
               position: "absolute",
               top: "32px",
               right: "-20px",
-              padding: "16px 20px",
+              padding: "10px 16px",
               background: "white",
-              borderRadius: "16px",
+              borderRadius: "14px",
               display: "flex",
               alignItems: "center",
-              gap: "12px",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+              gap: "8px",
+              boxShadow: "0 10px 25px rgba(37, 99, 235, 0.12)",
+              zIndex: 20
             }}>
-              <Cpu size={20} style={{ color: "var(--color-primary)" }} />
-              <div style={{ fontWeight: 700, fontSize: "var(--font-small)" }}>Scratch · LEGO · Arduino</div>
+              <Cpu size={16} style={{ color: "var(--color-primary)" }} />
+              <div style={{ fontWeight: 800, fontSize: "12px", color: "var(--color-text)" }}>
+                LEGO · Scratch · Python · Arduino
+              </div>
+            </div>
+
+            {/* Floating Info Card 3 */}
+            <div className="card-site" style={{
+              position: "absolute",
+              top: "140px",
+              left: "-40px",
+              padding: "8px 12px",
+              background: "#FEF3C7",
+              border: "1px solid #F59E0B",
+              borderRadius: "10px",
+              fontWeight: 800,
+              fontSize: "11px",
+              color: "#B45309",
+              boxShadow: "0 8px 20px rgba(245, 158, 11, 0.15)",
+              zIndex: 20
+            }}>
+              🔥 Осталось 2 места в группе
             </div>
           </div>
         </div>
@@ -319,42 +456,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3. PROBLEM & SOLUTION */}
-      <section style={{ padding: "120px 0" }}>
-        <div className="container" style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1.2fr",
-          gap: "80px",
-          alignItems: "center"
-        }}>
-          <div>
-            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", lineHeight: 1.2, marginBottom: "24px" }}>
-              Не просто «занять ребенка после школы»
+      {/* 3. Что ребенок принесет домой после первого месяца */}
+      <section style={{ padding: "120px 0", borderBottom: "1px solid var(--color-border)" }}>
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: "64px" }}>
+            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+              Что ребёнок унесёт домой после 1-го месяца занятий
             </h2>
-            <p style={{ fontSize: "var(--font-body-lg)", color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-              Наша миссия — вырастить инженеров, изобретателей и программистов, которые понимают, как работают современные технологии изнутри, а не просто потребляют контент с экрана.
+            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+              Осязаемые результаты обучения, которые вы увидите своими глазами
             </p>
           </div>
 
-          <div style={{ display: "grid", gap: "24px" }}>
-            <div className="card-site" style={{ padding: "24px", display: "flex", gap: "20px", alignItems: "flex-start" }}>
-              <div style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)", padding: "12px", borderRadius: "12px" }}>
-                <Lightbulb size={24} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: "24px"
+          }}>
+            {/* Card 1 */}
+            <div className="card-site" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Cpu size={24} />
               </div>
-              <div>
-                <h4 style={{ fontSize: "1.125rem", marginBottom: "8px", fontWeight: 700 }}>Инженерное мышление</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>Ребенок учится анализировать задачу, проектировать конструкции и создавать механизмы с нуля.</p>
-              </div>
+              <h4 style={{ fontSize: "1.25rem", fontWeight: 700 }}>3–4 работающих робота</h4>
+              <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                Собственные инженерные проекты: от простого вентилятора до робота-манипулятора и спортивного робота-сумоиста на LEGO.
+              </p>
             </div>
 
-            <div className="card-site" style={{ padding: "24px", display: "flex", gap: "20px", alignItems: "flex-start" }}>
-              <div style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)", padding: "12px", borderRadius: "12px" }}>
+            {/* Card 2 */}
+            <div className="card-site" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Code size={24} />
               </div>
-              <div>
-                <h4 style={{ fontSize: "1.125rem", marginBottom: "8px", fontWeight: 700 }}>Программирование и логика</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>Осваиваем алгоритмы в Scratch и переходим к реальному коду на Python и Arduino.</p>
+              <h4 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Свою первую 2D-игру</h4>
+              <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                Созданный и опубликованный в Scratch проект: аркада, лабиринт или платформер с собственными персонажами и прописанными скриптами.
+              </p>
+            </div>
+
+            {/* Card 3 */}
+            <div className="card-site" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ background: "var(--color-success-soft)", color: "var(--color-success)", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Lightbulb size={24} />
               </div>
+              <h4 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Понимание физики и логики</h4>
+              <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                Ребёнок на практике разберется, как работают шестеренки, ременные передачи, датчики цвета и ультразвуковые сенсоры.
+              </p>
             </div>
           </div>
         </div>
@@ -385,8 +534,8 @@ export default function LandingPage() {
                   flexDirection: "column",
                   justifyContent: "space-between",
                   gap: "24px",
-                  height: "300px"
-                }}>
+                  minHeight: "380px"
+                }} boundary-dummy-attribute="some-id">
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                       <div style={{
@@ -397,16 +546,48 @@ export default function LandingPage() {
                       }}>
                         <IconComp size={24} />
                       </div>
-                      <span className="badge badge-blue">{course.age}</span>
+                      <span className="badge badge-blue" style={{ fontWeight: 800 }}>{course.age}</span>
                     </div>
-                    <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>{course.title}</h3>
-                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{course.desc}</p>
+                    <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "12px", fontFamily: "var(--font-geologica)" }}>{course.title}</h3>
+                    
+                    {/* Mission badge & text */}
+                    <div style={{ 
+                      background: "var(--color-bg)", 
+                      padding: "12px", 
+                      borderRadius: "8px", 
+                      marginBottom: "16px",
+                      borderLeft: "3px solid var(--color-accent)" 
+                    }}>
+                      <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Инженерная миссия:</div>
+                      <div style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-text)" }}>{course.mission}</div>
+                    </div>
+
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "16px" }}>{course.desc}</p>
+                    
+                    {/* Month results checklist */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результат первого месяца:</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {course.results.map((res, i) => (
+                          <span key={i} style={{
+                            background: "rgba(37, 99, 235, 0.05)",
+                            color: "var(--color-primary-dark)",
+                            padding: "4px 8px",
+                            borderRadius: "6px",
+                            fontSize: "11px",
+                            fontWeight: 600
+                          }}>
+                            ✓ {res}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
-                    <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>{course.price}</span>
+                    <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--color-text)" }}>{course.price}</span>
                     <a href="#lead-form" onClick={() => setCourseId(course.id)}>
-                      <Button variant="secondary-site" style={{ height: "36px", padding: "0 16px", fontSize: "var(--font-small)" }}>
-                        Записаться
+                      <Button variant="secondary-site" style={{ height: "38px", padding: "0 20px", fontSize: "var(--font-small)", fontWeight: 700 }}>
+                        Записаться на миссию
                       </Button>
                     </a>
                   </div>
@@ -418,40 +599,69 @@ export default function LandingPage() {
       </section>
 
       {/* 5. HOW IT WORKS (TIMELINE) */}
-      <section style={{ padding: "120px 0" }}>
+      <section style={{ padding: "120px 0", borderBottom: "1px solid var(--color-border)" }}>
         <div className="container">
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
+          <div style={{ textAlign: "center", marginBottom: "80px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              Как проходит занятие
+              Как рождается проект: 5 этапов занятия
             </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              Каждый урок — это завершенный цикл от идеи до рабочего проекта
+              Каждый урок — это полный путь от идеи до презентации готового робота
             </p>
           </div>
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "24px"
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: "24px",
+            position: "relative"
           }}>
+            {/* Dashed connector line in background for desktop */}
+            <div style={{
+              position: "absolute",
+              top: "40px",
+              left: "40px",
+              right: "40px",
+              height: "2px",
+              borderTop: "2px dashed rgba(37,99,235,0.15)",
+              zIndex: 1,
+              pointerEvents: "none"
+            }} />
+
             {steps.map((step, idx) => (
               <div key={idx} style={{
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
-                gap: "16px"
+                gap: "16px",
+                zIndex: 2,
+                background: "white",
+                padding: "20px",
+                borderRadius: "12px",
+                border: "1px solid var(--color-border)",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.02)"
               }}>
                 <div style={{
-                  fontSize: "3.5rem",
-                  fontWeight: 900,
-                  color: "var(--color-primary-soft)",
-                  lineHeight: 1,
-                  fontFamily: "var(--font-geologica)"
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "50%",
+                  background: "var(--color-primary-soft)",
+                  color: "var(--color-primary-dark)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "var(--font-body-lg)",
+                  fontWeight: 800,
+                  fontFamily: "var(--font-geologica)",
+                  border: "2px solid white",
+                  boxShadow: "0 4px 10px rgba(37, 99, 235, 0.15)"
                 }}>
                   {step.num}
                 </div>
-                <h4 style={{ fontSize: "1.125rem", fontWeight: 700 }}>{step.title}</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{step.text}</p>
+                <div>
+                  <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--color-text)", marginBottom: "8px" }}>{step.title}</h4>
+                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.5 }}>{step.text}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -491,41 +701,174 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Smart Parent Portal Mockup */}
           <div style={{
             background: "white",
             border: "1px solid var(--color-border)",
             borderRadius: "var(--radius-card-site)",
-            padding: "40px",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.03)"
+            padding: "32px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.04)",
+            position: "relative",
+            overflow: "hidden"
           }}>
-            <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "24px" }}>
-              Контроль оплат и занятий
-            </h3>
-            <p style={{ fontSize: "var(--font-body)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-              С помощью нашей CRM-системы вы всегда будете видеть баланс своего абонемента, даты посещений и получать ссылки на оплату в мессенджерах.
-            </p>
+            {/* Header / Top bar of the app mockup */}
             <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "20px",
+              borderBottom: "1px solid var(--color-border)",
+              paddingBottom: "16px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, var(--color-primary) 0%, #3b82f6 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  fontWeight: 700,
+                  fontSize: "var(--font-small)"
+                }}>
+                  МИ
+                </div>
+                <div>
+                  <h4 style={{ fontWeight: 700, fontSize: "0.95rem", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                    Миша Иванов <span style={{ fontSize: "0.75rem", fontWeight: 400, color: "var(--color-text-muted)" }}>(8 лет)</span>
+                  </h4>
+                  <span style={{ fontSize: "0.75rem", color: "var(--color-primary)", fontWeight: 600 }}>
+                    Курс: Робототехника Lego
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span style={{
+                  display: "inline-block",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  background: "rgba(34, 197, 94, 0.1)",
+                  color: "rgb(34, 197, 94)",
+                  fontSize: "0.7rem",
+                  fontWeight: 600
+                }}>
+                  Активен
+                </span>
+              </div>
+            </div>
+
+            {/* Content Cards Grid */}
+            <div style={{ display: "grid", gap: "12px", marginBottom: "20px" }}>
+              {/* Row 1: Next Class & Attendance */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "12px",
+                  padding: "12px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem", marginBottom: "4px" }}>
+                    <Calendar size={12} style={{ color: "var(--color-primary)" }} />
+                    <span>Следующее занятие</span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Суббота, 12:00</div>
+                  <div style={{ fontSize: "0.65rem", color: "var(--color-text-muted)", marginTop: "2px" }}>Кабинет 3, Александр</div>
+                </div>
+
+                <div style={{
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "12px",
+                  padding: "12px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem", marginBottom: "4px" }}>
+                    <Check size={12} style={{ color: "rgb(34, 197, 94)" }} />
+                    <span>Посещаемость</span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>7 из 8</span>
+                    <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: "0.65rem" }}>88%</span>
+                  </div>
+                  {/* Attendance dots */}
+                  <div style={{ display: "flex", gap: "3px", marginTop: "6px" }}>
+                    {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "rgb(34, 197, 94)" }} />
+                    ))}
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-border)" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Current Project */}
+              <div style={{
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "12px",
+                padding: "12px"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem" }}>
+                    <Cpu size={12} style={{ color: "var(--color-primary)" }} />
+                    <span>Текущий проект (Миссия)</span>
+                  </div>
+                  <span style={{
+                    fontSize: "0.65rem",
+                    color: "var(--color-primary)",
+                    background: "rgba(37, 99, 235, 0.1)",
+                    padding: "1px 4px",
+                    borderRadius: "4px",
+                    fontWeight: 600
+                  }}>
+                    Сборка и код
+                  </span>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: "2px" }}>
+                  Робот «RoboSort-3000»
+                </div>
+                <p style={{ fontSize: "0.7rem", color: "var(--color-text-muted)", margin: 0, lineHeight: "1.3" }}>
+                  Программируем ультразвуковой датчик расстояния и сервопривод для сортировки деталей.
+                </p>
+              </div>
+
+              {/* Row 3: Tutor Feedback Quote */}
+              <div style={{
+                background: "rgba(249, 115, 22, 0.04)",
+                border: "1px dashed rgba(249, 115, 22, 0.3)",
+                borderRadius: "12px",
+                padding: "12px",
+                position: "relative"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-warning-dark)", fontSize: "0.7rem", fontWeight: 600, marginBottom: "4px" }}>
+                  <Smile size={12} />
+                  <span>Отчет наставника (Александр К.)</span>
+                </div>
+                <p style={{ fontSize: "0.75rem", lineHeight: "1.3", fontStyle: "italic", margin: 0, color: "var(--color-text-main)" }}>
+                  «Миша отлично справился с логикой ветвления. Сам доработал алгоритм захвата кубиков, добавив ультразвуковой датчик. Умничка!»
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom Panel: Finance & Button */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
               background: "var(--color-bg)",
               borderRadius: "12px",
-              padding: "16px",
-              fontSize: "var(--font-small)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
+              padding: "12px 16px",
               border: "1px solid var(--color-border)"
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--color-text-muted)" }}>Ученик:</span>
-                <span style={{ fontWeight: 700 }}>Миша Иванов</span>
+              <div>
+                <span style={{ fontSize: "0.65rem", color: "var(--color-text-muted)", display: "block" }}>Баланс абонемента</span>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                  Осталось <span style={{ color: "var(--color-warning-dark)" }}>2 занятия</span>
+                </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--color-text-muted)" }}>Абонемент:</span>
-                <span style={{ fontWeight: 700 }}>4 занятия</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--color-text-muted)" }}>Статус оплаты:</span>
-                <span className="badge badge-green">Оплачено</span>
-              </div>
+              <Button variant="primary-site" style={{ padding: "6px 12px", fontSize: "0.75rem", height: "auto" }}>
+                Продлить
+              </Button>
             </div>
           </div>
         </div>
@@ -561,21 +904,73 @@ export default function LandingPage() {
               <span style={{ fontWeight: 700 }}>6–8 лет</span>
               <span>Робототехника Lego (Старт)</span>
               <span>Вторник / Четверг 17:00</span>
-              <span className="badge badge-amber">Осталось 2 места</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "3px" }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-warning-dark)" }} />
+                    ))}
+                    {[1, 2].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-border)" }} />
+                    ))}
+                  </div>
+                  <span className="badge badge-amber">Осталось 2 места</span>
+                </div>
+              </div>
             </div>
-
+ 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center" }}>
               <span style={{ fontWeight: 700 }}>8–10 лет</span>
               <span>Программирование на Scratch</span>
               <span>Среда / Пятница 18:00</span>
-              <span className="badge badge-green">Места есть</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "3px" }}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "rgb(34, 197, 94)" }} />
+                    ))}
+                    {[1, 2, 3].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-border)" }} />
+                    ))}
+                  </div>
+                  <span className="badge badge-green">Осталось 3 места</span>
+                </div>
+              </div>
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", alignItems: "center" }}>
+ 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center" }}>
               <span style={{ fontWeight: 700 }}>10–14 лет</span>
               <span>Разработка на Python</span>
               <span>Суббота 12:00</span>
-              <span className="badge badge-red">Группа заполнена</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "3px" }}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-danger)" }} />
+                    ))}
+                  </div>
+                  <span className="badge badge-red">Группа заполнена</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", alignItems: "center" }}>
+              <span style={{ fontWeight: 700 }}>9–12 лет</span>
+              <span>Схемотехника и Arduino</span>
+              <span>Суббота 15:00</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "3px" }}>
+                    {[1, 2, 3, 4].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "rgb(34, 197, 94)" }} />
+                    ))}
+                    {[1, 2, 3, 4].map(i => (
+                      <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-border)" }} />
+                    ))}
+                  </div>
+                  <span className="badge badge-green">Осталось 4 места</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -798,6 +1193,61 @@ export default function LandingPage() {
               Оставьте контактные данные. Наш администратор свяжется с вами, чтобы подобрать удобную группу.
             </p>
 
+            {/* Robo-Helper Advisor */}
+            <div style={{
+              display: "flex",
+              gap: "16px",
+              alignItems: "center",
+              marginBottom: "32px",
+              background: "var(--color-bg)",
+              padding: "16px",
+              borderRadius: "12px",
+              border: "1px solid var(--color-border)",
+              position: "relative"
+            }}>
+              {/* Animated Robot SVG */}
+              <div className="robo-float" style={{ flexShrink: 0 }}>
+                <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="12" y="20" width="40" height="32" rx="8" fill="var(--color-primary-soft)" stroke="var(--color-primary)" strokeWidth="3" />
+                  <rect x="20" y="8" width="24" height="12" rx="4" fill="white" stroke="var(--color-primary)" strokeWidth="3" />
+                  <path d="M32 2V8" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
+                  <circle cx="32" cy="2" r="2" fill="var(--color-accent)" />
+                  <circle cx="28" cy="32" r="4" fill="var(--color-primary)" />
+                  <circle cx="36" cy="32" r="4" fill="var(--color-primary)" />
+                  <path d="M26 42C26 42 29 45 32 45C35 45 38 42 38 42" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
+                  <rect x="4" y="28" width="8" height="16" rx="4" fill="var(--color-primary)" />
+                  <rect x="52" y="28" width="8" height="16" rx="4" fill="var(--color-primary)" />
+                </svg>
+              </div>
+              
+              {/* Speech Bubble */}
+              <div style={{
+                position: "relative",
+                background: "white",
+                border: "1px solid var(--color-border)",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                fontSize: "0.85rem",
+                color: "var(--color-text-main)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                flexGrow: 1
+              }}>
+                <div style={{
+                  position: "absolute",
+                  left: "-6px",
+                  top: "50%",
+                  transform: "translateY(-50%) rotate(45deg)",
+                  width: "10px",
+                  height: "10px",
+                  background: "white",
+                  borderLeft: "1px solid var(--color-border)",
+                  borderBottom: "1px solid var(--color-border)"
+                }} />
+                <span style={{ fontWeight: 600, color: "var(--color-primary)", display: "block", marginBottom: "2px", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Робо-помощник:</span>
+                <span style={{ lineHeight: "1.4" }}>{roboAdvice}</span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label className="form-label">Ваше имя *</label>
@@ -808,6 +1258,8 @@ export default function LandingPage() {
                   required 
                   value={parentName}
                   onChange={(e) => setParentName(e.target.value)}
+                  onFocus={() => setRoboAdvice("Напишите ваше имя, чтобы мы знали, как к вам обращаться при звонке!")}
+                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
                 />
               </div>
 
@@ -820,6 +1272,8 @@ export default function LandingPage() {
                   required 
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
+                  onFocus={() => setRoboAdvice("Укажите телефон. Мы отправляем в Telegram/WhatsApp подтверждение записи и схему проезда!")}
+                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
                 />
               </div>
 
@@ -834,6 +1288,8 @@ export default function LandingPage() {
                     max="18"
                     value={childAge}
                     onChange={(e) => setChildAge(e.target.value)}
+                    onFocus={() => setRoboAdvice("Возраст важен! Для ребят 6–9 лет мы рекомендуем Lego, для 8–11 — Scratch, а старше 10 лет — Python или Arduino.")}
+                    onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
                   />
                 </div>
 
@@ -844,6 +1300,8 @@ export default function LandingPage() {
                     style={{ padding: "0 12px" }}
                     value={courseId}
                     onChange={(e) => setCourseId(e.target.value)}
+                    onFocus={() => setRoboAdvice("Выберите стартовое направление. Не волнуйтесь, на пробном занятии наставник поможет скорректировать выбор.")}
+                    onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
                   >
                     <option value="">Выберите курс</option>
                     {coursesList.map((course) => (
@@ -861,6 +1319,8 @@ export default function LandingPage() {
                   placeholder="Любые дополнительные пожелания..." 
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  onFocus={() => setRoboAdvice("Расскажите, увлекался ли ребенок конструированием ранее или имеет ли опыт в Scratch / Python. Это поможет наставнику!")}
+                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
                 />
               </div>
 

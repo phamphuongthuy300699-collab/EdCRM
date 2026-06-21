@@ -16,13 +16,38 @@ export default function CrmStudentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "archived">("all");
 
+  const getInitials = (name: string) => {
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      { bg: "#E0F2FE", text: "#0369A1" }, // Blue
+      { bg: "#DCFCE7", text: "#15803D" }, // Green
+      { bg: "#FEF3C7", text: "#B45309" }, // Yellow/Amber
+      { bg: "#F3E8FF", text: "#6B21A8" }, // Purple
+      { bg: "#FEE2E2", text: "#B91C1C" }, // Red
+      { bg: "#E0F2F1", text: "#00796B" }, // Teal
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
   const initialStudents = [
-    { id: 1, name: "Игорь Петров", age: 8, group: "LEGO Start 1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", paymentStatus: "paid", attendance: "100%", status: "active" },
-    { id: 2, name: "Данил Соловьев", age: 9, group: "LEGO Start 1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", paymentStatus: "paid", attendance: "90%", status: "active" },
-    { id: 3, name: "Алиса Волкова", age: 10, group: "Scratch Basic", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", paymentStatus: "pending", attendance: "95%", status: "active" },
-    { id: 4, name: "Кирилл Семенов", age: 7, group: "LEGO Start 2", parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", paymentStatus: "overdue", attendance: "80%", status: "active" },
-    { id: 5, name: "Даша Смирнова", age: 9, group: "Scratch Basic", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", paymentStatus: "paid", attendance: "100%", status: "active" },
-    { id: 6, name: "Максим Козлов", age: 12, group: "Python Junior", parent: "Алексей К.", phone: "+7 (980) 444-55-66", paymentStatus: "paid", attendance: "85%", status: "paused" }
+    { id: 1, name: "Игорь Петров", age: 8, group: "LEGO Start 1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", paymentStatus: "paid", attendance: "100%", status: "active", level: "Конструктор 2", project: "Робот-сумо" },
+    { id: 2, name: "Данил Соловьев", age: 9, group: "LEGO Start 1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", paymentStatus: "paid", attendance: "90%", status: "active", level: "Конструктор 2", project: "Кран-манипулятор" },
+    { id: 3, name: "Алиса Волкова", age: 10, group: "Scratch Basic", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", paymentStatus: "pending", attendance: "95%", status: "active", level: "Аниматор Scratch", project: "Лабиринт" },
+    { id: 4, name: "Кирилл Семенов", age: 7, group: "LEGO Start 2", parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", paymentStatus: "overdue", attendance: "80%", status: "active", level: "Новичок", project: "Ветряк" },
+    { id: 5, name: "Даша Смирнова", age: 9, group: "Scratch Basic", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", paymentStatus: "paid", attendance: "100%", status: "active", level: "Кодер Scratch", project: "Кликер звезд" },
+    { id: 6, name: "Максим Козлов", age: 12, group: "Python Junior", parent: "Алексей К.", phone: "+7 (980) 444-55-66", paymentStatus: "paid", attendance: "85%", status: "paused", level: "Разработчик", project: "Чат-бот" }
   ];
 
   const [students] = useState(initialStudents);
@@ -154,8 +179,7 @@ export default function CrmStudentsPage() {
                 height: "48px"
               }}>
                 <th style={{ padding: "0 24px" }}>Ученик</th>
-                <th>Возраст</th>
-                <th>Учебная группа</th>
+                <th>Учебная группа / EdTech Прогресс</th>
                 <th>Родитель</th>
                 <th>Телефон</th>
                 <th>Оплата</th>
@@ -168,12 +192,39 @@ export default function CrmStudentsPage() {
               {filteredStudents.map((student) => (
                 <tr key={student.id} style={{
                   borderBottom: "1px solid var(--color-border)",
-                  height: "64px",
+                  height: "72px",
                   transition: "background 0.2s"
                 }} className="table-row">
-                  <td style={{ padding: "0 24px", fontWeight: 700 }}>{student.name}</td>
-                  <td>{student.age} лет</td>
-                  <td>{student.group}</td>
+                  <td style={{ padding: "0 24px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div style={{
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        background: getAvatarColor(student.name).bg,
+                        color: getAvatarColor(student.name).text,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 700,
+                        fontSize: "var(--font-xs)"
+                      }}>
+                        {getInitials(student.name)}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{student.name}</span>
+                        <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{student.age} лет</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{student.group}</span>
+                      <span style={{ fontSize: "11px", color: "var(--color-primary-dark)", fontWeight: 500 }}>
+                        {student.level} · Проект: {student.project}
+                      </span>
+                    </div>
+                  </td>
                   <td>{student.parent}</td>
                   <td>{student.phone}</td>
                   <td>{getPaymentStatusBadge(student.paymentStatus)}</td>
