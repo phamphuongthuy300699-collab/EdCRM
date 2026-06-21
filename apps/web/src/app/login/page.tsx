@@ -40,9 +40,8 @@ export default function LoginPage() {
         throw new Error(error.message || "Неверный логин или пароль");
       }
 
-      // Successful login -> redirect to crm dashboard
-      router.push("/crm");
-      router.refresh();
+      // Successful login -> redirect to crm dashboard with a full reload to ensure cookies are sent
+      window.location.href = "/crm";
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Ошибка авторизации");
