@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
-
+import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import Link from "next/link";
 import { 
   Inbox, 
@@ -18,27 +18,162 @@ import {
 } from "lucide-react";
 
 export default function CrmDashboard() {
-  const stats = [
-    { name: "Новые заявки", value: "8", icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: "+3 новые за сегодня" },
-    { name: "Просроченные счета", value: "12 500 ₽", icon: CreditCard, color: "var(--color-danger)", bg: "var(--color-danger-soft)", desc: "4 неоплаченных счета" },
-    { name: "Занятия сегодня", value: "4", icon: Calendar, color: "var(--color-warning)", bg: "var(--color-warning-soft)", desc: "Ближайшее в 17:00" },
-    { name: "Активные ученики", value: "37", icon: Users, color: "var(--color-success)", bg: "var(--color-success-soft)", desc: "Заполненность групп: 85%" }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState({
+    newLeadsCount: 0,
+    newLeadsToday: 0,
+    overdueAmount: 0,
+    overdueCount: 0,
+    activeGroupsCount: 0,
+    activeStudentsCount: 0,
+    totalCapacity: 0,
+    enrolledCount: 0
+  });
 
-  const recentLeads = [
-    { name: "Анна Петрова", phone: "+7 (905) 555-12-34", child: "Игорь, 8 лет", course: "LEGO Start", date: "Сегодня, 11:32", status: "new" },
-    { name: "Сергей Волков", phone: "+7 (920) 222-33-44", child: "Алиса, 10 лет", course: "Scratch", date: "Сегодня, 09:15", status: "new" },
-    { name: "Ольга Семенова", phone: "+7 (915) 333-55-66", child: "Кирилл, 7 лет", course: "LEGO Start", date: "Вчера, 18:20", status: "contacted" }
-  ];
+  // Lists state with initial mock fallback
+  const [leads, setLeads] = useState<any[]>([
+    { id: "l1", name: "Анна Петрова", phone: "+7 (905) 555-12-34", child: "Игорь, 8 лет", course: "LEGO Start", date: "Сегодня, 11:32", status: "new" },
+    { id: "l2", name: "Сергей Волков", phone: "+7 (920) 222-33-44", child: "Алиса, 10 лет", course: "Scratch", date: "Сегодня, 09:15", status: "new" },
+    { id: "l3", name: "Ольга Семенова", phone: "+7 (915) 333-55-66", child: "Кирилл, 7 лет", course: "LEGO Start", date: "Вчера, 18:20", status: "contacted" }
+  ]);
 
-  const todaysSchedule = [
+  const [schedule, setSchedule] = useState<any[]>([
     { time: "17:00", name: "LEGO Start (6-8 лет)", room: "Каб. 101", teacher: "Алексей Д.", filled: "7/8 мест" },
     { time: "18:30", name: "Scratch (8-11 лет)", room: "Каб. 102", teacher: "Мария С.", filled: "6/8 мест" }
-  ];
+  ]);
 
-  const overdueInvoices = [
-    { student: "Миша Сидоров", parent: "Дмитрий С.", amount: "4 000 ₽", due: "18.06.2026" },
-    { student: "Лера Козлова", parent: "Елена К.", amount: "4 500 ₽", due: "15.06.2026" }
+  const [invoices, setInvoices] = useState<any[]>([
+    { id: "i1", student: "Миша Сидоров", parent: "Дмитрий С.", amount: "4 000 ₽", due: "18.06.2026" },
+    { id: "i2", student: "Лера Козлова", parent: "Елена К.", amount: "4 500 ₽", due: "15.06.2026" }
+  ]);
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        const supabase = createSupabaseBrowserClient();
+
+        // 1. Leads
+        const { data: leadsData } = await supabase
+          .from("leads")
+          .select("id, first_name, phone, child_name, course_id, status, created_at, courses(title)")
+          .order("created_at", { ascending: false });
+
+        // 2. Invoices
+        const { data: invoicesData } = await supabase
+          .from("invoices")
+          .select(`
+            id,
+            title,
+            amount,
+            status,
+            due_date,
+            students (
+              id,
+              full_name,
+              student_guardians (
+                guardians (
+                  full_name
+                )
+              )
+            )
+          `);
+
+        // 3. Students
+        const { data: studentsData } = await supabase
+          .from("students")
+          .select("id, status");
+
+        // 4. Groups & Enrollments
+        const { data: groupsData } = await supabase
+          .from("groups")
+          .select("id, title, capacity, profiles(full_name), courses(title)")
+          .eq("status", "active");
+
+        const { data: enrollmentsData } = await supabase
+          .from("enrollments")
+          .select("id")
+          .eq("status", "active");
+
+        // Calculations
+        const newLeads = leadsData?.filter((l: any) => l.status === "new") || [];
+        const newLeadsToday = leadsData?.filter((l: any) => l.status === "new" && new Date(l.created_at).toDateString() === new Date().toDateString()).length || 0;
+        
+        const overdueInvs = invoicesData?.filter((i: any) => i.status === "overdue") || [];
+        const overdueSum = overdueInvs.reduce((acc: number, curr: any) => acc + parseFloat(curr.amount || 0), 0);
+        
+        const activeStuds = studentsData?.filter((s: any) => s.status === "active") || [];
+        
+        const totalCapacity = groupsData?.reduce((acc: number, curr: any) => acc + (curr.capacity || 8), 0) || 0;
+        const enrolled = enrollmentsData?.length || 0;
+
+        setStatsData({
+          newLeadsCount: newLeads.length,
+          newLeadsToday,
+          overdueAmount: overdueSum,
+          overdueCount: overdueInvs.length,
+          activeGroupsCount: groupsData?.length || 0,
+          activeStudentsCount: activeStuds.length,
+          totalCapacity,
+          enrolledCount: enrolled
+        });
+
+        // Set recent leads if database has any
+        if (leadsData && leadsData.length > 0) {
+          setLeads(leadsData.slice(0, 3).map((l: any) => ({
+            id: l.id,
+            name: l.first_name || "Без имени",
+            phone: l.phone || "",
+            child: l.child_name ? `${l.child_name}` : "Не указан",
+            course: l.courses?.title || "Не указан",
+            date: new Date(l.created_at).toLocaleDateString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+            status: l.status
+          })));
+        }
+
+        // Set overdue invoices list if database has any
+        if (overdueInvs.length > 0) {
+          setInvoices(overdueInvs.slice(0, 3).map((i: any) => {
+            const firstGuardian = i.students?.student_guardians?.[0]?.guardians;
+            return {
+              id: i.id,
+              student: i.students?.full_name || "Неизвестно",
+              parent: firstGuardian?.full_name || "Не указан",
+              amount: `${parseFloat(i.amount).toLocaleString()} ₽`,
+              due: i.due_date ? new Date(i.due_date).toLocaleDateString("ru-RU") : "Не установлен"
+            };
+          }));
+        }
+
+        // Set schedule if database has any
+        if (groupsData && groupsData.length > 0) {
+          setSchedule(groupsData.slice(0, 3).map((g: any, idx: number) => {
+            const times = ["17:00", "18:30", "15:30"];
+            const rooms = ["Каб. 101", "Каб. 102", "Каб. 103"];
+            return {
+              time: times[idx % times.length],
+              name: g.title,
+              room: rooms[idx % rooms.length],
+              teacher: g.profiles?.full_name || "Не назначен",
+              filled: `${enrolled} / ${g.capacity || 8} мест`
+            };
+          }));
+        }
+      } catch (err) {
+        console.error("Error loading dashboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
+
+  const stats = [
+    { name: "Новые заявки", value: String(statsData.newLeadsCount), icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: `+${statsData.newLeadsToday} новые за сегодня` },
+    { name: "Просроченные счета", value: `${statsData.overdueAmount.toLocaleString()} ₽`, icon: CreditCard, color: "var(--color-danger)", bg: "var(--color-danger-soft)", desc: `${statsData.overdueCount} неоплаченных счета` },
+    { name: "Активные группы", value: String(statsData.activeGroupsCount), icon: Calendar, color: "var(--color-warning)", bg: "var(--color-warning-soft)", desc: "Действующие классы" },
+    { name: "Активные ученики", value: String(statsData.activeStudentsCount), icon: Users, color: "var(--color-success)", bg: "var(--color-success-soft)", desc: `Заполненность: ${statsData.totalCapacity > 0 ? Math.round((statsData.enrolledCount / statsData.totalCapacity) * 100) : 0}%` }
   ];
 
   return (
@@ -121,20 +256,20 @@ export default function CrmDashboard() {
           color: "var(--color-text)" 
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
-            <span style={{ color: "var(--color-primary)", fontSize: "1.1rem", fontWeight: 800 }}>8</span>
+            <span style={{ color: "var(--color-primary)", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.newLeadsCount}</span>
             <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>новых заявок в очереди</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
-            <span style={{ color: "var(--color-danger)", fontSize: "1.1rem", fontWeight: 800 }}>2</span>
+            <span style={{ color: "var(--color-danger)", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.overdueCount}</span>
             <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>просроченных счета</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
-            <span style={{ color: "#D97706", fontSize: "1.1rem", fontWeight: 800 }}>1</span>
-            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>группа почти заполнена (7/8)</span>
+            <span style={{ color: "#D97706", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.activeGroupsCount}</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>активных групп</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
-            <span style={{ color: "var(--color-text-muted)", fontSize: "1.1rem", fontWeight: 800 }}>3</span>
-            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>ребёнка пропустили занятия</span>
+            <span style={{ color: "var(--color-success)", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.activeStudentsCount}</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>активных учеников</span>
           </div>
         </div>
       </div>
@@ -155,7 +290,7 @@ export default function CrmDashboard() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {recentLeads.map((lead, idx) => (
+            {leads.map((lead, idx) => (
               <div key={idx} style={{
                 border: "1px solid var(--color-border)",
                 borderRadius: "10px",
@@ -235,13 +370,13 @@ export default function CrmDashboard() {
           <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <h3 style={{ fontSize: "1.125rem", fontFamily: "var(--font-geologica)" }}>Занятия на сегодня</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {todaysSchedule.map((session, idx) => (
+              {schedule.map((session, idx) => (
                 <div key={idx} style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  paddingBottom: idx === todaysSchedule.length - 1 ? 0 : "12px",
-                  borderBottom: idx === todaysSchedule.length - 1 ? "none" : "1px solid var(--color-border)"
+                  paddingBottom: idx === schedule.length - 1 ? 0 : "12px",
+                  borderBottom: idx === schedule.length - 1 ? "none" : "1px solid var(--color-border)"
                 }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -265,13 +400,13 @@ export default function CrmDashboard() {
               <h3 style={{ fontSize: "1.125rem", fontFamily: "var(--font-geologica)" }}>Просроченные оплаты</h3>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {overdueInvoices.map((inv, idx) => (
+              {invoices.map((inv, idx) => (
                 <div key={idx} style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  paddingBottom: idx === overdueInvoices.length - 1 ? 0 : "12px",
-                  borderBottom: idx === overdueInvoices.length - 1 ? "none" : "1px solid var(--color-border)"
+                  paddingBottom: idx === invoices.length - 1 ? 0 : "12px",
+                  borderBottom: idx === invoices.length - 1 ? "none" : "1px solid var(--color-border)"
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "var(--font-small)" }}>{inv.student}</div>

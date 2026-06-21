@@ -11,6 +11,7 @@ export type RoboContext =
   | "lead-form"
   | "thanks"
   | "parent-portal"
+  | "teacher-portal"
   | "crm-empty";
 
 export interface RoboAssistantProps {

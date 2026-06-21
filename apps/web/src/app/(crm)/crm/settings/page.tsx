@@ -77,6 +77,20 @@ export default function CrmSettingsPage() {
             price: parseFloat(c.price_monthly || "0")
           })));
         }
+
+        // Load Teachers
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, full_name");
+
+        if (profilesData && profilesData.length > 0) {
+          setTeachers(profilesData.map((p: any) => ({
+            id: p.id,
+            name: p.full_name || "Без имени",
+            specialty: "Преподаватель",
+            active: true
+          })));
+        }
       } catch (err) {
         console.error("Error loading settings:", err);
       } finally {

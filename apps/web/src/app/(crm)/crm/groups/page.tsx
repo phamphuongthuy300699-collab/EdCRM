@@ -30,7 +30,45 @@ export default function CrmGroupsPage() {
   ];
 
   const [groups, setGroups] = useState<any[]>([]);
+  
+  // Drawer state
+  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+  const [groupStudents, setGroupStudents] = useState<any[]>([]);
+  const [loadingGroupStudents, setLoadingGroupStudents] = useState(false);
+
   const supabase = createSupabaseBrowserClient();
+
+  const handleOpenGroupDrawer = async (group: any) => {
+    setSelectedGroup(group);
+    setGroupStudents([]);
+    
+    if (typeof group.id === "number" || (typeof group.id === "string" && group.id.startsWith("g"))) {
+      setGroupStudents([
+        { id: "s1", full_name: "Игорь Петров" },
+        { id: "s2", full_name: "Данил Соловьев" }
+      ]);
+      return;
+    }
+
+    try {
+      setLoadingGroupStudents(true);
+      const { data: enrolls } = await supabase
+        .from("enrollments")
+        .select(`
+          student_id,
+          students (id, full_name, birth_date)
+        `)
+        .eq("group_id", group.id)
+        .eq("status", "active");
+
+      const list = enrolls?.map((e: any) => e.students).filter(Boolean) || [];
+      setGroupStudents(list);
+    } catch (err) {
+      console.error("Error loading group students:", err);
+    } finally {
+      setLoadingGroupStudents(false);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -302,7 +340,7 @@ export default function CrmGroupsPage() {
             </div>
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <Button variant="secondary-site" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
+              <Button onClick={() => handleOpenGroupDrawer(group)} variant="secondary-site" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
                 Список учеников
               </Button>
               <Button variant="primary-crm" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
@@ -446,6 +484,89 @@ export default function CrmGroupsPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Details Drawer */}
+      {selectedGroup && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: "480px",
+          background: "white",
+          borderLeft: "1px solid var(--color-border)",
+          boxShadow: "-10px 0 30px rgba(15, 23, 42, 0.08)",
+          zIndex: 45,
+          padding: "32px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+          overflowY: "auto"
+        }}>
+          {/* Drawer Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--color-border)", paddingBottom: "20px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>{selectedGroup.title}</h3>
+                <span className={`badge ${selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>
+                  {selectedGroup.status === "active" ? "Активна" : "Черновик"}
+                </span>
+              </div>
+              <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
+                Курс: {selectedGroup.courseName} · Преподаватель: {selectedGroup.teacherName}
+              </p>
+            </div>
+            <button 
+              onClick={() => setSelectedGroup(null)}
+              style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", fontSize: "14px" }}
+            >
+              Закрыть [x]
+            </button>
+          </div>
+
+          {/* Group Details / Students List */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "var(--color-bg)", padding: "16px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Параметры группы</span>
+              <div><strong>Расписание:</strong> {selectedGroup.schedule}</div>
+              <div><strong>Возраст:</strong> {selectedGroup.ageRange}</div>
+              <div><strong>Вместимость:</strong> {selectedGroup.capacity} мест</div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
+              <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Список учеников ({groupStudents.length})</h4>
+              
+              {loadingGroupStudents ? (
+                <div style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>Загрузка списка учеников...</div>
+              ) : groupStudents.length === 0 ? (
+                <div style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>В группе пока нет учеников.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {groupStudents.map((student: any) => (
+                    <div key={student.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px",
+                      background: "var(--color-bg)",
+                      borderRadius: "8px",
+                      border: "1px solid var(--color-border)"
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: "13px" }}>{student.full_name}</div>
+                        {student.birth_date && (
+                          <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                            Дата рождения: {new Date(student.birth_date).toLocaleDateString("ru-RU")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

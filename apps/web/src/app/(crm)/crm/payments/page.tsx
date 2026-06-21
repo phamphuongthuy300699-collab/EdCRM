@@ -49,23 +49,34 @@ export default function CrmPaymentsPage() {
             amount,
             status,
             due_date,
-            students (full_name, id)
+            students (
+              id,
+              full_name,
+              student_guardians (
+                guardians (
+                  full_name
+                )
+              )
+            )
           `)
           .order("due_date", { ascending: false });
 
         if (error) throw error;
 
         if (invoicesData && invoicesData.length > 0) {
-          const formatted = invoicesData.map((inv: any) => ({
-            id: inv.id,
-            studentName: inv.students?.full_name || "Неизвестно",
-            parentName: "Родитель", // Simple placeholder or query guardians
-            groupName: "Курс школы",
-            amount: parseFloat(inv.amount),
-            dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
-            status: inv.status,
-            title: inv.title
-          }));
+          const formatted = invoicesData.map((inv: any) => {
+            const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
+            return {
+              id: inv.id,
+              studentName: inv.students?.full_name || "Неизвестно",
+              parentName: firstGuardian?.full_name || "Не указан",
+              groupName: "Курс школы",
+              amount: parseFloat(inv.amount),
+              dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
+              status: inv.status,
+              title: inv.title
+            };
+          });
 
           setInvoices([...formatted, ...initialInvoices]);
         } else {

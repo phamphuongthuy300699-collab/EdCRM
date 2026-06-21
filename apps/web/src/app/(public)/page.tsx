@@ -29,6 +29,7 @@ export default function LandingPage() {
   // Form State
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
+  const [childName, setChildName] = useState("");
   const [childAge, setChildAge] = useState("");
   const [courseId, setCourseId] = useState("");
   const [message, setMessage] = useState("");
@@ -58,6 +59,7 @@ export default function LandingPage() {
         body: JSON.stringify({
           parentName,
           parentPhone,
+          childName,
           childAge: childAge ? parseInt(childAge, 10) : undefined,
           courseId: courseId || undefined,
           message: message || undefined,
@@ -101,7 +103,7 @@ export default function LandingPage() {
       price: "4 000 ₽ / мес"
     },
     {
-      id: "python-kids",
+      id: "2d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
       title: "Программирование на Python",
       age: "10–14 лет",
       desc: "Освоение профессионального программирования на простых и понятных задачах.",
@@ -111,7 +113,7 @@ export default function LandingPage() {
       price: "4 800 ₽ / мес"
     },
     {
-      id: "arduino-electronics",
+      id: "3d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
       title: "Arduino и схемотехника",
       age: "10–15 лет",
       desc: "Проектирование электронных схем, умных устройств и программирование микроконтроллеров.",
@@ -1297,6 +1299,26 @@ export default function LandingPage() {
                   onChange={(e) => setParentName(e.target.value)}
                   onFocus={() => {
                     setRoboAdvice("Знакомимся 👋 Напишите имя — администратор будет знать, как к вам обращаться.");
+                    setRoboMood("happy");
+                  }}
+                  onBlur={() => {
+                    setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                    setRoboMood("idle");
+                  }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Имя ребенка *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Миша" 
+                  required 
+                  value={childName}
+                  onChange={(e) => setChildName(e.target.value)}
+                  onFocus={() => {
+                    setRoboAdvice("Напишите имя ребенка. Это поможет нам настроить его личный кабинет!");
                     setRoboMood("happy");
                   }}
                   onBlur={() => {

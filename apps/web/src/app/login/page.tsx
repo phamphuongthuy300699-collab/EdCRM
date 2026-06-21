@@ -26,12 +26,21 @@ export default function LoginPage() {
 
       if (isDemoMode) {
         // Симулируем вход для тестирования интерфейса на локалхосте
-        router.push("/crm");
+        const emailLower = email.toLowerCase();
+        if (emailLower.startsWith("admin")) {
+          router.push("/crm");
+        } else if (emailLower.startsWith("teacher")) {
+          router.push("/teacher");
+        } else if (emailLower.startsWith("parent")) {
+          router.push("/parent");
+        } else {
+          router.push("/crm");
+        }
         router.refresh();
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -40,8 +49,43 @@ export default function LoginPage() {
         throw new Error(error.message || "Неверный логин или пароль");
       }
 
-      // Successful login -> redirect to crm dashboard with a full reload to ensure cookies are sent
-      window.location.href = "/crm";
+      const user = data.user;
+
+      // Query membership
+      const { data: membership } = await (supabase.from("org_memberships") as any)
+        .select("role")
+        .eq("user_id", user?.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      // Query guardian
+      const { data: guardianUser } = await (supabase.from("guardian_users") as any)
+        .select("id")
+        .eq("user_id", user?.id)
+        .maybeSingle();
+
+      const role = membership?.role;
+      const isGuardian = !!guardianUser;
+
+      if (role === "owner" || role === "admin" || role === "manager") {
+        window.location.href = "/crm";
+      } else if (role === "teacher") {
+        window.location.href = "/teacher";
+      } else if (isGuardian) {
+        window.location.href = "/parent";
+      } else {
+        // Fallback email checks in case membership or guardian link is not found
+        const emailLower = email.toLowerCase();
+        if (emailLower.startsWith("admin")) {
+          window.location.href = "/crm";
+        } else if (emailLower.startsWith("teacher")) {
+          window.location.href = "/teacher";
+        } else if (emailLower.startsWith("parent")) {
+          window.location.href = "/parent";
+        } else {
+          window.location.href = "/crm";
+        }
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Ошибка авторизации");

@@ -14,7 +14,11 @@ import {
   LogOut, 
   Search, 
   Bell, 
-  User 
+  User,
+  BookOpen,
+  Calendar,
+  ClipboardList,
+  FileText
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -38,6 +42,10 @@ export default function CrmLayout({
     { name: "Ученики", path: "/crm/students", icon: Users },
     { name: "Группы", path: "/crm/groups", icon: GraduationCap },
     { name: "Оплаты", path: "/crm/payments", icon: CreditCard },
+    { name: "Учебные материалы", path: "/crm/materials", icon: BookOpen },
+    { name: "Занятия", path: "/crm/lessons", icon: Calendar },
+    { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },
+    { name: "Скрипты продаж", path: "/crm/scripts", icon: FileText },
     { name: "Настройки", path: "/crm/settings", icon: Settings },
   ];
 
