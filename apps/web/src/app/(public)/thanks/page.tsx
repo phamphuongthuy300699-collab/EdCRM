@@ -34,6 +34,7 @@ export default function ThanksPage() {
           <RoboAssistant
             context="thanks"
             mood="success"
+            size="lg"
             message="Ура! Заявка успешно отправлена. Я передал её администратору на пульт! 🎉"
           />
         </div>

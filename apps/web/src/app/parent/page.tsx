@@ -202,7 +202,7 @@ export default function ParentDashboard() {
 
         {/* Robo assistant alert widget */}
         <div style={{ borderTop: "1px dashed var(--color-border)", paddingTop: "16px" }}>
-          <RoboAssistant context="parent-portal" mood={roboMood as any} message={roboMessage} />
+          <RoboAssistant context="parent-portal" mood={roboMood as any} message={roboMessage} size="md" />
         </div>
       </div>
 

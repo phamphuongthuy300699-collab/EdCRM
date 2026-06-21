@@ -18,4 +18,5 @@ export interface RoboAssistantProps {
   context?: RoboContext;
   message?: string;
   compact?: boolean;
+  size?: "sm" | "md" | "lg";
 }

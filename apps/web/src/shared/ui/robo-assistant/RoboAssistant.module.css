@@ -2,17 +2,18 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  background: var(--color-surface);
+  background: white;
   border: 1px solid var(--color-border);
-  padding: 16px;
-  border-radius: 16px;
+  padding: 20px;
+  border-radius: 20px;
   position: relative;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.03);
   width: 100%;
 }
 
 .roboContainerCompact {
-  padding: 8px 12px;
+  padding: 0;
   gap: 12px;
   background: transparent;
   border: none;
@@ -25,99 +26,196 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Floating animation */
+.roboSVG {
+  display: block;
+  overflow: visible;
+  transition: filter 0.4s ease;
+}
+
+/* Float animation (breathing) */
 .float {
-  animation: floatAnim 3.4s ease-in-out infinite;
+  animation: floatAnim 6s ease-in-out infinite;
 }
 
 @keyframes floatAnim {
-  0% {
+  0%, 100% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-6px);
-  }
-  100% {
-    transform: translateY(0px);
+    transform: translateY(-4px);
   }
 }
 
-/* Breathing body scale animation */
-.bodyPulse {
-  transform-origin: center;
-  animation: breathingAnim 4.8s ease-in-out infinite;
+/* Head breathing scaling */
+.roboHead {
+  transform-origin: 80px 74px;
+  animation: headBreathe 8s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes breathingAnim {
+@keyframes headBreathe {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(0.5px) scale(0.99);
+  }
+}
+
+/* Body minor breathing */
+.roboBody {
+  transform-origin: 80px 127px;
+  animation: bodyBreathe 8s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bodyBreathe {
   0%, 100% {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.02);
+    transform: scale(1.008);
   }
 }
 
-/* Eye Blinking */
+/* Eye Blinking - every 5 seconds */
 .eye {
   transform-origin: center;
-  animation: blinkAnim 4.5s ease-in-out infinite;
+  animation: blinkAnim 5s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes blinkAnim {
-  0%, 96%, 100% {
+  0%, 95%, 100% {
     transform: scaleY(1);
   }
-  98% {
+  97.5% {
     transform: scaleY(0.1);
   }
 }
 
-/* Antenna wiggling */
+/* Antenna slow rotation oscillation */
 .antenna {
-  transform-origin: bottom center;
-  animation: antennaWiggle 3.2s ease-in-out infinite;
+  transform-origin: 80px 38px;
+  animation: antennaOscillate 4s ease-in-out infinite;
 }
 
-@keyframes antennaWiggle {
+@keyframes antennaOscillate {
   0%, 100% {
     transform: rotate(0deg);
   }
   50% {
-    transform: rotate(6deg);
+    transform: rotate(3deg);
   }
 }
 
-/* Antenna light pulse */
+/* Antenna indicator glow */
 .antennaLight {
-  animation: pulseLight 1.8s infinite alternate;
+  animation: lightPulse 3s ease-in-out infinite alternate;
+  transition: fill 0.3s ease;
 }
 
-@keyframes pulseLight {
+@keyframes lightPulse {
   0% {
-    fill: var(--color-accent);
-    filter: drop-shadow(0 0 1px var(--color-accent));
+    opacity: 0.8;
   }
   100% {
-    fill: #ffedd5;
-    filter: drop-shadow(0 0 6px var(--color-accent));
+    opacity: 1;
   }
 }
 
-/* Speech Bubble styling */
+/* Core LED heart pulse */
+.coreLed {
+  transform-origin: 80px 130px;
+  animation: corePulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes corePulse {
+  0% {
+    fill: #38bdf8;
+    filter: drop-shadow(0 0 1px #0284c7);
+  }
+  100% {
+    fill: #60a5fa;
+    filter: drop-shadow(0 0 5px #3b82f6);
+  }
+}
+
+/* Right Arm Waving in Success */
+.waveArm {
+  transform-origin: 120px 115px;
+  animation: armWave 1.4s ease-in-out infinite;
+}
+
+@keyframes armWave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-15deg);
+  }
+}
+
+/* Flying Gears particles for Success */
+.gearParticle {
+  transform-origin: center;
+  opacity: 0;
+  animation: gearFloatUp 2.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+@keyframes gearFloatUp {
+  0% {
+    transform: translateY(20px) scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-35px) scale(0.9) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+/* Interactive Hover Actions */
+.roboContainer:hover {
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 15px 40px rgba(37, 99, 235, 0.06);
+}
+
+.roboContainer:hover .roboSVG {
+  filter: drop-shadow(0 12px 24px rgba(37, 99, 235, 0.12));
+}
+
+.roboContainer:hover .roboHead {
+  /* head tilts slightly to look friendly */
+  transform: rotate(3deg) translateY(-0.5px);
+}
+
+.roboContainer:hover .eye {
+  /* eyes track cursor by shifting to the right */
+  transform: translate(2px, -0.5px);
+}
+
+/* Speech Bubble layout */
 .speechBubble {
   position: relative;
-  background: var(--color-surface-soft);
+  background: var(--color-bg-site);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 12px 16px;
+  border-radius: 16px;
+  padding: 16px 20px;
   font-size: var(--font-small);
   color: var(--color-text);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.01);
   flex-grow: 1;
-  transition: all 0.2s ease;
-  min-height: 52px;
+  transition: all 0.3s ease;
+  min-height: 70px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -130,7 +228,7 @@
   transform: translateY(-50%) rotate(45deg);
   width: 10px;
   height: 10px;
-  background: var(--color-surface-soft);
+  background: var(--color-bg-site);
   border-left: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
 }
@@ -138,47 +236,64 @@
 .speechTitle {
   font-weight: 700;
   color: var(--color-primary);
-  font-size: var(--font-xs);
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 2px;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
 }
 
 .speechText {
-  line-height: 1.4;
+  line-height: 1.5;
+  font-weight: 500;
 }
 
-/* Success bouncy animation */
-.successBounce {
-  animation: successBounceAnim 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) 1;
+/* Interactive Demo Mood Switcher */
+.demoMoodBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 8px;
 }
 
-@keyframes successBounceAnim {
-  0% {
-    transform: translateY(0) scale(1);
-  }
-  30% {
-    transform: translateY(-16px) scale(1.1);
-  }
-  50% {
-    transform: translateY(0) scale(0.9);
-  }
-  70% {
-    transform: translateY(-6px) scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
+.demoMoodBtn {
+  font-size: 10px;
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: white;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* Reduced Motion Settings */
+.demoMoodBtn:hover {
+  background: var(--color-bg-site);
+  color: var(--color-text);
+  border-color: var(--color-primary-soft);
+}
+
+.demoMoodBtnActive {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+  border-color: var(--color-primary);
+}
+
+/* Prefers-reduced-motion compatibility */
 @media (prefers-reduced-motion: reduce) {
   .float,
-  .bodyPulse,
+  .roboHead,
+  .roboBody,
   .eye,
   .antenna,
   .antennaLight,
-  .successBounce {
+  .coreLed,
+  .waveArm,
+  .gearParticle {
     animation: none !important;
+    transform: none !important;
   }
 }

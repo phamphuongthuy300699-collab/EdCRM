@@ -256,7 +256,12 @@ export default function LandingPage() {
               boxShadow: "0 24px 60px rgba(37, 99, 235, 0.08)",
               border: "1px solid var(--color-border)",
               position: "relative",
-              overflow: "hidden"
+              overflow: "hidden",
+              height: "420px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column"
             }}>
               {/* Image Placeholder Backdrop */}
               <div style={{
@@ -265,105 +270,65 @@ export default function LandingPage() {
                 left: 0,
                 width: "100%",
                 height: "100%",
-                backgroundImage: "linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.96)), url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800')",
+                backgroundImage: "linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800')",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
-                opacity: 0.12,
+                opacity: 0.15,
                 zIndex: 0
               }} />
 
-              {/* Interactive Assembly SVG */}
-              <svg width="100%" height="420" viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", display: "block", position: "relative", zIndex: 1 }}>
-                {/* Dashed engineering circles in background of simulation */}
-                <circle cx="200" cy="170" r="110" stroke="rgba(37,99,235,0.06)" strokeWidth="1" />
-                <circle cx="200" cy="170" r="85" stroke="rgba(37,99,235,0.08)" strokeWidth="1" strokeDasharray="4 4" />
-                <circle cx="200" cy="170" r="60" stroke="rgba(37,99,235,0.1)" strokeWidth="1" />
-
-                {/* Grid guidelines */}
-                <line x1="200" y1="0" x2="200" y2="340" stroke="rgba(37,99,235,0.05)" strokeWidth="1" strokeDasharray="3 3" />
-                <line x1="0" y1="170" x2="400" y2="170" stroke="rgba(37,99,235,0.05)" strokeWidth="1" strokeDasharray="3 3" />
-
-                {/* Robot assembly parts */}
-                <g className="robot-assembly-container">
-                  <g className="robot-assembly">
-                    {/* Fixed robot chassis */}
-                    <g className="part-chassis-anim">
-                      <rect x="140" y="130" width="120" height="80" rx="16" fill="#1E293B" stroke="#2563EB" strokeWidth="3" />
-                      <rect x="155" y="145" width="90" height="50" rx="8" fill="#0F172A" />
-                    </g>
-
-                    {/* Left wheel (slides in on hover & entry) */}
-                    <g className="part-wheel-left-anim">
-                      <rect x="106" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
-                      <circle cx="117" cy="170" r="6" fill="#64748B" />
-                      <line x1="108" y1="145" x2="126" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                      <line x1="108" y1="170" x2="126" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                      <line x1="108" y1="195" x2="126" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    </g>
-
-                    {/* Right wheel (slides in on hover & entry) */}
-                    <g className="part-wheel-right-anim">
-                      <rect x="272" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
-                      <circle cx="283" cy="170" r="6" fill="#64748B" />
-                      <line x1="274" y1="145" x2="292" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                      <line x1="274" y1="170" x2="292" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                      <line x1="274" y1="195" x2="292" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    </g>
-
-                    {/* Sensor (slides down on hover & entry) */}
-                    <g className="part-sensor-anim">
-                      <rect x="175" y="90" width="50" height="22" rx="4" fill="#475569" stroke="#94A3B8" strokeWidth="2" />
-                      <circle cx="190" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
-                      <circle cx="190" cy="101" r="2.5" fill="#10B981" />
-                      <circle cx="210" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
-                      <circle cx="210" cy="101" r="2.5" fill="#10B981" />
-                      <line x1="200" y1="112" x2="200" y2="130" stroke="#94A3B8" strokeWidth="2.5" />
-                    </g>
-
-                    {/* Green PCB Controller (slides down on hover & entry) */}
-                    <g className="part-cpu-anim">
-                      <rect x="165" y="150" width="70" height="40" rx="5" fill="#065F46" stroke="#34D399" strokeWidth="2" />
-                      <circle cx="200" cy="170" r="8" fill="#A7F3D0" />
-                      <circle cx="200" cy="170" r="3" fill="#065F46" />
-                      <rect x="175" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
-                      <rect x="217" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
-                    </g>
-
-                    {/* Schematic orange links (appear on hover & entry) */}
-                    <g className="part-lines-anim">
-                      <path d="M128 170h37M235 170h37M200 112v38" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="3 3" />
-                      <circle cx="128" cy="170" r="3" fill="#F59E0B" />
-                      <circle cx="272" cy="170" r="3" fill="#F59E0B" />
-                      <circle cx="200" cy="112" r="3" fill="#F59E0B" />
-                    </g>
-                  </g>
-                </g>
-              </svg>
-
-              {/* Hover Invitation Overlay */}
+              {/* Blueprint pattern overlay */}
               <div style={{
                 position: "absolute",
-                bottom: "12px",
+                top: 0,
                 left: 0,
-                right: 0,
-                textAlign: "center",
-                fontSize: "11px",
-                color: "var(--color-text-muted)",
-                fontWeight: 600,
-                pointerEvents: "none",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em"
-              }}>
-                Наведите курсор для сборки робота ⚙️
+                width: "100%",
+                height: "100%",
+                backgroundImage: "radial-gradient(circle, rgba(37,99,235,0.06) 1px, transparent 1px)",
+                backgroundSize: "20px 20px",
+                zIndex: 1
+              }} />
+
+              {/* Concentric blueprint circles */}
+              <div style={{
+                position: "absolute",
+                width: "300px",
+                height: "300px",
+                borderRadius: "50%",
+                border: "1px dashed rgba(37,99,235,0.08)",
+                zIndex: 1,
+                pointerEvents: "none"
+              }} />
+              <div style={{
+                position: "absolute",
+                width: "200px",
+                height: "200px",
+                borderRadius: "50%",
+                border: "1px solid rgba(37,99,235,0.04)",
+                zIndex: 1,
+                pointerEvents: "none"
+              }} />
+
+              {/* Centered RoboAssistant */}
+              <div style={{ zIndex: 10, position: "relative" }}>
+                <RoboAssistant context="hero" mood="idle" size="lg" />
               </div>
 
-              {/* Mini code float overlay */}
-              <div className="code-overlay">
-                <div style={{ color: "#38bdf8", marginBottom: "4px" }}># Алгоритм обхода препятствий</div>
-                <div>if sensor.distance &lt; 10:</div>
-                <div style={{ paddingLeft: "12px" }}>robot.turn_around()</div>
-                <div>else:</div>
-                <div style={{ paddingLeft: "12px" }}>robot.move_forward()</div>
+              {/* Character label */}
+              <div style={{
+                position: "absolute",
+                bottom: "20px",
+                zIndex: 10,
+                fontSize: "11px",
+                color: "var(--color-primary-dark)",
+                background: "var(--color-primary-soft)",
+                padding: "4px 12px",
+                borderRadius: "20px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em"
+              }}>
+                Робо-наставник Роберт 🤖
               </div>
             </div>
 
@@ -1317,7 +1282,7 @@ export default function LandingPage() {
 
             {/* Robo-Helper Advisor */}
             <div style={{ marginBottom: "32px" }}>
-              <RoboAssistant context="lead-form" mood={roboMood} message={roboAdvice} />
+              <RoboAssistant context="lead-form" mood={roboMood} message={roboAdvice} size="md" />
             </div>
 
             <form onSubmit={handleSubmit}>
