@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
+import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import { 
   Users, 
   Layers, 
@@ -35,6 +36,7 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [roboAdvice, setRoboAdvice] = useState("Я помогу подобрать идеальную группу по возрасту и уровню!");
+  const [roboMood, setRoboMood] = useState<"idle" | "happy" | "thinking" | "success" | "warning" | "sleepy">("idle");
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -92,7 +94,7 @@ export default function LandingPage() {
       id: "1d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
       title: "Scratch и основы программирования",
       age: "7–11 лет",
-      desc: "Создание собственных игр, мультфильмов and интерактивных проектов.",
+      desc: "Создание собственных игр, мультфильмов и интерактивных проектов.",
       mission: "Создать 2D-платформер с физикой прыжков и врагами",
       results: ["своя игра на Scratch", "логические ветвления", "опыт геймдизайна"],
       icon: Gamepad2,
@@ -102,7 +104,7 @@ export default function LandingPage() {
       id: "python-kids",
       title: "Программирование на Python",
       age: "10–14 лет",
-      desc: "Освоение professional программирования на простых и понятных задачах.",
+      desc: "Освоение профессионального программирования на простых и понятных задачах.",
       mission: "Написать ИИ-помощника для Telegram",
       results: ["синтаксис Python", "работа с API", "деплой первого чат-бота"],
       icon: Code,
@@ -121,11 +123,11 @@ export default function LandingPage() {
   ];
 
   const steps = [
-    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах." },
-    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками." },
-    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере." },
-    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде." },
-    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям." }
+    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=200" },
+    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=200" },
+    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200" },
+    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=200" },
+    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=200" }
   ];
 
   const faqItems = [
@@ -256,8 +258,22 @@ export default function LandingPage() {
               position: "relative",
               overflow: "hidden"
             }}>
+              {/* Image Placeholder Backdrop */}
+              <div style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                backgroundImage: "linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.96)), url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800')",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                opacity: 0.12,
+                zIndex: 0
+              }} />
+
               {/* Interactive Assembly SVG */}
-              <svg width="100%" height="420" viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", display: "block" }}>
+              <svg width="100%" height="420" viewBox="0 0 400 340" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", display: "block", position: "relative", zIndex: 1 }}>
                 {/* Dashed engineering circles in background of simulation */}
                 <circle cx="200" cy="170" r="110" stroke="rgba(37,99,235,0.06)" strokeWidth="1" />
                 <circle cx="200" cy="170" r="85" stroke="rgba(37,99,235,0.08)" strokeWidth="1" strokeDasharray="4 4" />
@@ -268,73 +284,58 @@ export default function LandingPage() {
                 <line x1="0" y1="170" x2="400" y2="170" stroke="rgba(37,99,235,0.05)" strokeWidth="1" strokeDasharray="3 3" />
 
                 {/* Robot assembly parts */}
-                <g className="robot-assembly">
-                  {/* Fixed robot chassis */}
-                  <rect x="140" y="130" width="120" height="80" rx="16" fill="#1E293B" stroke="#2563EB" strokeWidth="3" />
-                  <rect x="155" y="145" width="90" height="50" rx="8" fill="#0F172A" />
+                <g className="robot-assembly-container">
+                  <g className="robot-assembly">
+                    {/* Fixed robot chassis */}
+                    <g className="part-chassis-anim">
+                      <rect x="140" y="130" width="120" height="80" rx="16" fill="#1E293B" stroke="#2563EB" strokeWidth="3" />
+                      <rect x="155" y="145" width="90" height="50" rx="8" fill="#0F172A" />
+                    </g>
 
-                  {/* Left wheel (slides in on hover) */}
-                  <g className="part-wheel-left" style={{
-                    transform: "translateX(-40px)",
-                    opacity: 0.4,
-                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}>
-                    <rect x="106" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
-                    <circle cx="117" cy="170" r="6" fill="#64748B" />
-                    <line x1="108" y1="145" x2="126" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    <line x1="108" y1="170" x2="126" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    <line x1="108" y1="195" x2="126" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                  </g>
+                    {/* Left wheel (slides in on hover & entry) */}
+                    <g className="part-wheel-left-anim">
+                      <rect x="106" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
+                      <circle cx="117" cy="170" r="6" fill="#64748B" />
+                      <line x1="108" y1="145" x2="126" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                      <line x1="108" y1="170" x2="126" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                      <line x1="108" y1="195" x2="126" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    </g>
 
-                  {/* Right wheel (slides in on hover) */}
-                  <g className="part-wheel-right" style={{
-                    transform: "translateX(40px)",
-                    opacity: 0.4,
-                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}>
-                    <rect x="272" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
-                    <circle cx="283" cy="170" r="6" fill="#64748B" />
-                    <line x1="274" y1="145" x2="292" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    <line x1="274" y1="170" x2="292" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                    <line x1="274" y1="195" x2="292" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                  </g>
+                    {/* Right wheel (slides in on hover & entry) */}
+                    <g className="part-wheel-right-anim">
+                      <rect x="272" y="135" width="22" height="70" rx="6" fill="#0F172A" stroke="#2563EB" strokeWidth="2.5" />
+                      <circle cx="283" cy="170" r="6" fill="#64748B" />
+                      <line x1="274" y1="145" x2="292" y2="145" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                      <line x1="274" y1="170" x2="292" y2="170" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                      <line x1="274" y1="195" x2="292" y2="195" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+                    </g>
 
-                  {/* Sensor (slides down on hover) */}
-                  <g className="part-sensor" style={{
-                    transform: "translateY(-50px)",
-                    opacity: 0.3,
-                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}>
-                    <rect x="175" y="90" width="50" height="22" rx="4" fill="#475569" stroke="#94A3B8" strokeWidth="2" />
-                    <circle cx="190" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
-                    <circle cx="190" cy="101" r="2.5" fill="#10B981" />
-                    <circle cx="210" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
-                    <circle cx="210" cy="101" r="2.5" fill="#10B981" />
-                    <line x1="200" y1="112" x2="200" y2="130" stroke="#94A3B8" strokeWidth="2.5" />
-                  </g>
+                    {/* Sensor (slides down on hover & entry) */}
+                    <g className="part-sensor-anim">
+                      <rect x="175" y="90" width="50" height="22" rx="4" fill="#475569" stroke="#94A3B8" strokeWidth="2" />
+                      <circle cx="190" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
+                      <circle cx="190" cy="101" r="2.5" fill="#10B981" />
+                      <circle cx="210" cy="101" r="7" fill="#000" stroke="#F59E0B" strokeWidth="1.5" />
+                      <circle cx="210" cy="101" r="2.5" fill="#10B981" />
+                      <line x1="200" y1="112" x2="200" y2="130" stroke="#94A3B8" strokeWidth="2.5" />
+                    </g>
 
-                  {/* Green PCB Controller (slides down on hover) */}
-                  <g className="part-cpu" style={{
-                    transform: "translateY(-30px)",
-                    opacity: 0.3,
-                    transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}>
-                    <rect x="165" y="150" width="70" height="40" rx="5" fill="#065F46" stroke="#34D399" strokeWidth="2" />
-                    <circle cx="200" cy="170" r="8" fill="#A7F3D0" />
-                    <circle cx="200" cy="170" r="3" fill="#065F46" />
-                    <rect x="175" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
-                    <rect x="217" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
-                  </g>
+                    {/* Green PCB Controller (slides down on hover & entry) */}
+                    <g className="part-cpu-anim">
+                      <rect x="165" y="150" width="70" height="40" rx="5" fill="#065F46" stroke="#34D399" strokeWidth="2" />
+                      <circle cx="200" cy="170" r="8" fill="#A7F3D0" />
+                      <circle cx="200" cy="170" r="3" fill="#065F46" />
+                      <rect x="175" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
+                      <rect x="217" y="158" width="8" height="8" rx="1.5" fill="#34D399" />
+                    </g>
 
-                  {/* Schematic orange links (appear on hover) */}
-                  <g className="part-lines" style={{
-                    opacity: 0,
-                    transition: "opacity 0.6s ease"
-                  }}>
-                    <path d="M128 170h37M235 170h37M200 112v38" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <circle cx="128" cy="170" r="3" fill="#F59E0B" />
-                    <circle cx="272" cy="170" r="3" fill="#F59E0B" />
-                    <circle cx="200" cy="112" r="3" fill="#F59E0B" />
+                    {/* Schematic orange links (appear on hover & entry) */}
+                    <g className="part-lines-anim">
+                      <path d="M128 170h37M235 170h37M200 112v38" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="3 3" />
+                      <circle cx="128" cy="170" r="3" fill="#F59E0B" />
+                      <circle cx="272" cy="170" r="3" fill="#F59E0B" />
+                      <circle cx="200" cy="112" r="3" fill="#F59E0B" />
+                    </g>
                   </g>
                 </g>
               </svg>
@@ -355,10 +356,19 @@ export default function LandingPage() {
               }}>
                 Наведите курсор для сборки робота ⚙️
               </div>
+
+              {/* Mini code float overlay */}
+              <div className="code-overlay">
+                <div style={{ color: "#38bdf8", marginBottom: "4px" }}># Алгоритм обхода препятствий</div>
+                <div>if sensor.distance &lt; 10:</div>
+                <div style={{ paddingLeft: "12px" }}>robot.turn_around()</div>
+                <div>else:</div>
+                <div style={{ paddingLeft: "12px" }}>robot.move_forward()</div>
+              </div>
             </div>
 
             {/* Floating Info Card 1 */}
-            <div className="card-site" style={{
+            <div className="card-site floating-card-anim" style={{
               position: "absolute",
               bottom: "40px",
               left: "-32px",
@@ -390,7 +400,7 @@ export default function LandingPage() {
             </div>
 
             {/* Floating Info Card 2 */}
-            <div className="card-site" style={{
+            <div className="card-site floating-card-anim" style={{
               position: "absolute",
               top: "32px",
               right: "-20px",
@@ -410,7 +420,7 @@ export default function LandingPage() {
             </div>
 
             {/* Floating Info Card 3 */}
-            <div className="card-site" style={{
+            <div className="card-site floating-card-anim" style={{
               position: "absolute",
               top: "140px",
               left: "-40px",
@@ -452,6 +462,58 @@ export default function LandingPage() {
           <div style={{ textAlign: "center" }}>
             <h3 style={{ fontSize: "2.5rem", color: "var(--color-primary)", marginBottom: "4px" }}>100% практики</h3>
             <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", fontWeight: 600 }}>Результат на каждом занятии</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.5. ТАК ВЫГЛЯДИТ ЗАНЯТИЕ ВНУТРИ (PHOTO GALLERY) */}
+      <section style={{ padding: "80px 0", background: "white", borderBottom: "1px solid var(--color-border)" }}>
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: "48px" }}>
+            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+              Так выглядит занятие внутри
+            </h2>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+              Каждое занятие — это полноценный цикл разработки от идеи до готового устройства
+            </p>
+          </div>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "24px"
+          }}>
+            {[
+              { title: "Собираем конструкцию", desc: "Конструирование из LEGO Education и Arduino датчиков", img: "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=400" },
+              { title: "Пишем код", desc: "Программирование поведения робота в Scratch или Python", img: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&q=80&w=400" },
+              { title: "Тестируем робота", desc: "Запуск роботов на специальных трассах и полигонах", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=400" },
+              { title: "Показываем результат", desc: "Демонстрация работы готового проекта родителям", img: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=400" }
+            ].map((step, idx) => (
+              <div key={idx} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{
+                  height: "180px",
+                  position: "relative",
+                  background: "var(--color-surface-soft)",
+                  overflow: "hidden"
+                }}>
+                  <img
+                    src={step.img}
+                    alt={step.title}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover"
+                    }}
+                  />
+                  {/* Subtle Blueprint Grid Overlay */}
+                  <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
+                </div>
+                <div style={{ padding: "20px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <h4 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{step.title}</h4>
+                  <p style={{ fontSize: "13px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: 0 }}>{step.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -633,34 +695,48 @@ export default function LandingPage() {
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
-                gap: "16px",
+                gap: "12px",
                 zIndex: 2,
                 background: "white",
-                padding: "20px",
+                padding: "16px",
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 boxShadow: "0 8px 20px rgba(0,0,0,0.02)"
               }}>
                 <div style={{
-                  width: "48px",
-                  height: "48px",
+                  height: "90px",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  position: "relative",
+                  background: "var(--color-surface-soft)"
+                }}>
+                  <img src={step.img} alt={step.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
+                </div>
+                <div style={{
+                  width: "36px",
+                  height: "36px",
                   borderRadius: "50%",
                   background: "var(--color-primary-soft)",
                   color: "var(--color-primary-dark)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "var(--font-body-lg)",
+                  fontSize: "14px",
                   fontWeight: 800,
                   fontFamily: "var(--font-geologica)",
                   border: "2px solid white",
-                  boxShadow: "0 4px 10px rgba(37, 99, 235, 0.15)"
+                  boxShadow: "0 4px 10px rgba(37, 99, 235, 0.1)",
+                  marginTop: "-28px",
+                  marginLeft: "8px",
+                  position: "relative",
+                  zIndex: 5
                 }}>
                   {step.num}
                 </div>
-                <div>
-                  <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--color-text)", marginBottom: "8px" }}>{step.title}</h4>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.5 }}>{step.text}</p>
+                <div style={{ marginTop: "4px" }}>
+                  <h4 style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--color-text)", marginBottom: "6px" }}>{step.title}</h4>
+                  <p style={{ fontSize: "11px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: 0 }}>{step.text}</p>
                 </div>
               </div>
             ))}
@@ -697,6 +773,22 @@ export default function LandingPage() {
                   <h4 style={{ fontWeight: 700, fontSize: "1.05rem" }}>Обратная связь от наставника</h4>
                   <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>После каждого занятия вы знаете о прогрессе вашего ребенка.</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Environment Collage */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "32px" }}>
+              <div style={{ height: "90px", borderRadius: "8px", overflow: "hidden", position: "relative", border: "1px solid var(--color-border)" }}>
+                <img src="https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&q=80&w=200" alt="Кабинет" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ position: "absolute", bottom: "4px", left: "6px", fontSize: "9px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "1px 5px", borderRadius: "4px", fontWeight: 600 }}>Кабинет</div>
+              </div>
+              <div style={{ height: "90px", borderRadius: "8px", overflow: "hidden", position: "relative", border: "1px solid var(--color-border)" }}>
+                <img src="https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=80&w=200" alt="Наборы LEGO" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ position: "absolute", bottom: "4px", left: "6px", fontSize: "9px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "1px 5px", borderRadius: "4px", fontWeight: 600 }}>Наборы LEGO</div>
+              </div>
+              <div style={{ height: "90px", borderRadius: "8px", overflow: "hidden", position: "relative", border: "1px solid var(--color-border)" }}>
+                <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=200" alt="Зона ожидания" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ position: "absolute", bottom: "4px", left: "6px", fontSize: "9px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "1px 5px", borderRadius: "4px", fontWeight: 600 }}>Зона ожидания</div>
               </div>
             </div>
           </div>
@@ -1071,8 +1163,18 @@ export default function LandingPage() {
             gap: "32px"
           }}>
             <div className="card-site" style={{ textAlign: "center" }}>
-              <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: "var(--color-primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
-                <Users size={40} style={{ color: "var(--color-primary)" }} />
+              <div style={{
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                overflow: "hidden",
+                margin: "0 auto 20px auto",
+                border: "3px solid var(--color-primary-soft)",
+                boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                position: "relative"
+              }}>
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200" alt="Алексей Дмитриев" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
               </div>
               <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>Алексей Дмитриев</h4>
               <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>Старший наставник (LEGO & Arduino)</p>
@@ -1082,8 +1184,18 @@ export default function LandingPage() {
             </div>
 
             <div className="card-site" style={{ textAlign: "center" }}>
-              <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: "var(--color-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
-                <Users size={40} style={{ color: "var(--color-accent)" }} />
+              <div style={{
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                overflow: "hidden",
+                margin: "0 auto 20px auto",
+                border: "3px solid var(--color-accent-soft)",
+                boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                position: "relative"
+              }}>
+                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200" alt="Мария Соколова" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
               </div>
               <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>Мария Соколова</h4>
               <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-accent)", fontWeight: 700, marginBottom: "16px" }}>Преподаватель программирования (Scratch)</p>
@@ -1093,8 +1205,18 @@ export default function LandingPage() {
             </div>
 
             <div className="card-site" style={{ textAlign: "center" }}>
-              <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: "var(--color-primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
-                <Users size={40} style={{ color: "var(--color-primary)" }} />
+              <div style={{
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                overflow: "hidden",
+                margin: "0 auto 20px auto",
+                border: "3px solid var(--color-primary-soft)",
+                boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                position: "relative"
+              }}>
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200" alt="Егор Смирнов" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
               </div>
               <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>Егор Смирнов</h4>
               <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>Разработчик на Python / Arduino</p>
@@ -1194,58 +1316,8 @@ export default function LandingPage() {
             </p>
 
             {/* Robo-Helper Advisor */}
-            <div style={{
-              display: "flex",
-              gap: "16px",
-              alignItems: "center",
-              marginBottom: "32px",
-              background: "var(--color-bg)",
-              padding: "16px",
-              borderRadius: "12px",
-              border: "1px solid var(--color-border)",
-              position: "relative"
-            }}>
-              {/* Animated Robot SVG */}
-              <div className="robo-float" style={{ flexShrink: 0 }}>
-                <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="12" y="20" width="40" height="32" rx="8" fill="var(--color-primary-soft)" stroke="var(--color-primary)" strokeWidth="3" />
-                  <rect x="20" y="8" width="24" height="12" rx="4" fill="white" stroke="var(--color-primary)" strokeWidth="3" />
-                  <path d="M32 2V8" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
-                  <circle cx="32" cy="2" r="2" fill="var(--color-accent)" />
-                  <circle cx="28" cy="32" r="4" fill="var(--color-primary)" />
-                  <circle cx="36" cy="32" r="4" fill="var(--color-primary)" />
-                  <path d="M26 42C26 42 29 45 32 45C35 45 38 42 38 42" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" />
-                  <rect x="4" y="28" width="8" height="16" rx="4" fill="var(--color-primary)" />
-                  <rect x="52" y="28" width="8" height="16" rx="4" fill="var(--color-primary)" />
-                </svg>
-              </div>
-              
-              {/* Speech Bubble */}
-              <div style={{
-                position: "relative",
-                background: "white",
-                border: "1px solid var(--color-border)",
-                borderRadius: "12px",
-                padding: "12px 16px",
-                fontSize: "0.85rem",
-                color: "var(--color-text-main)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-                flexGrow: 1
-              }}>
-                <div style={{
-                  position: "absolute",
-                  left: "-6px",
-                  top: "50%",
-                  transform: "translateY(-50%) rotate(45deg)",
-                  width: "10px",
-                  height: "10px",
-                  background: "white",
-                  borderLeft: "1px solid var(--color-border)",
-                  borderBottom: "1px solid var(--color-border)"
-                }} />
-                <span style={{ fontWeight: 600, color: "var(--color-primary)", display: "block", marginBottom: "2px", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Робо-помощник:</span>
-                <span style={{ lineHeight: "1.4" }}>{roboAdvice}</span>
-              </div>
+            <div style={{ marginBottom: "32px" }}>
+              <RoboAssistant context="lead-form" mood={roboMood} message={roboAdvice} />
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -1258,8 +1330,14 @@ export default function LandingPage() {
                   required 
                   value={parentName}
                   onChange={(e) => setParentName(e.target.value)}
-                  onFocus={() => setRoboAdvice("Напишите ваше имя, чтобы мы знали, как к вам обращаться при звонке!")}
-                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
+                  onFocus={() => {
+                    setRoboAdvice("Знакомимся 👋 Напишите имя — администратор будет знать, как к вам обращаться.");
+                    setRoboMood("happy");
+                  }}
+                  onBlur={() => {
+                    setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                    setRoboMood("idle");
+                  }}
                 />
               </div>
 
@@ -1272,8 +1350,14 @@ export default function LandingPage() {
                   required 
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
-                  onFocus={() => setRoboAdvice("Укажите телефон. Мы отправляем в Telegram/WhatsApp подтверждение записи и схему проезда!")}
-                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
+                  onFocus={() => {
+                    setRoboAdvice("Позвоним один раз, чтобы подобрать группу. Без спама.");
+                    setRoboMood("happy");
+                  }}
+                  onBlur={() => {
+                    setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                    setRoboMood("idle");
+                  }}
                 />
               </div>
 
@@ -1288,8 +1372,14 @@ export default function LandingPage() {
                     max="18"
                     value={childAge}
                     onChange={(e) => setChildAge(e.target.value)}
-                    onFocus={() => setRoboAdvice("Возраст важен! Для ребят 6–9 лет мы рекомендуем Lego, для 8–11 — Scratch, а старше 10 лет — Python или Arduino.")}
-                    onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
+                    onFocus={() => {
+                      setRoboAdvice("6–9 лет → LEGO, 7–11 лет → Scratch, 10+ лет → Python / Arduino ⚙️");
+                      setRoboMood("thinking");
+                    }}
+                    onBlur={() => {
+                      setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                      setRoboMood("idle");
+                    }}
                   />
                 </div>
 
@@ -1299,9 +1389,21 @@ export default function LandingPage() {
                     className="form-input" 
                     style={{ padding: "0 12px" }}
                     value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
-                    onFocus={() => setRoboAdvice("Выберите стартовое направление. Не волнуйтесь, на пробном занятии наставник поможет скорректировать выбор.")}
-                    onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
+                    onChange={(e) => {
+                      setCourseId(e.target.value);
+                      if (e.target.value) {
+                        setRoboAdvice("Отличный старт! Прекрасный выбор курса.");
+                        setRoboMood("happy");
+                      }
+                    }}
+                    onFocus={() => {
+                      setRoboAdvice("Выберите стартовое направление. На пробном наставник подскажет точнее.");
+                      setRoboMood("happy");
+                    }}
+                    onBlur={() => {
+                      setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                      setRoboMood("idle");
+                    }}
                   >
                     <option value="">Выберите курс</option>
                     {coursesList.map((course) => (
@@ -1319,8 +1421,14 @@ export default function LandingPage() {
                   placeholder="Любые дополнительные пожелания..." 
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  onFocus={() => setRoboAdvice("Расскажите, увлекался ли ребенок конструированием ранее или имеет ли опыт в Scratch / Python. Это поможет наставнику!")}
-                  onBlur={() => setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!")}
+                  onFocus={() => {
+                    setRoboAdvice("Расскажите о ребенке. Увлекался ли уже роботами или программированием?");
+                    setRoboMood("thinking");
+                  }}
+                  onBlur={() => {
+                    setRoboAdvice("Я помогу подобрать идеальную группу по возрасту и уровню!");
+                    setRoboMood("idle");
+                  }}
                 />
               </div>
 
@@ -1359,21 +1467,57 @@ export default function LandingPage() {
           gap: "80px",
           alignItems: "center"
         }}>
-          {/* Map / Location Placeholders */}
-          <div style={{
-            background: "#E5E7EB",
-            borderRadius: "var(--radius-card-site)",
-            height: "400px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 10px 25px rgba(0,0,0,0.03)",
-            border: "1px solid var(--color-border)"
-          }}>
-            <MapPin size={48} style={{ color: "var(--color-primary)", marginBottom: "12px" }} />
-            <span style={{ fontWeight: 700, color: "var(--color-text)" }}>Интерактивная карта</span>
-            <span style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>г. Липецк, ул. Ленина, д. 10</span>
+          {/* Map & Photos Split */}
+          <div style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
+            {/* Styled Map Preview Card */}
+            <div style={{
+              background: "linear-gradient(to bottom, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.25)), url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=600') center/cover no-repeat",
+              borderRadius: "var(--radius-card-site)",
+              position: "relative",
+              border: "1px solid var(--color-border)",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "250px"
+            }}>
+              {/* Map pin indicator */}
+              <div style={{
+                background: "white",
+                padding: "8px 16px",
+                borderRadius: "20px",
+                border: "2px solid var(--color-primary)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px"
+              }}>
+                <MapPin size={16} style={{ color: "var(--color-primary)" }} />
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text)" }}>ул. Ленина, д. 10</span>
+              </div>
+            </div>
+
+            {/* Photos collage */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <div style={{
+                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=300') center/cover no-repeat",
+                borderRadius: "12px",
+                border: "1px solid var(--color-border)",
+                position: "relative",
+                height: "130px"
+              }}>
+                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Фасад здания</span>
+              </div>
+              <div style={{
+                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=300') center/cover no-repeat",
+                borderRadius: "12px",
+                border: "1px solid var(--color-border)",
+                position: "relative",
+                height: "130px"
+              }}>
+                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Вход в школу</span>
+              </div>
+            </div>
           </div>
 
           {/* Details */}

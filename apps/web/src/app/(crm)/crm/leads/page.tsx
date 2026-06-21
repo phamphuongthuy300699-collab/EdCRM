@@ -106,6 +106,36 @@ export default function CrmLeadsPage() {
     }
   };
 
+  const handleConvertLead = async (leadId: any) => {
+    try {
+      setLoading(true);
+      if (typeof leadId === "number") {
+        setLeads(leads.map(lead => lead.id === leadId ? { ...lead, status: "converted" } : lead));
+        alert("Демонстрационный лид зачислен! (Данные обновлены локально)");
+        return;
+      }
+
+      const res = await fetch("/api/crm/leads/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Не удалось зачислить ученика");
+      }
+
+      alert(`Ученик успешно зачислен!\nСоздан логин для родителя: ${data.parentEmail}\nПароль: demo`);
+      setLeads(leads.map(lead => lead.id === leadId ? { ...lead, status: "converted" } : lead));
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Ошибка зачисления");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredLeads = leads.filter(lead => {
     const matchesTab = activeTab === "all" || lead.status === activeTab;
     const matchesSearch = 
@@ -320,7 +350,7 @@ export default function CrmLeadsPage() {
                     {lead.status === "trial" && (
                       <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                         <button 
-                          onClick={() => handleUpdateStatus(lead.id, "converted")}
+                          onClick={() => handleConvertLead(lead.id)}
                           style={{
                             padding: "6px 12px",
                             borderRadius: "6px",
@@ -334,6 +364,7 @@ export default function CrmLeadsPage() {
                             alignItems: "center",
                             gap: "4px"
                           }}
+                          disabled={loading}
                         >
                           <UserCheck size={12} />
                           Создать ученика

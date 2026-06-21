@@ -270,25 +270,113 @@ a {
   font-size: 11px;
 }
 
-/* Assembly hover animations */
-.hero-visual-card:hover .part-cpu {
-  transform: translateY(0) !important;
-  opacity: 1 !important;
+/* Entry animations for robot assembly */
+@keyframes assemble-chassis {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
-.hero-visual-card:hover .part-wheel-left {
-  transform: translateX(0) !important;
-  opacity: 1 !important;
+@keyframes assemble-wheel-left {
+  from { transform: translateX(-50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
-.hero-visual-card:hover .part-wheel-right {
-  transform: translateX(0) !important;
-  opacity: 1 !important;
+@keyframes assemble-wheel-right {
+  from { transform: translateX(50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
-.hero-visual-card:hover .part-sensor {
-  transform: translateY(0) !important;
-  opacity: 1 !important;
+@keyframes assemble-sensor {
+  from { transform: translateY(-60px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
-.hero-visual-card:hover .part-lines {
-  opacity: 1 !important;
+@keyframes assemble-cpu {
+  from { transform: translateY(-40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes assemble-lines {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes beep-wiggle {
+  0%, 100% { transform: scale(1) rotate(0); }
+  15% { transform: scale(1.05) rotate(-4deg) translateY(-4px); }
+  30% { transform: scale(1.05) rotate(4deg) translateY(-4px); }
+  45% { transform: scale(1.02) rotate(-2deg); }
+  60% { transform: scale(1.02) rotate(2deg); }
+  75% { transform: scale(1); rotate(0); }
+}
+@keyframes fade-in-card {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.part-chassis-anim {
+  opacity: 0;
+  animation: assemble-chassis 0.6s 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.part-wheel-left-anim {
+  opacity: 0;
+  animation: assemble-wheel-left 0.6s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.part-wheel-right-anim {
+  opacity: 0;
+  animation: assemble-wheel-right 0.6s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.part-sensor-anim {
+  opacity: 0;
+  animation: assemble-sensor 0.6s 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.part-cpu-anim {
+  opacity: 0;
+  animation: assemble-cpu 0.6s 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.part-lines-anim {
+  opacity: 0;
+  animation: assemble-lines 0.8s 1.5s ease forwards;
+}
+.robot-assembly-container {
+  transform-origin: center 170px;
+  animation: beep-wiggle 0.7s 2.1s ease-in-out;
+}
+.floating-card-anim {
+  opacity: 0;
+  animation: fade-in-card 0.6s 2.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Hover-wiggle for the robot chassis */
+.hero-visual-card:hover .robot-assembly {
+  animation: beep-wiggle 0.6s ease-in-out infinite alternate;
+}
+
+/* Schematic orange links pulse on hover */
+@keyframes pulse-lines {
+  0%, 100% { stroke: #F59E0B; opacity: 1; }
+  50% { stroke: var(--color-primary); opacity: 0.7; }
+}
+.hero-visual-card:hover .part-lines-anim {
+  animation: pulse-lines 1.2s infinite;
+}
+
+/* Mini code box overlay */
+.code-overlay {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #34D399;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+  z-index: 30;
+}
+.hero-visual-card:hover .code-overlay {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 /* Robo-Helper Float animation */
