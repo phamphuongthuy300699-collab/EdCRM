@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -24,6 +27,12 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^1.6.0",
+    "jsdom": "^24.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@testing-library/react": "^14.2.1",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@playwright/test": "^1.42.1"
   }
 }

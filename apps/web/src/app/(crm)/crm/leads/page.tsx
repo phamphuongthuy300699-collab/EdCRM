@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
+import Link from "next/link";
 import { 
   Inbox, 
   Search, 
@@ -28,10 +29,12 @@ interface Lead {
   childName: string;
   childAge: number | null;
   course: string;
-  courseId?: string;
-  status: string;
+  courseId?: string | null;
+  status: "new" | "contacted" | "trial_scheduled" | "converted" | "lost";
   date: string;
   source: string;
+  convertedStudentId?: string | null;
+  convertedGuardianId?: string | null;
 }
 
 interface Interaction {
@@ -58,7 +61,7 @@ export default function CrmLeadsPage() {
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string>("");
 
-  const initialLeads = [
+  const initialLeads: Lead[] = [
     { id: 1, parentName: "Анна Петрова", phone: "+7 (905) 555-12-34", childName: "Игорь", childAge: 8, course: "Робототехника LEGO", status: "new", date: "20.06.2026", source: "Форма на сайте" },
     { id: 2, parentName: "Сергей Волков", phone: "+7 (920) 222-33-44", childName: "Алиса", childAge: 10, course: "Программирование Scratch", status: "new", date: "20.06.2026", source: "Форма на сайте" },
     { id: 3, parentName: "Ольга Семенова", phone: "+7 (915) 333-55-66", childName: "Кирилл", childAge: 7, course: "Робототехника LEGO", status: "contacted", date: "19.06.2026", source: "Форма на сайте" },
@@ -98,6 +101,10 @@ export default function CrmLeadsPage() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [leadToConvert, setLeadToConvert] = useState<Lead | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+
+  const [convertingLeadId, setConvertingLeadId] = useState<string | number | null>(null);
+  const [updatingLeadId, setUpdatingLeadId] = useState<string | number | null>(null);
+  const [creatingLead, setCreatingLead] = useState(false);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -140,23 +147,30 @@ export default function CrmLeadsPage() {
 
       if (error) throw error;
 
-      if (leadsData && leadsData.length > 0) {
-        const formatted = leadsData.map((l: any) => ({
-          id: l.id,
-          parentName: l.parent_name,
-          phone: l.parent_phone,
-          childName: l.child_name || "",
-          childAge: l.child_age || null,
-          course: l.course_id ? (courseMap.get(l.course_id) || "Робототехника") : "Не выбран",
-          courseId: l.course_id,
-          status: l.status,
-          date: new Date(l.created_at).toLocaleDateString("ru-RU"),
-          source: l.source === "site_form" ? "Форма на сайте" : (l.source === "manual" ? "Вручную" : (l.source || "Другое"))
-        }));
-        // Merge mock data with real data to make page feel full and show real ones at the top
-        setLeads([...formatted, ...initialLeads]);
-      } else {
+      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+      if (isDemoMode) {
         setLeads(initialLeads);
+      } else {
+        if (leadsData && leadsData.length > 0) {
+          const formatted = leadsData.map((l: any) => ({
+            id: l.id,
+            parentName: l.parent_name,
+            phone: l.parent_phone,
+            childName: l.child_name || "",
+            childAge: l.child_age || null,
+            course: l.course_id ? (courseMap.get(l.course_id) || "Робототехника") : "Не выбран",
+            courseId: l.course_id,
+            status: l.status,
+            date: new Date(l.created_at).toLocaleDateString("ru-RU"),
+            source: l.source === "site_form" ? "Форма на сайте" : (l.source === "manual" ? "Вручную" : (l.source || "Другое")),
+            convertedStudentId: l.converted_student_id,
+            convertedGuardianId: l.converted_guardian_id
+          }));
+          setLeads(formatted);
+        } else {
+          setLeads([]);
+        }
       }
     } catch (err) {
       console.error("Error loading leads:", err);
@@ -219,8 +233,10 @@ export default function CrmLeadsPage() {
     }
   };
 
-  const handleUpdateStatus = async (id: any, newStatus: string) => {
+  const handleUpdateStatus = async (id: any, newStatus: "new" | "contacted" | "trial_scheduled" | "converted" | "lost") => {
+    if (updatingLeadId === id || convertingLeadId === id) return;
     try {
+      setUpdatingLeadId(id);
       if (typeof id === "string") {
         const { error } = await (supabase
           .from("leads") as any)
@@ -236,6 +252,8 @@ export default function CrmLeadsPage() {
     } catch (err) {
       console.error("Error updating lead status:", err);
       alert("Не удалось обновить статус заявки");
+    } finally {
+      setUpdatingLeadId(null);
     }
   };
 
@@ -247,10 +265,11 @@ export default function CrmLeadsPage() {
 
   const handleConvertLeadConfirm = async () => {
     if (!leadToConvert) return;
-    try {
-      setLoading(true);
-      const leadId = leadToConvert.id;
+    const leadId = leadToConvert.id;
+    if (convertingLeadId === leadId) return;
 
+    try {
+      setConvertingLeadId(leadId);
       if (typeof leadId === "number") {
         setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status: "converted" } : lead));
         alert("Демонстрационный лид зачислен! (Данные обновлены локально)");
@@ -273,24 +292,43 @@ export default function CrmLeadsPage() {
         throw new Error(data.error || "Не удалось зачислить ученика");
       }
 
-      alert(`Ученик успешно зачислен!\nСоздан логин для родителя: ${data.parentEmail}\nПароль: demo`);
-      setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status: "converted" } : lead));
+      alert(`Ученик успешно зачислен!\nСоздан логин для родителя: ${data.parentEmail || "уже существует"}\nПароль: demo`);
+      
+      setLeads(prev => prev.map(lead => 
+        lead.id === leadId 
+          ? { 
+              ...lead, 
+              status: "converted", 
+              convertedStudentId: data.studentId, 
+              convertedGuardianId: data.guardianId 
+            } 
+          : lead
+      ));
+      
       if (selectedLead && selectedLead.id === leadId) {
-        setSelectedLead(prev => prev ? { ...prev, status: "converted" } : null);
+        setSelectedLead(prev => prev ? { 
+          ...prev, 
+          status: "converted", 
+          convertedStudentId: data.studentId, 
+          convertedGuardianId: data.guardianId 
+        } : null);
       }
+      
       setShowConvertModal(false);
       setLeadToConvert(null);
     } catch (err: any) {
       console.error(err);
       alert(err.message || "Ошибка зачисления");
     } finally {
-      setLoading(false);
+      setConvertingLeadId(null);
     }
   };
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creatingLead) return;
     try {
+      setCreatingLead(true);
       const insertData = {
         organization_id: orgId,
         status: "new",
@@ -306,7 +344,7 @@ export default function CrmLeadsPage() {
       if (error) throw error;
 
       const selCourse = courses.find(c => c.id === newCourseId);
-      const newLeadObj = {
+      const newLeadObj: Lead = {
         id: data.id,
         parentName: data.parent_name,
         phone: data.parent_phone,
@@ -330,6 +368,8 @@ export default function CrmLeadsPage() {
     } catch (err: any) {
       console.error(err);
       alert("Не удалось создать лид: " + err.message);
+    } finally {
+      setCreatingLead(false);
     }
   };
 
@@ -376,7 +416,7 @@ export default function CrmLeadsPage() {
       setSelectedObjectionId("");
 
       // Automatically update lead status based on result
-      let targetStatus = "";
+      let targetStatus: Lead["status"] | "" = "";
       if (intResult === "scheduled_trial") {
         targetStatus = "trial_scheduled";
       } else if (intResult === "rejected") {
@@ -567,7 +607,7 @@ export default function CrmLeadsPage() {
                     <td>{lead.date}</td>
                     <td style={{ color: "var(--color-text-muted)" }}>{lead.source}</td>
                     <td style={{ padding: "0 24px", textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                         <button 
                           onClick={() => setSelectedLead(lead)}
                           style={{
@@ -588,86 +628,103 @@ export default function CrmLeadsPage() {
                           Касание
                         </button>
 
-                        {lead.status === "new" && (
-                          <button 
-                            onClick={() => handleUpdateStatus(lead.id, "contacted")}
+                        {lead.status === "converted" && lead.convertedStudentId ? (
+                          <Link
+                            href={`/crm/students/${lead.convertedStudentId}`}
                             style={{
                               padding: "6px 12px",
                               borderRadius: "6px",
-                              border: "1px solid var(--color-primary)",
-                              background: "white",
-                              color: "var(--color-primary)",
+                              background: "var(--color-primary-soft)",
+                              color: "var(--color-primary-dark)",
                               fontWeight: 700,
                               fontSize: "12px",
-                              cursor: "pointer",
-                              display: "flex",
+                              textDecoration: "none",
+                              display: "inline-flex",
                               alignItems: "center",
-                              gap: "4px"
+                              border: "1px solid transparent"
                             }}
                           >
-                            <PhoneCall size={12} />
-                            Позвонить
-                          </button>
-                        )}
-                        {lead.status === "contacted" && (
-                          <button 
-                            onClick={() => handleUpdateStatus(lead.id, "trial_scheduled")}
-                            style={{
-                              padding: "6px 12px",
-                              borderRadius: "6px",
-                              border: "1px solid #FEF3C7",
-                              background: "#FEF3C7",
-                              color: "#D97706",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <Calendar size={12} />
-                            Пробное
-                          </button>
-                        )}
-                        {lead.status === "trial_scheduled" && (
-                          <button 
-                            onClick={() => handleConvertLead(lead)}
-                            style={{
-                              padding: "6px 12px",
-                              borderRadius: "6px",
-                              border: "none",
-                              background: "var(--color-success)",
-                              color: "white",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            disabled={loading}
-                          >
-                            <UserCheck size={12} />
-                            Зачислить
-                          </button>
-                        )}
-                        {lead.status !== "converted" && lead.status !== "lost" && (
-                          <button 
-                            onClick={() => handleUpdateStatus(lead.id, "lost")}
-                            style={{
-                              padding: "6px 12px",
-                              borderRadius: "6px",
-                              border: "none",
-                              background: "var(--color-danger-soft)",
-                              color: "var(--color-danger)",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                              cursor: "pointer"
-                            }}
-                          >
-                            Отклонить
-                          </button>
+                            Открыть ученика
+                          </Link>
+                        ) : (
+                          <>
+                            {lead.status === "new" && (
+                              <button
+                                onClick={() => handleUpdateStatus(lead.id, "contacted")}
+                                disabled={updatingLeadId === lead.id || convertingLeadId === lead.id}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  border: "1px solid var(--color-border)",
+                                  background: "#f8fafc",
+                                  color: "var(--color-text)",
+                                  fontWeight: 700,
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  opacity: (updatingLeadId === lead.id || convertingLeadId === lead.id) ? 0.6 : 1
+                                }}
+                              >
+                                Позвонить
+                              </button>
+                            )}
+                            {(lead.status === "new" || lead.status === "contacted") && (
+                              <button
+                                onClick={() => handleUpdateStatus(lead.id, "trial_scheduled")}
+                                disabled={updatingLeadId === lead.id || convertingLeadId === lead.id}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  border: "1px solid var(--color-border)",
+                                  background: "#f5f3ff",
+                                  color: "#6d28d9",
+                                  fontWeight: 700,
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  opacity: (updatingLeadId === lead.id || convertingLeadId === lead.id) ? 0.6 : 1
+                                }}
+                              >
+                                Пробное
+                              </button>
+                            )}
+                            {lead.status !== "converted" && (
+                              <button
+                                onClick={() => handleConvertLead(lead)}
+                                disabled={updatingLeadId === lead.id || convertingLeadId === lead.id}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  background: "var(--color-primary)",
+                                  color: "white",
+                                  fontWeight: 700,
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  border: "none",
+                                  opacity: (updatingLeadId === lead.id || convertingLeadId === lead.id) ? 0.6 : 1
+                                }}
+                              >
+                                {convertingLeadId === lead.id ? "Зачисление..." : "Зачислить"}
+                              </button>
+                            )}
+                            {lead.status !== "lost" && (
+                              <button
+                                onClick={() => handleUpdateStatus(lead.id, "lost")}
+                                disabled={updatingLeadId === lead.id || convertingLeadId === lead.id}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "#94a3b8",
+                                  fontWeight: 500,
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  opacity: (updatingLeadId === lead.id || convertingLeadId === lead.id) ? 0.6 : 1
+                                }}
+                              >
+                                Отклонить
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -1045,8 +1102,9 @@ export default function CrmLeadsPage() {
                   variant="primary-crm" 
                   style={{ flex: 1 }}
                   onClick={handleConvertLeadConfirm}
+                  disabled={convertingLeadId === leadToConvert.id}
                 >
-                  Зачислить
+                  {convertingLeadId === leadToConvert.id ? "Зачисление..." : "Зачислить"}
                 </Button>
               </div>
             </div>

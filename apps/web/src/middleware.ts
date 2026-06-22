@@ -46,9 +46,10 @@ export async function middleware(request: NextRequest) {
   const isCrmPath = pathname.startsWith("/crm");
   const isTeacherPath = pathname.startsWith("/teacher");
   const isParentPath = pathname.startsWith("/parent");
+  const isStudentPath = pathname.startsWith("/student");
   const isLoginPath = pathname === "/login";
 
-  if (isCrmPath || isTeacherPath || isParentPath || isLoginPath) {
+  if (isCrmPath || isTeacherPath || isParentPath || isStudentPath || isLoginPath) {
     if (!user) {
       if (isLoginPath) {
         return response;
@@ -72,8 +73,15 @@ export async function middleware(request: NextRequest) {
         .eq("user_id", user.id)
         .maybeSingle();
 
+      // Query student
+      const { data: studentUser } = await (supabase.from("student_users") as any)
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
       const role = membership?.role; // 'owner' | 'admin' | 'manager' | 'teacher'
       const isGuardian = !!guardianUser;
+      const isStudent = !!studentUser;
 
       // Handle login redirection
       if (isLoginPath) {
@@ -81,6 +89,8 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/crm", request.url));
         } else if (role === "teacher") {
           return NextResponse.redirect(new URL("/teacher", request.url));
+        } else if (isStudent) {
+          return NextResponse.redirect(new URL("/student", request.url));
         } else if (isGuardian) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
@@ -95,6 +105,8 @@ export async function middleware(request: NextRequest) {
           return response;
         } else if (role === "teacher") {
           return NextResponse.redirect(new URL("/teacher", request.url));
+        } else if (isStudent) {
+          return NextResponse.redirect(new URL("/student", request.url));
         } else if (isGuardian) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
@@ -109,6 +121,8 @@ export async function middleware(request: NextRequest) {
           return response;
         } else if (role === "owner" || role === "admin" || role === "manager") {
           return NextResponse.redirect(new URL("/crm", request.url));
+        } else if (isStudent) {
+          return NextResponse.redirect(new URL("/student", request.url));
         } else if (isGuardian) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
@@ -124,6 +138,23 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/crm", request.url));
         } else if (role === "teacher") {
           return NextResponse.redirect(new URL("/teacher", request.url));
+        } else if (isStudent) {
+          return NextResponse.redirect(new URL("/student", request.url));
+        } else {
+          return NextResponse.redirect(new URL("/login", request.url));
+        }
+      }
+
+      // Restrict Student paths
+      if (isStudentPath) {
+        if (isStudent) {
+          return response;
+        } else if (role === "owner" || role === "admin" || role === "manager") {
+          return NextResponse.redirect(new URL("/crm", request.url));
+        } else if (role === "teacher") {
+          return NextResponse.redirect(new URL("/teacher", request.url));
+        } else if (isGuardian) {
+          return NextResponse.redirect(new URL("/parent", request.url));
         } else {
           return NextResponse.redirect(new URL("/login", request.url));
         }

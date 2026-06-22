@@ -14,6 +14,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Button } from "@robotics-crm/ui";
+import { useRouter } from "next/navigation";
 
 interface StudentAttendance {
   studentId: string;
@@ -25,6 +26,7 @@ interface StudentAttendance {
 
 export default function TeacherDashboard() {
   const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   
   // States
@@ -35,6 +37,10 @@ export default function TeacherDashboard() {
   const [studentsAttendance, setStudentsAttendance] = useState<StudentAttendance[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
 
+  // Lesson Session States
+  const [session, setSession] = useState<any>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+
   // Fallback demo values
   const demoTeacher = {
     full_name: "Демо Преподаватель",
@@ -42,8 +48,8 @@ export default function TeacherDashboard() {
   };
 
   const demoGroups = [
-    { id: "g1", title: "LEGO Start 1", courseName: "Робототехника (Lego Education)", time: "Вторник / Четверг 17:00" },
-    { id: "g2", title: "Scratch Basic", courseName: "Программирование на Scratch", time: "Суббота 11:00" }
+    { id: "g1", title: "LEGO Start 1", courseName: "Робототехника (Lego Education)", time: "Вторник / Четверг 17:00", organization_id: "7f8d5918-a6fe-4fbe-9b37-236b28ee2e7b", course_id: "4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a" },
+    { id: "g2", title: "Scratch Basic", courseName: "Программирование на Scratch", time: "Суббота 11:00", organization_id: "7f8d5918-a6fe-4fbe-9b37-236b28ee2e7b", course_id: "1d0d97b0-cbe6-444a-a006-2c5e533ebbbd" }
   ];
 
   const demoStudents = [
@@ -57,9 +63,9 @@ export default function TeacherDashboard() {
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
+        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-        if (!user) {
-          // Local fallback
+        if (isDemo) {
           setTeacherProfile(demoTeacher);
           setGroups(demoGroups);
           if (demoGroups.length > 0) {
@@ -69,20 +75,27 @@ export default function TeacherDashboard() {
           return;
         }
 
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
         // Query profile
-        const { data: profile } = await supabase
-          .from("profiles")
+        const { data: profile } = await (supabase
+          .from("profiles") as any)
           .select("*")
           .eq("id", user.id)
           .single();
 
-        setTeacherProfile(profile || demoTeacher);
+        setTeacherProfile(profile || { full_name: "Преподаватель", phone: "" });
 
         // Query groups where teacher_id = user.id
         const { data: groupsData } = await (supabase.from("groups") as any)
           .select(`
             id,
             title,
+            organization_id,
+            course_id,
             courses (title)
           `)
           .eq("teacher_id", user.id);
@@ -92,13 +105,15 @@ export default function TeacherDashboard() {
             id: g.id,
             title: g.title,
             courseName: g.courses?.title || "Робототехника",
-            time: "Пн / Чт 18:00 (демо)"
+            time: "Пн / Чт 18:00",
+            organization_id: g.organization_id,
+            course_id: g.course_id
           }));
           setGroups(formatted);
           setSelectedGroupId(formatted[0].id);
         } else {
-          setGroups(demoGroups);
-          setSelectedGroupId(demoGroups[0].id);
+          setGroups([]);
+          setSelectedGroupId("");
         }
       } catch (err) {
         console.error("Error loading teacher portal data:", err);
@@ -112,6 +127,48 @@ export default function TeacherDashboard() {
 
     loadTeacherData();
   }, []);
+
+  // Fetch lesson session when group or date changes
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setSession(null);
+      return;
+    }
+
+    async function loadSession() {
+      try {
+        setLoadingSession(true);
+        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (isDemo || !user) {
+          setSession({
+            status: "planned",
+            materials_unlocked: false
+          });
+          return;
+        }
+
+        const { data: sess, error } = await (supabase
+          .from("lesson_sessions") as any)
+          .select("*")
+          .eq("group_id", selectedGroupId)
+          .eq("lesson_date", lessonDate)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error loading session:", error);
+        }
+        setSession(sess || null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingSession(false);
+      }
+    }
+
+    loadSession();
+  }, [selectedGroupId, lessonDate]);
 
   // Fetch students and attendance when group or date changes
   useEffect(() => {
@@ -149,14 +206,7 @@ export default function TeacherDashboard() {
         })) || [];
 
         if (studentsList.length === 0) {
-          // If no real students enrolled, use demo ones for presentation liveness
-          const mapped = demoStudents.map(student => ({
-            studentId: student.id,
-            studentName: student.full_name,
-            isPresent: true,
-            comment: ""
-          }));
-          setStudentsAttendance(mapped);
+          setStudentsAttendance([]);
           return;
         }
 
@@ -221,13 +271,9 @@ export default function TeacherDashboard() {
       }
 
       // Fetch organization ID
-      const orgRes = await (supabase.from("organizations") as any)
-        .select("id")
-        .eq("slug", "robotics-lipetsk")
-        .single();
-      
-      if (!orgRes.data) throw new Error("Organization not found");
-      const organizationId = orgRes.data.id;
+      const currentGroup = groups.find(g => g.id === selectedGroupId);
+      if (!currentGroup) throw new Error("Группа не найдена");
+      const organizationId = currentGroup.organization_id;
 
       // Map rows for database insertion
       const rows = studentsAttendance.map(row => ({
@@ -251,6 +297,93 @@ export default function TeacherDashboard() {
       alert("Не удалось сохранить посещаемость: " + err.message);
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleStartLesson = async () => {
+    if (!selectedGroupId) return;
+    try {
+      const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (isDemo || !user) {
+        setSession({
+          status: "live",
+          materials_unlocked: true,
+          started_at: new Date().toISOString()
+        });
+        alert("Урок начат! Допуск к учебным материалам для учеников открыт (Демо-режим).");
+        return;
+      }
+
+      // Real database update or insert
+      const currentGroup = groups.find(g => g.id === selectedGroupId);
+      if (!currentGroup) return;
+
+      const orgId = currentGroup.organization_id;
+      const courseId = currentGroup.course_id || null;
+
+      const sessionData = {
+        organization_id: orgId,
+        group_id: selectedGroupId,
+        course_id: courseId,
+        lesson_date: lessonDate,
+        status: "live" as const,
+        materials_unlocked: true,
+        started_at: new Date().toISOString(),
+        starts_at: new Date().toISOString(),
+        teacher_id: user.id
+      };
+
+      const { data, error } = await (supabase
+        .from("lesson_sessions") as any)
+        .upsert(sessionData, {
+          onConflict: "group_id,lesson_date"
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setSession(data);
+      alert("Урок успешно запущен! Материалы урока разблокированы для учеников на сегодня.");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось запустить урок: " + err.message);
+    }
+  };
+
+  const handleEndLesson = async () => {
+    if (!selectedGroupId || !session) return;
+    try {
+      const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (isDemo || !user) {
+        setSession({
+          ...session,
+          status: "completed",
+          completed_at: new Date().toISOString()
+        });
+        alert("Урок завершен (Демо-режим)!");
+        return;
+      }
+
+      const { data, error } = await (supabase
+        .from("lesson_sessions") as any)
+        .update({
+          status: "completed" as const,
+          completed_at: new Date().toISOString()
+        })
+        .eq("id", session.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setSession(data);
+      alert("Урок успешно завершен!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось завершить урок: " + err.message);
     }
   };
 
@@ -349,6 +482,61 @@ export default function TeacherDashboard() {
               style={{ borderRadius: "8px", height: "40px" }}
             />
           </div>
+
+          {/* Lesson Control Card */}
+          {selectedGroupId && (
+            <div className="card-crm" style={{ background: "white" }}>
+              <h3 style={{ fontSize: "var(--font-small)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <Sparkles size={16} style={{ color: "var(--color-primary)" }} />
+                <span>Управление уроком</span>
+              </h3>
+              
+              {loadingSession ? (
+                <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Загрузка сессии...</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                    Статус:{" "}
+                    {(!session || session.status === "planned") && (
+                      <span className="badge badge-blue">Запланирован</span>
+                    )}
+                    {session?.status === "live" && (
+                      <span className="badge badge-green">Идет урок</span>
+                    )}
+                    {session?.status === "completed" && (
+                      <span className="badge badge-gray">Завершен</span>
+                    )}
+                  </div>
+                  
+                  {(!session || session.status === "planned") && (
+                    <Button 
+                      onClick={handleStartLesson}
+                      variant="primary-crm"
+                      style={{ width: "100%", height: "36px", fontSize: "12px" }}
+                    >
+                      Начать урок 🚀
+                    </Button>
+                  )}
+
+                  {session?.status === "live" && (
+                    <Button 
+                      onClick={handleEndLesson}
+                      variant="secondary-site"
+                      style={{ width: "100%", height: "36px", fontSize: "12px", border: "1px solid var(--color-danger)", color: "var(--color-danger)" }}
+                    >
+                      Завершить урок 🏁
+                    </Button>
+                  )}
+
+                  {session?.status === "completed" && (
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontStyle: "italic" }}>
+                      Материалы закрыты для редактирования, занятие окончено.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Attendance Marks & Review Journal */}

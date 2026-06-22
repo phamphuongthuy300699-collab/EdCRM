@@ -163,10 +163,12 @@ export default function ParentDashboard() {
   }
 
   // Determine whether we display real DB kids or fallback demo
+  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const hasRealData = childrenList.length > 0;
+  const showDemoData = isDemoMode && !hasRealData;
   
   // Robo message based on state
-  const isBalanceLow = hasRealData 
+  const isBalanceLow = !showDemoData 
     ? false // Real db balance checks can be added
     : demoData.remainingClasses <= 2;
 
@@ -207,7 +209,7 @@ export default function ParentDashboard() {
       </div>
 
       {/* Real / Mock Student Display Grid */}
-      {!hasRealData ? (
+      {showDemoData ? (
         // Demo dashboard render
         <div style={{
           display: "grid",
@@ -413,6 +415,12 @@ export default function ParentDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      ) : childrenList.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "64px 0", background: "white", borderRadius: "14px", border: "1px solid var(--color-border)", width: "100%" }}>
+          <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)", margin: 0 }}>
+            К вашему аккаунту не привязано ни одного ученика. Пожалуйста, обратитесь к администратору.
+          </p>
         </div>
       ) : (
         // Real DB children list render

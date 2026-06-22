@@ -15,10 +15,11 @@ export default function CrmPaymentsPage() {
   const [newStudentId, setNewStudentId] = useState("");
   const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
   const [newAmount, setNewAmount] = useState("4500");
-  const [newDueDate, setNewDueDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+  const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
 
   const [students, setStudents] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const supabase = createSupabaseBrowserClient();
 
   const initialInvoices = [
@@ -63,24 +64,29 @@ export default function CrmPaymentsPage() {
 
         if (error) throw error;
 
-        if (invoicesData && invoicesData.length > 0) {
-          const formatted = invoicesData.map((inv: any) => {
-            const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
-            return {
-              id: inv.id,
-              studentName: inv.students?.full_name || "Неизвестно",
-              parentName: firstGuardian?.full_name || "Не указан",
-              groupName: "Курс школы",
-              amount: parseFloat(inv.amount),
-              dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
-              status: inv.status,
-              title: inv.title
-            };
-          });
+        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-          setInvoices([...formatted, ...initialInvoices]);
-        } else {
+        if (isDemoMode) {
           setInvoices(initialInvoices);
+        } else {
+          if (invoicesData && invoicesData.length > 0) {
+            const formatted = invoicesData.map((inv: any) => {
+              const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
+              return {
+                id: inv.id,
+                studentName: inv.students?.full_name || "Неизвестно",
+                parentName: firstGuardian?.full_name || "Не указан",
+                groupName: "Курс школы",
+                amount: parseFloat(inv.amount),
+                dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
+                status: inv.status,
+                title: inv.title
+              };
+            });
+            setInvoices(formatted);
+          } else {
+            setInvoices([]);
+          }
         }
       } catch (err) {
         console.error("Error loading payments:", err);
@@ -123,20 +129,60 @@ export default function CrmPaymentsPage() {
   };
 
   const handleMarkAsPaid = async (id: any) => {
+    if (payingInvoiceId) return;
     try {
-      if (typeof id === "string") {
-        const { error } = await (supabase.from("invoices") as any)
-          .update({ status: "paid", paid_at: new Date().toISOString() })
-          .eq("id", id);
-        
-        if (error) throw error;
+      setPayingInvoiceId(id);
+
+      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const isMockId = typeof id === "string" && (id.startsWith("i") || id.startsWith("mock-"));
+
+      if (isDemoMode || isMockId) {
+        setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
+        alert("Счет успешно отмечен как оплаченный! (Демо-режим)");
+        return;
       }
+
+      // Fetch invoice details
+      const { data: inv, error: fetchErr } = await (supabase
+        .from("invoices") as any)
+        .select("student_id, amount, organization_id")
+        .eq("id", id)
+        .single();
+
+      if (fetchErr || !inv) {
+        throw new Error("Счет не найден в базе данных");
+      }
+
+      // Create payment transaction
+      const { error: paymentErr } = await (supabase
+        .from("payments") as any)
+        .insert({
+          organization_id: inv.organization_id,
+          student_id: inv.student_id,
+          invoice_id: id,
+          amount: parseFloat(inv.amount),
+          payment_method: "cash",
+          status: "completed",
+          paid_at: new Date().toISOString()
+        });
+
+      if (paymentErr) throw paymentErr;
+
+      // Update invoice status
+      const { error } = await (supabase
+        .from("invoices") as any)
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", id);
+      
+      if (error) throw error;
 
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
       alert("Счет успешно отмечен как оплаченный!");
     } catch (err: any) {
       console.error(err);
       alert("Не удалось изменить статус оплаты: " + err.message);
+    } finally {
+      setPayingInvoiceId(null);
     }
   };
 
@@ -311,6 +357,7 @@ export default function CrmPaymentsPage() {
                   {inv.status !== "paid" ? (
                     <button 
                       onClick={() => handleMarkAsPaid(inv.id)}
+                      disabled={payingInvoiceId === inv.id}
                       style={{
                         padding: "6px 12px",
                         borderRadius: "6px",
@@ -319,10 +366,11 @@ export default function CrmPaymentsPage() {
                         color: "var(--color-success)",
                         fontWeight: 700,
                         fontSize: "12px",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        opacity: payingInvoiceId === inv.id ? 0.6 : 1
                       }}
                     >
-                      Отметить оплаченным
+                      {payingInvoiceId === inv.id ? "Обработка..." : "Отметить оплаченным"}
                     </button>
                   ) : (
                     <span style={{ color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 600 }}>Проведено</span>

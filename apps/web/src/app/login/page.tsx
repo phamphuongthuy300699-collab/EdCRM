@@ -31,6 +31,8 @@ export default function LoginPage() {
           router.push("/crm");
         } else if (emailLower.startsWith("teacher")) {
           router.push("/teacher");
+        } else if (emailLower.startsWith("student")) {
+          router.push("/student");
         } else if (emailLower.startsWith("parent")) {
           router.push("/parent");
         } else {
@@ -64,13 +66,22 @@ export default function LoginPage() {
         .eq("user_id", user?.id)
         .maybeSingle();
 
+      // Query student
+      const { data: studentUser } = await (supabase.from("student_users") as any)
+        .select("id")
+        .eq("user_id", user?.id)
+        .maybeSingle();
+
       const role = membership?.role;
       const isGuardian = !!guardianUser;
+      const isStudent = !!studentUser;
 
       if (role === "owner" || role === "admin" || role === "manager") {
         window.location.href = "/crm";
       } else if (role === "teacher") {
         window.location.href = "/teacher";
+      } else if (isStudent) {
+        window.location.href = "/student";
       } else if (isGuardian) {
         window.location.href = "/parent";
       } else {
@@ -80,6 +91,8 @@ export default function LoginPage() {
           window.location.href = "/crm";
         } else if (emailLower.startsWith("teacher")) {
           window.location.href = "/teacher";
+        } else if (emailLower.startsWith("student")) {
+          window.location.href = "/student";
         } else if (emailLower.startsWith("parent")) {
           window.location.href = "/parent";
         } else {

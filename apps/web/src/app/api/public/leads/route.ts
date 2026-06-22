@@ -17,6 +17,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (isDemoMode) {
+      console.log("Demo Mode: lead submission received:", body);
+      return NextResponse.json({ ok: true });
+    }
+
     const supabase = createSupabaseAdminClient();
 
     const { data: org, error: orgError } = await supabase

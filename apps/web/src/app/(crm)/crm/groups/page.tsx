@@ -114,22 +114,27 @@ export default function CrmGroupsPage() {
           enrollCountMap.set(e.group_id, (enrollCountMap.get(e.group_id) || 0) + 1);
         });
 
-        if (groupsData && groupsData.length > 0) {
-          const formatted = groupsData.map((g: any) => ({
-            id: g.id,
-            title: g.title,
-            courseName: g.courses?.title || "Не указан",
-            schedule: "Пн / Чт 18:00 (демо)", // fallback schedule
-            teacherName: g.profiles?.full_name || "Не назначен",
-            ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
-            capacity: g.capacity || 8,
-            enrolled: enrollCountMap.get(g.id) || 0,
-            status: g.status
-          }));
-          
-          setGroups([...formatted, ...initialGroups]);
-        } else {
+        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+        if (isDemoMode) {
           setGroups(initialGroups);
+        } else {
+          if (groupsData && groupsData.length > 0) {
+            const formatted = groupsData.map((g: any) => ({
+              id: g.id,
+              title: g.title,
+              courseName: g.courses?.title || "Не указан",
+              schedule: "Пн / Чт 18:00 (демо)", // fallback schedule
+              teacherName: g.profiles?.full_name || "Не назначен",
+              ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
+              capacity: g.capacity || 8,
+              enrolled: enrollCountMap.get(g.id) || 0,
+              status: g.status
+            }));
+            setGroups(formatted);
+          } else {
+            setGroups([]);
+          }
         }
       } catch (err) {
         console.error("Error loading groups:", err);
@@ -141,6 +146,19 @@ export default function CrmGroupsPage() {
 
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && groups.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const openId = params.get("open");
+      if (openId) {
+        const found = groups.find(g => g.id === openId);
+        if (found) {
+          handleOpenGroupDrawer(found);
+        }
+      }
+    }
+  }, [groups]);
 
   const getCapacityBar = (enrolled: number, capacity: number) => {
     const percentage = Math.min(100, Math.round((enrolled / capacity) * 100));

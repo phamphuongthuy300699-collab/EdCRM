@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     const supabase = createSupabaseAdminClient();
 
-    // 1. Fetch the lead
+    // 1. Fetch the lead to get parent info for Auth User provisioning
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .select("*")
@@ -29,84 +29,41 @@ export async function POST(request: Request) {
       );
     }
 
-    if (lead.status === "converted") {
+    // 2. Call the transactional RPC to convert the lead safely
+    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+      "convert_lead_to_student",
+      { p_lead_id: leadId, p_group_id: groupId || null }
+    );
+
+    if (rpcError || !rpcResult) {
+      console.error("RPC convert_lead_to_student error:", rpcError);
       return NextResponse.json(
-        { ok: false, error: "Заявка уже переведена в статус ученика" },
-        { status: 400 }
-      );
-    }
-
-    // 2. Create the guardian (parent)
-    const guardianData = {
-      organization_id: lead.organization_id,
-      full_name: lead.parent_name,
-      phone: lead.parent_phone,
-      email: lead.parent_email || null,
-      notes: `Создан из заявки. Комментарий: ${lead.message || "нет"}`
-    };
-
-    const { data: guardian, error: guardianError } = await supabase
-      .from("guardians")
-      .insert(guardianData)
-      .select("id")
-      .single();
-
-    if (guardianError || !guardian) {
-      console.error("Create guardian error:", guardianError);
-      return NextResponse.json(
-        { ok: false, error: "Не удалось создать карточку родителя" },
+        { ok: false, error: rpcError?.message || "Не удалось конвертировать лида" },
         { status: 500 }
       );
     }
 
-    // 3. Create the student
-    const studentData = {
-      organization_id: lead.organization_id,
-      full_name: lead.child_name || `${lead.parent_name} (Ребенок)`,
-      notes: `Создан автоматически из заявки. Возраст: ${lead.child_age || "не указан"}`,
-      status: "active" as const
-    };
-
-    const { data: student, error: studentError } = await supabase
-      .from("students")
-      .insert(studentData)
-      .select("id")
-      .single();
-
-    if (studentError || !student) {
-      console.error("Create student error:", studentError);
-      // Clean up guardian
-      await supabase.from("guardians").delete().eq("id", guardian.id);
+    const result = rpcResult as any;
+    if (!result.ok) {
       return NextResponse.json(
-        { ok: false, error: "Не удалось создать карточку ученика" },
+        { ok: false, error: "Не удалось выполнить конвертацию лида" },
         { status: 500 }
       );
     }
 
-    // 4. Link student and guardian
-    const { error: linkError } = await supabase
-      .from("student_guardians")
-      .insert({
-        organization_id: lead.organization_id,
-        student_id: student.id,
-        guardian_id: guardian.id,
-        is_primary: true,
-        relation: "Родитель"
+    const { studentId, guardianId, alreadyConverted } = result;
+
+    // 3. If already converted, return immediately
+    if (alreadyConverted) {
+      return NextResponse.json({
+        ok: true,
+        studentId,
+        guardianId,
+        alreadyConverted: true
       });
-
-    if (linkError) {
-      console.error("Link guardian student error:", linkError);
-      // Clean up both
-      await supabase.from("students").delete().eq("id", student.id);
-      await supabase.from("guardians").delete().eq("id", guardian.id);
-      return NextResponse.json(
-        { ok: false, error: "Не удалось связать ученика с родителем" },
-        { status: 500 }
-      );
     }
 
-    // 5. Create Auth user for parent (for parent portal)
-    // We construct a unique email if not provided
+    // 4. Create Auth user for parent (for parent portal) if not already created
     const cleanPhone = lead.parent_phone.replace(/\D/g, "");
     const parentEmail = lead.parent_email || `parent-${cleanPhone || leadId.slice(0, 8)}@robotics-crm.ru`;
     
@@ -117,77 +74,40 @@ export async function POST(request: Request) {
       email_confirm: true
     });
 
+    let parentUserId: string | null = null;
+
     if (authError) {
-      // If user already exists in auth.users, try to get existing ID
       if (authError.message && authError.message.includes("already registered")) {
-        console.log("Auth user already exists. Linking existing auth user...");
+        console.log("Auth user already registered. Linking existing auth user...");
         const { data: listUsers } = await supabase.auth.admin.listUsers();
         const existing = listUsers?.users.find(u => u.email === parentEmail);
         if (existing) {
-          await supabase
-            .from("guardians")
-            .update({ user_id: existing.id })
-            .eq("id", guardian.id);
+          parentUserId = existing.id;
         }
       } else {
         console.error("Auth user creation failed (non-blocking for conversion):", authError);
       }
     } else if (authUser?.user) {
-      // Link user_id to guardian
-      await supabase
-        .from("guardians")
-        .update({ user_id: authUser.user.id })
-        .eq("id", guardian.id);
-      console.log("Auth user linked to guardian.");
+      parentUserId = authUser.user.id;
     }
 
-    // 6. Enroll student in group if groupId provided
-    let finalGroupId = groupId;
-    if (!finalGroupId) {
-      // Fallback: try to find a group that corresponds to the course
-      const { data: groups } = await supabase
-        .from("groups")
-        .select("id")
-        .eq("course_id", lead.course_id || "")
-        .eq("status", "active")
-        .limit(1);
-      
-      if (groups && groups.length > 0) {
-        finalGroupId = groups[0].id;
-      }
-    }
-
-    if (finalGroupId) {
-      console.log("Enrolling student in group:", finalGroupId);
+    // 5. Link parent user to guardian in guardian_users
+    if (parentUserId) {
       await supabase
-        .from("enrollments")
+        .from("guardian_users")
         .insert({
           organization_id: lead.organization_id,
-          student_id: student.id,
-          group_id: finalGroupId,
-          status: "active",
-          started_on: new Date().toISOString().split("T")[0]
+          guardian_id: guardianId,
+          user_id: parentUserId
         });
-    }
-
-    // 7. Update lead status
-    const { error: updateLeadError } = await supabase
-      .from("leads")
-      .update({
-        status: "converted",
-        converted_student_id: student.id,
-        converted_guardian_id: guardian.id
-      })
-      .eq("id", leadId);
-
-    if (updateLeadError) {
-      console.error("Update lead converted error:", updateLeadError);
+      console.log("Linked auth user to guardian in guardian_users.");
     }
 
     return NextResponse.json({
       ok: true,
-      studentId: student.id,
-      guardianId: guardian.id,
+      studentId,
+      guardianId,
+      alreadyConverted: false,
       parentEmail
     });
   } catch (err: any) {

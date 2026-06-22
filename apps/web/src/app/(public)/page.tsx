@@ -49,6 +49,7 @@ export default function LandingPage() {
   // Submit Lead
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setErrorMsg("");
 

@@ -139,51 +139,56 @@ export default function CrmStudentsPage() {
           .select("student_id, is_present")
           .eq("organization_id", orgRes.data.id);
 
-        if (studentsData && studentsData.length > 0) {
-          const formatted = studentsData.map((s: any) => {
-            // Find active enrollments
-            const activeEnroll = s.enrollments?.find((e: any) => e.groups) || null;
-            const groupTitle = activeEnroll ? activeEnroll.groups.title : "Без группы";
-            const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
+        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-            // Find primary guardian
-            const parentLink = s.student_guardians?.[0]?.guardians || null;
-            const parentName = parentLink ? parentLink.full_name : "Не указан";
-            const parentPhone = parentLink ? parentLink.phone : "—";
-
-            // Calculate attendance rate
-            const sAtt = attendanceData?.filter((a: any) => a.student_id === s.id) || [];
-            const totalAtt = sAtt.length;
-            const presentAtt = sAtt.filter((a: any) => a.is_present).length;
-            const attVal = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100;
-
-            // Age calculation
-            let ageNum = 8;
-            if (s.birth_date) {
-              const diffMs = Date.now() - new Date(s.birth_date).getTime();
-              ageNum = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
-            }
-
-            return {
-              id: s.id,
-              name: s.full_name,
-              age: ageNum,
-              group: groupTitle,
-              parent: parentName,
-              phone: parentPhone,
-              paymentStatus: "paid" as const,
-              attendance: `${attVal}%`,
-              attendanceValue: attVal,
-              status: s.status,
-              level: courseTitle === "LEGO Start" ? "Конструктор" : "Программист",
-              project: s.notes || "Первый проект",
-              homeworkProgress: attVal > 80 ? 90 : 70
-            };
-          });
-
-          setStudents([...formatted, ...initialLeadsAsStudents(initialStudents, formatted)]);
-        } else {
+        if (isDemoMode) {
           setStudents(initialStudents);
+        } else {
+          if (studentsData && studentsData.length > 0) {
+            const formatted = studentsData.map((s: any) => {
+              // Find active enrollments
+              const activeEnroll = s.enrollments?.find((e: any) => e.groups) || null;
+              const groupTitle = activeEnroll ? activeEnroll.groups.title : "Без группы";
+              const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
+
+              // Find primary guardian
+              const parentLink = s.student_guardians?.[0]?.guardians || null;
+              const parentName = parentLink ? parentLink.full_name : "Не указан";
+              const parentPhone = parentLink ? parentLink.phone : "—";
+
+              // Calculate attendance rate
+              const sAtt = attendanceData?.filter((a: any) => a.student_id === s.id) || [];
+              const totalAtt = sAtt.length;
+              const presentAtt = sAtt.filter((a: any) => a.is_present).length;
+              const attVal = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100;
+
+              // Age calculation
+              let ageNum = 8;
+              if (s.birth_date) {
+                const diffMs = Date.now() - new Date(s.birth_date).getTime();
+                ageNum = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
+              }
+
+              return {
+                id: s.id,
+                name: s.full_name,
+                age: ageNum,
+                group: groupTitle,
+                parent: parentName,
+                phone: parentPhone,
+                paymentStatus: "paid" as const,
+                attendance: `${attVal}%`,
+                attendanceValue: attVal,
+                status: s.status,
+                level: courseTitle === "LEGO Start" ? "Конструктор" : "Программист",
+                project: s.notes || "Первый проект",
+                homeworkProgress: attVal > 80 ? 90 : 70
+              };
+            });
+            setStudents(formatted);
+          } else {
+            setStudents([]);
+          }
         }
       } catch (err) {
         console.error("Error loading students list:", err);
