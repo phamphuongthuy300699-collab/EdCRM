@@ -577,7 +577,7 @@ export default function ScriptsPage() {
         }}>
           <div className="card-crm" style={{ width: "100%", maxWidth: "600px", padding: "32px", background: "white", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>
-              Добавить скрипт звонка
+              {editingScriptId ? "Редактировать скрипт звонка" : "Добавить скрипт звонка"}
             </h3>
             <form onSubmit={handleCreateScript} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group">
@@ -666,7 +666,7 @@ export default function ScriptsPage() {
         }}>
           <div className="card-crm" style={{ width: "100%", maxWidth: "500px", padding: "32px", background: "white" }}>
             <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>
-              Добавить возражение
+              {editingObjectionId ? "Редактировать возражение" : "Добавить возражение"}
             </h3>
             <form onSubmit={handleCreateObjection} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group">
