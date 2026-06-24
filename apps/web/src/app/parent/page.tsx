@@ -472,11 +472,19 @@ export default function ParentDashboard() {
                   </div>
 
                   <Button 
-                    onClick={handleRequestPaymentLink}
+                    onClick={(isDemoMode() && process.env.NODE_ENV !== "production") ? handleRequestPaymentLink : undefined}
+                    disabled={!(isDemoMode() && process.env.NODE_ENV !== "production")}
                     variant="primary-site" 
-                    style={{ background: "var(--color-accent)", width: "100%", height: "40px", fontSize: "13px", marginTop: "8px" }}
+                    style={{ 
+                      background: (isDemoMode() && process.env.NODE_ENV !== "production") ? "var(--color-accent)" : "var(--color-text-muted)", 
+                      cursor: (isDemoMode() && process.env.NODE_ENV !== "production") ? "pointer" : "not-allowed",
+                      width: "100%", 
+                      height: "40px", 
+                      fontSize: "13px", 
+                      marginTop: "8px" 
+                    }}
                   >
-                    Запросить ссылку на оплату
+                    {(isDemoMode() && process.env.NODE_ENV !== "production") ? "Запросить ссылку на оплату" : "Оплата будет подключена после выдачи ключей"}
                   </Button>
                 </div>
               </div>
@@ -647,19 +655,19 @@ export default function ParentDashboard() {
 
                             {inv.status !== "paid" && (
                               <Button 
-                                onClick={isDemo ? handleRequestPaymentLink : undefined}
-                                disabled={!isDemo}
+                                onClick={(isDemo && process.env.NODE_ENV !== "production") ? handleRequestPaymentLink : undefined}
+                                disabled={!(isDemo && process.env.NODE_ENV !== "production")}
                                 variant="primary-site" 
                                 style={{ 
-                                  background: isDemo ? "var(--color-accent)" : "var(--color-text-muted)", 
-                                  cursor: isDemo ? "pointer" : "not-allowed",
+                                  background: (isDemo && process.env.NODE_ENV !== "production") ? "var(--color-accent)" : "var(--color-text-muted)", 
+                                  cursor: (isDemo && process.env.NODE_ENV !== "production") ? "pointer" : "not-allowed",
                                   height: "36px", 
                                   fontSize: "12px", 
                                   width: "100%", 
                                   marginTop: "4px" 
                                 }}
                               >
-                                {isDemo ? "Запросить ссылку" : "Оплата будет подключена после выдачи ключей"}
+                                {(isDemo && process.env.NODE_ENV !== "production") ? "Запросить ссылку" : "Оплата будет подключена после выдачи ключей"}
                               </Button>
                             )}
                           </div>

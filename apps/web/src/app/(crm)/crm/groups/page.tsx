@@ -77,6 +77,23 @@ export default function CrmGroupsPage() {
   const [newAgeFrom, setNewAgeFrom] = useState("6");
   const [newAgeTo, setNewAgeTo] = useState("9");
 
+  // Edit Group Form State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editCourseId, setEditCourseId] = useState("");
+  const [editSchedule, setEditSchedule] = useState("");
+  const [editTeacherId, setEditTeacherId] = useState("");
+  const [editCapacity, setEditCapacity] = useState("8");
+  const [editAgeFrom, setEditAgeFrom] = useState("6");
+  const [editAgeTo, setEditAgeTo] = useState("9");
+  const [savingGroup, setSavingGroup] = useState(false);
+
+  // Enrollment fields
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [studentToAddId, setStudentToAddId] = useState("");
+  const [addingStudentToGroup, setAddingStudentToGroup] = useState(false);
+
   const [courses, setCourses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
 
@@ -128,85 +145,94 @@ export default function CrmGroupsPage() {
     }
   };
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
+  async function loadData() {
+    try {
+      setLoading(true);
 
-        // Fetch courses for selection
-        const { data: coursesData } = await supabase
-          .from("courses")
-          .select("id, title");
-        if (coursesData) setCourses(coursesData);
+      // Fetch courses for selection
+      const { data: coursesData } = await supabase
+        .from("courses")
+        .select("id, title");
+      if (coursesData) setCourses(coursesData);
 
-        // Fetch teachers for selection
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, full_name");
-        if (profilesData) setTeachers(profilesData);
+      // Fetch teachers for selection
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, full_name");
+      if (profilesData) setTeachers(profilesData);
 
-        // Fetch groups
-        const { data: groupsData, error } = await supabase
-          .from("groups")
-          .select(`
-            id,
-            title,
-            capacity,
-            age_from,
-            age_to,
-            status,
-            courses (title),
-            profiles (full_name),
-            group_schedule_rules (weekday, starts_at, ends_at)
-          `);
+      // Fetch all active students
+      const { data: studentsData } = await supabase
+        .from("students")
+        .select("id, full_name, birth_date")
+        .eq("status", "active")
+        .order("full_name");
+      if (studentsData) setAllStudents(studentsData);
 
-        if (error) throw error;
+      // Fetch groups
+      const { data: groupsData, error } = await supabase
+        .from("groups")
+        .select(`
+          id,
+          title,
+          course_id,
+          teacher_id,
+          capacity,
+          age_from,
+          age_to,
+          status,
+          courses (title),
+          profiles (full_name),
+          group_schedule_rules (weekday, starts_at, ends_at)
+        `);
 
-        // Fetch enrollments to calculate enrolled count
-        const { data: enrollments } = await supabase
-          .from("enrollments")
-          .select("group_id, status")
-          .eq("status", "active");
+      if (error) throw error;
 
-        const enrollCountMap = new Map();
-        (enrollments as any[])?.forEach(e => {
-          enrollCountMap.set(e.group_id, (enrollCountMap.get(e.group_id) || 0) + 1);
-        });
+      // Fetch enrollments to calculate enrolled count
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("group_id, status")
+        .eq("status", "active");
 
-        const demo = isDemoMode();
+      const enrollCountMap = new Map();
+      (enrollments as any[])?.forEach(e => {
+        enrollCountMap.set(e.group_id, (enrollCountMap.get(e.group_id) || 0) + 1);
+      });
 
-        if (demo) {
-          setGroups(initialGroups);
-        } else {
-          if (groupsData && groupsData.length > 0) {
-            const formatted = groupsData.map((g: any) => ({
-              id: g.id,
-              title: g.title,
-              courseName: g.courses?.title || "Не указан",
-              schedule: formatScheduleRules(g.group_schedule_rules),
-              teacherName: g.profiles?.full_name || "Не назначен",
-              ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
-              capacity: g.capacity || 8,
-              enrolled: enrollCountMap.get(g.id) || 0,
-              status: g.status
-            }));
-            setGroups(formatted);
-          } else {
-            setGroups([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading groups:", err);
-        if (isDemoMode()) {
-          setGroups(initialGroups);
+      const demo = isDemoMode();
+
+      if (demo) {
+        setGroups(initialGroups);
+      } else {
+        if (groupsData && groupsData.length > 0) {
+          const formatted = groupsData.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            courseName: g.courses?.title || "Не указан",
+            courseId: g.course_id,
+            teacherId: g.teacher_id,
+            schedule: formatScheduleRules(g.group_schedule_rules),
+            teacherName: g.profiles?.full_name || "Не назначен",
+            ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
+            ageFrom: g.age_from || 6,
+            ageTo: g.age_to || 14,
+            capacity: g.capacity || 8,
+            enrolled: enrollCountMap.get(g.id) || 0,
+            status: g.status
+          }));
+          setGroups(formatted);
         } else {
           setGroups([]);
         }
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      console.error("Error loading group list:", err);
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -328,6 +354,178 @@ export default function CrmGroupsPage() {
     }
   };
 
+  const handleOpenEditModal = (group: any) => {
+    setEditingGroupId(group.id);
+    setEditTitle(group.title);
+    setEditCourseId(group.courseId || "");
+    setEditSchedule(group.schedule);
+    setEditTeacherId(group.teacherId || "");
+    setEditCapacity(String(group.capacity));
+    setEditAgeFrom(String(group.ageFrom));
+    setEditAgeTo(String(group.ageTo));
+    setShowEditModal(true);
+  };
+
+  const handleUpdateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (savingGroup) return;
+    try {
+      setSavingGroup(true);
+      const demo = isDemoMode();
+      const isMockId = typeof editingGroupId === "string" && editingGroupId.startsWith("g");
+
+      const rules = parseSchedule(editSchedule);
+      const selCourse = courses.find(c => c.id === editCourseId);
+      const selTeacher = teachers.find(t => t.id === editTeacherId);
+
+      if (demo || isMockId) {
+        setGroups(prev => prev.map(g => g.id === editingGroupId ? {
+          ...g,
+          title: editTitle,
+          courseName: selCourse ? selCourse.title : "Не указан",
+          courseId: editCourseId,
+          teacherId: editTeacherId,
+          schedule: formatScheduleRules(rules),
+          teacherName: selTeacher ? selTeacher.full_name : "Не назначен",
+          ageRange: `${editAgeFrom}–${editAgeTo} лет`,
+          ageFrom: parseInt(editAgeFrom, 10),
+          ageTo: parseInt(editAgeTo, 10),
+          capacity: parseInt(editCapacity, 10)
+        } : g));
+        setShowEditModal(false);
+        alert("Группа обновлена (Демо-режим)!");
+        return;
+      }
+
+      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
+      if (!orgRes.data) throw new Error("Org not found");
+
+      // Update groups table
+      const { error: groupErr } = await (supabase
+        .from("groups") as any)
+        .update({
+          title: editTitle,
+          course_id: editCourseId,
+          teacher_id: editTeacherId || null,
+          capacity: parseInt(editCapacity, 10),
+          age_from: parseInt(editAgeFrom, 10),
+          age_to: parseInt(editAgeTo, 10)
+        })
+        .eq("id", editingGroupId);
+
+      if (groupErr) throw groupErr;
+
+      // Update schedule rules: delete old, insert new
+      const { error: deleteErr } = await (supabase
+        .from("group_schedule_rules") as any)
+        .delete()
+        .eq("group_id", editingGroupId);
+
+      if (deleteErr) throw deleteErr;
+
+      for (const rule of rules) {
+        await (supabase.from("group_schedule_rules") as any).insert({
+          organization_id: orgRes.data.id,
+          group_id: editingGroupId,
+          weekday: rule.weekday,
+          starts_at: rule.starts_at,
+          ends_at: rule.ends_at
+        });
+      }
+
+      await loadData();
+      setShowEditModal(false);
+      alert("Группа успешно обновлена!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось обновить группу: " + err.message);
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const handleAddStudent = async () => {
+    if (!studentToAddId || addingStudentToGroup) return;
+    try {
+      setAddingStudentToGroup(true);
+      const demo = isDemoMode();
+      const isMockId = typeof selectedGroup.id === "string" && selectedGroup.id.startsWith("g");
+
+      const studentObj = allStudents.find(s => s.id === studentToAddId);
+
+      if (demo || isMockId) {
+        setGroupStudents(prev => [...prev, { id: studentToAddId, full_name: studentObj ? studentObj.full_name : "Новый ученик" }]);
+        setStudentToAddId("");
+        alert("Ученик зачислен в группу (Демо-режим)!");
+        return;
+      }
+
+      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
+      if (!orgRes.data) throw new Error("Org not found");
+
+      // Insert enrollment
+      const { error: enrollErr } = await (supabase
+        .from("enrollments") as any)
+        .insert({
+          organization_id: orgRes.data.id,
+          student_id: studentToAddId,
+          group_id: selectedGroup.id,
+          status: "active",
+          started_on: new Date().toISOString().split("T")[0]
+        });
+
+      if (enrollErr) throw enrollErr;
+
+      // Reload drawer students and groups list
+      await handleOpenGroupDrawer(selectedGroup);
+      await loadData();
+      setStudentToAddId("");
+      alert("Ученик успешно зачислен!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось зачислить ученика: " + err.message);
+    } finally {
+      setAddingStudentToGroup(false);
+    }
+  };
+
+  const handleRemoveStudent = async (studentId: string) => {
+    const confirmRemove = window.confirm("Вы уверены, что хотите исключить ученика из группы?");
+    if (!confirmRemove) return;
+
+    try {
+      const demo = isDemoMode();
+      const isMockId = typeof selectedGroup.id === "string" && selectedGroup.id.startsWith("g");
+
+      if (demo || isMockId) {
+        setGroupStudents(prev => prev.filter(gs => gs.id !== studentId));
+        alert("Ученик исключен (Демо-режим)!");
+        return;
+      }
+
+      // Update enrollment to cancelled
+      const { error: cancelErr } = await (supabase
+        .from("enrollments") as any)
+        .update({
+          status: "cancelled",
+          ended_on: new Date().toISOString().split("T")[0]
+        })
+        .eq("group_id", selectedGroup.id)
+        .eq("student_id", studentId)
+        .eq("status", "active");
+
+      if (cancelErr) throw cancelErr;
+
+      // Reload drawer students and groups list
+      await handleOpenGroupDrawer(selectedGroup);
+      await loadData();
+      alert("Ученик успешно исключен из группы.");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось исключить ученика: " + err.message);
+    }
+  };
+
   const filteredGroups = groups.filter(g => {
     const query = searchQuery.toLowerCase();
     return g.title.toLowerCase().includes(query) ||
@@ -438,8 +636,8 @@ export default function CrmGroupsPage() {
               <Button onClick={() => handleOpenGroupDrawer(group)} variant="secondary-site" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
                 Список учеников
               </Button>
-              <Button variant="primary-crm" disabled style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
-                Будет позже
+              <Button onClick={() => handleOpenEditModal(group)} variant="primary-crm" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
+                Редактировать
               </Button>
             </div>
           </div>
@@ -657,11 +855,184 @@ export default function CrmGroupsPage() {
                           </div>
                         )}
                       </div>
+                      <Button 
+                        onClick={() => handleRemoveStudent(student.id)} 
+                        variant="secondary-site" 
+                        style={{ height: "28px", padding: "0 8px", fontSize: "11px", color: "var(--color-danger)" }}
+                      >
+                        Исключить
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {/* Add Student to Group Form */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "12px" }}>
+              <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Добавить ученика в группу</h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <select 
+                  className="form-input" 
+                  value={studentToAddId}
+                  onChange={(e) => setStudentToAddId(e.target.value)}
+                  style={{ height: "36px", fontSize: "13px" }}
+                >
+                  <option value="">Выберите ученика...</option>
+                  {allStudents
+                    .filter(s => !groupStudents.some(gs => gs.id === s.id))
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.full_name}</option>
+                    ))
+                  }
+                </select>
+                <Button 
+                  onClick={handleAddStudent} 
+                  disabled={!studentToAddId || addingStudentToGroup}
+                  variant="primary-crm" 
+                  style={{ height: "36px", fontSize: "13px", whiteSpace: "nowrap" }}
+                >
+                  {addingStudentToGroup ? "..." : "Добавить"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.4)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 50,
+          padding: "20px"
+        }}>
+          <div style={{
+            background: "white",
+            borderRadius: "var(--radius-card-site)",
+            border: "1px solid var(--color-border)",
+            width: "100%",
+            maxWidth: "480px",
+            padding: "32px",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px"
+          }}>
+            <div>
+              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Редактировать группу</h3>
+              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Обновление параметров учебного класса</p>
+            </div>
+
+            <form onSubmit={handleUpdateGroup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Название группы *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Курс *</label>
+                <select 
+                  className="form-input" 
+                  required 
+                  value={editCourseId}
+                  onChange={(e) => setEditCourseId(e.target.value)}
+                >
+                  <option value="">Выберите направление</option>
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Расписание (дни и время) *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={editSchedule}
+                  onChange={(e) => setEditSchedule(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Преподаватель</label>
+                <select 
+                  className="form-input" 
+                  value={editTeacherId}
+                  onChange={(e) => setEditTeacherId(e.target.value)}
+                >
+                  <option value="">Не назначен</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.full_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Мест *</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    required 
+                    value={editCapacity}
+                    onChange={(e) => setEditCapacity(e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Возраст от</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={editAgeFrom}
+                    onChange={(e) => setEditAgeFrom(e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">до</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={editAgeTo}
+                    onChange={(e) => setEditAgeTo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                <Button 
+                  type="button" 
+                  variant="secondary-site" 
+                  style={{ flex: 1 }}
+                  disabled={savingGroup}
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Отмена
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="primary-crm" 
+                  style={{ flex: 1 }}
+                  disabled={savingGroup}
+                >
+                  {savingGroup ? "Сохранение..." : "Сохранить"}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

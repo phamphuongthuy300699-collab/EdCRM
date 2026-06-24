@@ -52,9 +52,19 @@ export default function CrmPaymentsPage() {
             amount,
             status,
             due_date,
+            enrollments (
+              groups (
+                title
+              )
+            ),
             students (
               id,
               full_name,
+              enrollments (
+                groups (
+                  title
+                )
+              ),
               student_guardians (
                 guardians (
                   full_name
@@ -74,11 +84,13 @@ export default function CrmPaymentsPage() {
           if (invoicesData && invoicesData.length > 0) {
             const formatted = invoicesData.map((inv: any) => {
               const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
+              const activeEnroll = inv.students?.enrollments?.find((e: any) => e.groups) || null;
+              const groupTitle = inv.enrollments?.groups?.title || activeEnroll?.groups?.title || "Без группы";
               return {
                 id: inv.id,
                 studentName: inv.students?.full_name || "Неизвестно",
                 parentName: firstGuardian?.full_name || "Не указан",
-                groupName: "Курс школы",
+                groupName: groupTitle,
                 amount: parseFloat(inv.amount),
                 dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
                 status: inv.status,
@@ -202,15 +214,65 @@ export default function CrmPaymentsPage() {
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const orgRes = await (supabase.from("organizations") as any).select("id").eq("slug", "robotics-lipetsk").single();
+      const demo = isDemoMode();
+      const selStudent = students.find(s => s.id === newStudentId);
+
+      if (demo) {
+        const newInvObj = {
+          id: "i-mock-" + Date.now(),
+          studentName: selStudent?.full_name || "Неизвестно",
+          parentName: "Анна Петрова",
+          groupName: "LEGO Start 1",
+          amount: parseFloat(newAmount),
+          dueDate: new Date(newDueDate).toLocaleDateString("ru-RU"),
+          status: "issued",
+          title: newTitle
+        };
+        setInvoices([newInvObj, ...invoices]);
+        setShowAddModal(false);
+        setNewStudentId("");
+        setNewTitle("Абонемент на 8 занятий");
+        setNewAmount("4500");
+        alert("Счет выставлен (Демо-режим)!");
+        return;
+      }
+
+      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
       if (!orgRes.data) throw new Error("Org not found");
 
-      // Find student name for local update
-      const selStudent = students.find(s => s.id === newStudentId);
+      // Fetch primary guardian and active enrollment for the selected student
+      const { data: studentInfo } = await supabase
+        .from("students")
+        .select(`
+          enrollments (
+            id,
+            status,
+            groups (
+              title
+            )
+          ),
+          student_guardians (
+            guardian_id,
+            is_primary,
+            guardians (
+              full_name
+            )
+          )
+        `)
+        .eq("id", newStudentId)
+        .single() as any;
+
+      const activeEnrollment = studentInfo?.enrollments?.find((e: any) => e.status === "active");
+      const primaryGuardianLink = studentInfo?.student_guardians?.find((sg: any) => sg.is_primary) || studentInfo?.student_guardians?.[0];
+      
+      const parentName = primaryGuardianLink?.guardians?.full_name || "Не указан";
+      const groupTitle = activeEnrollment?.groups?.title || "Без группы";
 
       const insertData = {
         organization_id: orgRes.data.id,
         student_id: newStudentId,
+        guardian_id: primaryGuardianLink?.guardian_id || null,
+        enrollment_id: activeEnrollment?.id || null,
         title: newTitle,
         amount: parseFloat(newAmount),
         currency: "RUB",
@@ -219,32 +281,14 @@ export default function CrmPaymentsPage() {
         issued_at: new Date().toISOString()
       };
 
-      const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single();
+      const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single() as any;
       if (error) throw error;
-
-      // Fetch parent name through student_guardians -> guardians
-      let parentName = "Не указан";
-      if (!isDemoMode()) {
-        const { data: sgData } = await supabase
-          .from("student_guardians")
-          .select(`
-            guardians (
-              full_name
-            )
-          `)
-          .eq("student_id", newStudentId)
-          .limit(1)
-          .maybeSingle() as any;
-        if (sgData?.guardians?.full_name) {
-          parentName = sgData.guardians.full_name;
-        }
-      }
 
       const newInvObj = {
         id: data.id,
         studentName: selStudent?.full_name || "Неизвестно",
         parentName: parentName,
-        groupName: "Робототехника",
+        groupName: groupTitle,
         amount: data.amount,
         dueDate: new Date(data.due_date).toLocaleDateString("ru-RU"),
         status: data.status,
@@ -258,6 +302,7 @@ export default function CrmPaymentsPage() {
       setNewStudentId("");
       setNewTitle("Абонемент на 8 занятий");
       setNewAmount("4500");
+      alert("Счет успешно выставлен!");
     } catch (err: any) {
       console.error(err);
       alert("Не удалось создать счет: " + err.message);

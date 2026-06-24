@@ -6,6 +6,7 @@ import {
   ArrowLeft, 
   Plus, 
   Trash2, 
+  Edit,
   ExternalLink, 
   FileText, 
   Image as ImageIcon, 
@@ -74,6 +75,18 @@ export default function LessonDetailsPage() {
   const [matExternalUrl, setMatExternalUrl] = useState("");
   const [matContent, setMatContent] = useState("");
   const [matSortOrder, setMatSortOrder] = useState(100);
+  const [creatingMaterial, setCreatingMaterial] = useState(false);
+
+  // Edit Material State
+  const [showEditMaterialModal, setShowEditMaterialModal] = useState(false);
+  const [editingMaterialId, setEditingMaterialId] = useState("");
+  const [editMatTitle, setEditMatTitle] = useState("");
+  const [editMatType, setEditMatType] = useState("lesson_plan");
+  const [editMatVisibility, setEditMatVisibility] = useState("teacher_only");
+  const [editMatExternalUrl, setEditMatExternalUrl] = useState("");
+  const [editMatContent, setEditMatContent] = useState("");
+  const [editMatSortOrder, setEditMatSortOrder] = useState(100);
+  const [savingMaterial, setSavingMaterial] = useState(false);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -167,9 +180,10 @@ export default function LessonDetailsPage() {
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matTitle) return;
+    if (!matTitle || creatingMaterial) return;
 
     try {
+      setCreatingMaterial(true);
       const { data, error } = await (supabase
         .from("lesson_materials") as any)
         .insert({
@@ -198,6 +212,59 @@ export default function LessonDetailsPage() {
     } catch (err) {
       console.error("Error creating material:", err);
       alert("Не удалось добавить материал");
+    } finally {
+      setCreatingMaterial(false);
+    }
+  };
+
+  const handleOpenEditMaterialModal = (mat: LessonMaterial) => {
+    setEditingMaterialId(mat.id);
+    setEditMatTitle(mat.title);
+    setEditMatType(mat.type);
+    setEditMatVisibility(mat.visibility);
+    setEditMatExternalUrl(mat.external_url || "");
+    setEditMatContent(mat.content || "");
+    setEditMatSortOrder(mat.sort_order);
+    setShowEditMaterialModal(true);
+  };
+
+  const handleUpdateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (savingMaterial) return;
+    try {
+      setSavingMaterial(true);
+
+      const { error } = await (supabase
+        .from("lesson_materials") as any)
+        .update({
+          title: editMatTitle,
+          type: editMatType,
+          visibility: editMatVisibility,
+          external_url: editMatExternalUrl || null,
+          content: editMatContent || null,
+          sort_order: editMatSortOrder
+        })
+        .eq("id", editingMaterialId);
+
+      if (error) throw error;
+
+      setMaterials(prev => prev.map(m => m.id === editingMaterialId ? {
+        ...m,
+        title: editMatTitle,
+        type: editMatType,
+        visibility: editMatVisibility,
+        external_url: editMatExternalUrl || null,
+        content: editMatContent || null,
+        sort_order: editMatSortOrder
+      } : m).sort((a, b) => a.sort_order - b.sort_order));
+
+      setShowEditMaterialModal(false);
+      alert("Материал успешно обновлен!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Не удалось обновить материал: " + err.message);
+    } finally {
+      setSavingMaterial(false);
     }
   };
 
@@ -499,19 +566,34 @@ export default function LessonDetailsPage() {
                       </div>
                     </div>
 
-                    <button 
-                      title="Удалить материал"
-                      onClick={() => handleDeleteMaterial(mat.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--color-danger)",
-                        cursor: "pointer",
-                        padding: "4px"
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button 
+                        title="Редактировать материал"
+                        onClick={() => handleOpenEditMaterialModal(mat)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--color-primary)",
+                          cursor: "pointer",
+                          padding: "4px"
+                        }}
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        title="Удалить материал"
+                        onClick={() => handleDeleteMaterial(mat.id)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--color-danger)",
+                          cursor: "pointer",
+                          padding: "4px"
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Resource action links or display content */}
@@ -653,8 +735,118 @@ export default function LessonDetailsPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
-                <Button type="button" variant="secondary-crm" onClick={() => setShowMaterialModal(false)}>Отмена</Button>
-                <Button type="submit" variant="primary-crm">Добавить</Button>
+                <Button type="button" variant="secondary-crm" disabled={creatingMaterial} onClick={() => setShowMaterialModal(false)}>Отмена</Button>
+                <Button type="submit" variant="primary-crm" disabled={creatingMaterial}>
+                  {creatingMaterial ? "Добавление..." : "Добавить"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Material Modal */}
+      {showEditMaterialModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100
+        }}>
+          <div className="card-crm" style={{ width: "100%", maxWidth: "500px", padding: "32px", background: "white" }}>
+            <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>
+              Редактировать методический материал
+            </h3>
+            <form onSubmit={handleUpdateMaterial} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="form-group">
+                <label className="form-label">Название материала</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={editMatTitle}
+                  onChange={e => setEditMatTitle(e.target.value)}
+                  placeholder="Например: Схема сборки гусениц"
+                  required
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr 1fr", gap: "16px" }}>
+                <div className="form-group">
+                  <label className="form-label">Тип</label>
+                  <select 
+                    className="form-input"
+                    value={editMatType}
+                    onChange={e => setEditMatType(e.target.value)}
+                  >
+                    <option value="lesson_plan">План-конспект</option>
+                    <option value="presentation">Презентация</option>
+                    <option value="build_scheme">Схема сборки</option>
+                    <option value="code_listing">Код программы</option>
+                    <option value="student_handout">Раздаточный материал</option>
+                    <option value="video">Видео-ролик</option>
+                    <option value="external_link">Внешняя ссылка</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Видимость</label>
+                  <select 
+                    className="form-input"
+                    value={editMatVisibility}
+                    onChange={e => setEditMatVisibility(e.target.value)}
+                  >
+                    <option value="teacher_only">Только учитель</option>
+                    <option value="student_visible">Виден ученикам</option>
+                    <option value="parent_visible">Виден родителям</option>
+                    <option value="admin_only">Только администратор</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Сортировка</label>
+                  <input 
+                    type="number"
+                    className="form-input"
+                    value={editMatSortOrder}
+                    onChange={e => setEditMatSortOrder(parseInt(e.target.value, 10) || 100)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ссылка на ресурс (Google Doc, LEGO и др.)</label>
+                <input 
+                  type="url" 
+                  className="form-input" 
+                  value={editMatExternalUrl}
+                  onChange={e => setEditMatExternalUrl(e.target.value)}
+                  placeholder="https://docs.google.com/..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Текст материала / Код программы</label>
+                <textarea 
+                  className="form-input" 
+                  style={{ height: "120px", padding: "12px 16px", resize: "none", fontFamily: "monospace" }}
+                  value={editMatContent}
+                  onChange={e => setEditMatContent(e.target.value)}
+                  placeholder="Вставьте листинг кода или текстовое примечание..."
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
+                <Button type="button" variant="secondary-crm" disabled={savingMaterial} onClick={() => setShowEditMaterialModal(false)}>Отмена</Button>
+                <Button type="submit" variant="primary-crm" disabled={savingMaterial}>
+                  {savingMaterial ? "Сохранение..." : "Сохранить"}
+                </Button>
               </div>
             </form>
           </div>

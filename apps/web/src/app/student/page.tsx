@@ -38,6 +38,8 @@ export default function StudentPortal() {
   const [group, setGroup] = useState<any>(null);
   const [sessionToday, setSessionToday] = useState<any>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [isPastSession, setIsPastSession] = useState(false);
+  const [homeworks, setHomeworks] = useState<any[]>([]);
 
   // Demo toggler
   const [demoActiveSession, setDemoActiveSession] = useState(false);
@@ -175,25 +177,55 @@ export default function StudentPortal() {
         setSessionToday(null);
         setMaterials([]);
       }
+
+      setHomeworks([
+        {
+          id: "hw1",
+          due_at: new Date(Date.now() + 86400000 * 2).toISOString(),
+          status: "assigned",
+          homework_templates: {
+            title: "Сборка базовой тележки",
+            description: "Соберите модель колесного робота по инструкции и запрограммируйте движение по квадрату.",
+            difficulty: "Средняя",
+            estimated_minutes: 40
+          }
+        }
+      ]);
       return;
     }
 
-    async function loadTodaySession() {
+    async function loadTodaySessionAndHomeworks() {
       try {
         const todayDate = new Date().toISOString().split("T")[0];
-        const { data: sess, error } = await (supabase
+        const { data: liveSess } = await (supabase
           .from("lesson_sessions") as any)
           .select("*")
           .eq("group_id", group.id)
           .eq("lesson_date", todayDate)
+          .eq("status", "live")
           .maybeSingle();
 
-        if (error) {
-          console.error("Error fetching session:", error);
-          return;
+        let sess = liveSess;
+        let isPast = false;
+
+        if (!sess) {
+          const { data: completedSess } = await (supabase
+            .from("lesson_sessions") as any)
+            .select("*")
+            .eq("group_id", group.id)
+            .eq("status", "completed")
+            .order("starts_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (completedSess) {
+            sess = completedSess;
+            isPast = true;
+          }
         }
 
         setSessionToday(sess);
+        setIsPastSession(isPast);
 
         if (sess && sess.materials_unlocked && (sess.status === "live" || sess.status === "completed")) {
           // Fetch student visible materials for this lesson template strictly
@@ -212,12 +244,31 @@ export default function StudentPortal() {
         } else {
           setMaterials([]);
         }
+
+        // Fetch homework assignments
+        const { data: hwData } = await (supabase
+          .from("homework_assignments") as any)
+          .select(`
+            id,
+            due_at,
+            status,
+            homework_templates (
+              title,
+              description,
+              difficulty,
+              estimated_minutes
+            )
+          `)
+          .eq("group_id", group.id)
+          .order("created_at", { ascending: false });
+
+        setHomeworks(hwData || []);
       } catch (err) {
-        console.error("Error loading session/materials:", err);
+        console.error("Error loading session/materials/homework:", err);
       }
     }
 
-    loadTodaySession();
+    loadTodaySessionAndHomeworks();
   }, [group, demoActiveSession]);
 
   if (loading) {
@@ -389,7 +440,7 @@ export default function StudentPortal() {
           <div className="card-crm" style={{ background: "white", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
             <h3 style={{ fontSize: "15px", fontWeight: 800, borderBottom: "1px solid var(--color-border)", paddingBottom: "12px", margin: 0, display: "flex", alignItems: "center", justifySelf: "flex-start", gap: "8px" }}>
               <BookOpen size={18} style={{ color: "var(--color-primary)" }} />
-              <span>Материалы сегодняшнего урока</span>
+              <span>{isPastSession ? "Материалы прошедшего урока" : "Материалы сегодняшнего урока"}</span>
             </h3>
 
             {!isUnlocked ? (
@@ -430,9 +481,9 @@ export default function StudentPortal() {
               /* Unlocked State Display */
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                 <div style={{
-                  background: "var(--color-success-soft)",
-                  border: "1px solid var(--color-success)",
-                  color: "var(--color-success-dark)",
+                  background: isPastSession ? "var(--color-bg)" : "var(--color-success-soft)",
+                  border: isPastSession ? "1px solid var(--color-border)" : "1px solid var(--color-success)",
+                  color: isPastSession ? "var(--color-text-muted)" : "var(--color-success-dark)",
                   padding: "12px 16px",
                   borderRadius: "8px",
                   fontSize: "13px",
@@ -442,7 +493,7 @@ export default function StudentPortal() {
                   gap: "8px"
                 }}>
                   <CheckCircle size={16} />
-                  <span>Урок запущен! Все материалы доступны для просмотра.</span>
+                  <span>{isPastSession ? "Доступны материалы прошедшего занятия" : "Урок запущен! Все материалы доступны для просмотра."}</span>
                 </div>
 
                 {materials.length === 0 ? (
@@ -509,6 +560,86 @@ export default function StudentPortal() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Homework Section */}
+        <div className="card-crm" style={{ background: "white", padding: "28px", display: "flex", flexDirection: "column", gap: "20px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, borderBottom: "1px solid var(--color-border)", paddingBottom: "12px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+            <FileText size={18} style={{ color: "var(--color-primary)" }} />
+            <span>Домашние задания ({homeworks.length})</span>
+          </h3>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+            {homeworks.map(hw => {
+              const tpl = hw.homework_templates || {};
+              const dueStr = hw.due_at ? new Date(hw.due_at).toLocaleDateString("ru-RU") : "Без срока";
+              
+              return (
+                <div 
+                  key={hw.id}
+                  style={{
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "10px",
+                    padding: "20px",
+                    background: "var(--color-bg)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                    justifyContent: "space-between"
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+                      <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        background: "white",
+                        border: "1px solid var(--color-border)",
+                        color: "var(--color-primary-dark)",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        fontSize: "10px",
+                        fontWeight: 700
+                      }}>
+                        {tpl.difficulty || "Обычная"}
+                      </span>
+                      {tpl.estimated_minutes && (
+                        <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: "2px" }}>
+                          <Clock size={10} />
+                          <span>~{tpl.estimated_minutes} мин</span>
+                        </span>
+                      )}
+                    </div>
+                    <h4 style={{ fontWeight: 700, fontSize: "14px", margin: "0 0 6px 0", color: "var(--color-text)" }}>
+                      {tpl.title}
+                    </h4>
+                    <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}>
+                      {tpl.description || "Инструкция к выполнению отсутствует."}
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "4px" }}>
+                    <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                      Сдать до: <strong style={{ color: "var(--color-text)" }}>{dueStr}</strong>
+                    </span>
+                    <span className={`badge ${
+                      hw.status === "checked" ? "badge-green" : 
+                      hw.status === "submitted" ? "badge-amber" : "badge-blue"
+                    }`} style={{ fontSize: "10px" }}>
+                      {hw.status === "checked" ? "Проверено" : 
+                       hw.status === "submitted" ? "На проверке" : "Выдано"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {homeworks.length === 0 && (
+              <div style={{ gridColumn: "span 3", padding: "32px", textAlign: "center", color: "var(--color-text-muted)" }}>
+                <p style={{ margin: 0, fontStyle: "italic", fontSize: "13px" }}>Отлично! Все домашние задания выполнены или еще не назначены.</p>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
 import { Settings, Building, BookOpen, Users, CreditCard, Save } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
 
 export default function CrmSettingsPage() {
   const [activeSection, setActiveSection] = useState<"org" | "courses" | "teachers" | "payments">("org");
@@ -61,6 +62,8 @@ export default function CrmSettingsPage() {
         if (branches) {
           setAddress(branches.address || "");
           setPhone(branches.phone || "");
+          if (branches.email) setEmail(branches.email);
+          if (branches.hours) setHours(branches.hours);
         }
 
         // Load Courses
@@ -114,7 +117,7 @@ export default function CrmSettingsPage() {
           .eq("id", orgRes.data.id);
         
         await (supabase.from("branches") as any)
-          .update({ address, phone })
+          .update({ address, phone, email, hours })
           .eq("organization_id", orgRes.data.id);
       }
 
@@ -250,23 +253,25 @@ export default function CrmSettingsPage() {
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Email для уведомлений (не редактируется)</label>
+                  <label className="form-label">Email для уведомлений *</label>
                   <input 
                     type="email" 
                     className="form-input" 
-                    disabled 
+                    required 
                     value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
                   />
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Режим работы (не редактируется)</label>
+                <label className="form-label">Режим работы *</label>
                 <input 
                   type="text" 
                   className="form-input" 
-                  disabled 
+                  required 
                   value={hours} 
+                  onChange={(e) => setHours(e.target.value)} 
                 />
               </div>
 
@@ -374,7 +379,9 @@ export default function CrmSettingsPage() {
                   <div>
                     <h4 style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                       <span>ЮKassa</span>
-                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Подключается на следующем этапе</span>
+                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>
+                        {isDemoMode() ? "Подключается на следующем этапе" : "Подключается после выдачи боевых ключей"}
+                      </span>
                     </h4>
                     <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>Прием платежей картами, СБП, SberPay</p>
                   </div>
@@ -390,7 +397,9 @@ export default function CrmSettingsPage() {
                   <div>
                     <h4 style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                       <span>Robokassa</span>
-                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Подключается на следующем этапе</span>
+                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>
+                        {isDemoMode() ? "Подключается на следующем этапе" : "Подключается после выдачи боевых ключей"}
+                      </span>
                     </h4>
                     <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>Прием международных и локальных онлайн-карт</p>
                   </div>

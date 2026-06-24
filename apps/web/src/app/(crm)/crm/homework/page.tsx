@@ -13,7 +13,8 @@ import {
   Filter, 
   BookOpen,
   Check,
-  AlertCircle
+  AlertCircle,
+  Pencil
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 
@@ -49,6 +50,15 @@ export default function HomeworkPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newDifficulty, setNewDifficulty] = useState("Средняя");
   const [newEstMinutes, setNewEstMinutes] = useState(30);
+
+  // Edit Template Form
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<HomeworkTemplate | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDifficulty, setEditDifficulty] = useState("Средняя");
+  const [editEstMinutes, setEditEstMinutes] = useState(30);
+  const [submittingTemplate, setSubmittingTemplate] = useState(false);
 
   const [groups, setGroups] = useState<any[]>([]);
 
@@ -113,9 +123,10 @@ export default function HomeworkPage() {
 
   const handleCreateTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
+    if (!newTitle || submittingTemplate) return;
 
     try {
+      setSubmittingTemplate(true);
       const { data, error } = await (supabase
         .from("homework_templates") as any)
         .insert({
@@ -141,6 +152,49 @@ export default function HomeworkPage() {
     } catch (err) {
       console.error("Error creating hw template:", err);
       alert("Не удалось создать шаблон");
+    } finally {
+      setSubmittingTemplate(false);
+    }
+  };
+
+  const openEditModal = (tpl: HomeworkTemplate) => {
+    setEditingTemplate(tpl);
+    setEditTitle(tpl.title);
+    setEditDescription(tpl.description || "");
+    setEditDifficulty(tpl.difficulty || "Средняя");
+    setEditEstMinutes(tpl.estimated_minutes || 30);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTemplate || !editTitle || submittingTemplate) return;
+
+    try {
+      setSubmittingTemplate(true);
+      const { data, error } = await (supabase
+        .from("homework_templates") as any)
+        .update({
+          title: editTitle,
+          description: editDescription,
+          difficulty: editDifficulty,
+          estimated_minutes: editEstMinutes
+        })
+        .eq("id", editingTemplate.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? data : t));
+      setShowEditModal(false);
+      setEditingTemplate(null);
+      alert("Шаблон домашнего задания успешно изменен!");
+    } catch (err) {
+      console.error("Error updating hw template:", err);
+      alert("Не удалось обновить шаблон");
+    } finally {
+      setSubmittingTemplate(false);
     }
   };
 
@@ -355,19 +409,34 @@ export default function HomeworkPage() {
                     )}
                   </div>
                 </div>
-                <button 
-                  title="Удалить"
-                  onClick={() => handleDeleteTemplate(tpl.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--color-danger)",
-                    cursor: "pointer",
-                    padding: "4px"
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button 
+                    title="Редактировать"
+                    onClick={() => openEditModal(tpl)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-primary)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button 
+                    title="Удалить"
+                    onClick={() => handleDeleteTemplate(tpl.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-danger)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               <p style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)", lineHeight: 1.5, flex: 1 }}>
                 {tpl.description || "Нет описания"}
@@ -547,7 +616,9 @@ export default function HomeworkPage() {
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
                 <Button type="button" variant="secondary-crm" onClick={() => setShowTemplateModal(false)}>Отмена</Button>
-                <Button type="submit" variant="primary-crm">Создать</Button>
+                <Button type="submit" variant="primary-crm" disabled={submittingTemplate}>
+                  {submittingTemplate ? "Создание..." : "Создать"}
+                </Button>
               </div>
             </form>
           </div>
@@ -615,6 +686,85 @@ export default function HomeworkPage() {
                 <Button type="button" variant="secondary-crm" onClick={() => setShowAssignModal(false)}>Отмена</Button>
                 <Button type="submit" variant="primary-crm" disabled={submittingAssign}>
                   {submittingAssign ? "Назначение..." : "Назначить"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Template Modal */}
+      {showEditModal && editingTemplate && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100
+        }}>
+          <div className="card-crm" style={{ width: "100%", maxWidth: "500px", padding: "32px", background: "white" }}>
+            <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>
+              Редактировать шаблон ДЗ
+            </h3>
+            <form onSubmit={handleUpdateTemplate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="form-group">
+                <label className="form-label">Название задания</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  placeholder="Например: Сборка колесной пары"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Инструкция / Описание</label>
+                <textarea 
+                  className="form-input" 
+                  style={{ height: "100px", padding: "12px 16px", resize: "none" }}
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  placeholder="Что нужно сделать ребенку дома..."
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div className="form-group">
+                  <label className="form-label">Сложность</label>
+                  <select 
+                    className="form-input"
+                    value={editDifficulty}
+                    onChange={e => setEditDifficulty(e.target.value)}
+                  >
+                    <option value="Легкая">Легкая</option>
+                    <option value="Средняя">Средняя</option>
+                    <option value="Сложная">Сложная</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Время выполнения (минут)</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={editEstMinutes}
+                    onChange={e => setEditEstMinutes(parseInt(e.target.value, 10) || 0)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
+                <Button type="button" variant="secondary-crm" onClick={() => { setShowEditModal(false); setEditingTemplate(null); }}>Отмена</Button>
+                <Button type="submit" variant="primary-crm" disabled={submittingTemplate}>
+                  {submittingTemplate ? "Сохранение..." : "Сохранить"}
                 </Button>
               </div>
             </form>

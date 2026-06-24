@@ -91,6 +91,8 @@ export default function LessonConductPage() {
 
   const [loading, setLoading] = useState(true);
   const [savingAttendance, setSavingAttendance] = useState(false);
+  const [closingSession, setClosingSession] = useState(false);
+  const [submittingHw, setSubmittingHw] = useState(false);
   const [orgId, setOrgId] = useState<string>("");
 
   const supabase = createSupabaseBrowserClient();
@@ -269,9 +271,10 @@ export default function LessonConductPage() {
 
   const handleAssignHomework = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session || !selectedHwTemplateId) return;
+    if (!session || !selectedHwTemplateId || submittingHw) return;
 
     try {
+      setSubmittingHw(true);
       const { data, error } = await (supabase
         .from("homework_assignments") as any)
         .insert({
@@ -299,14 +302,17 @@ export default function LessonConductPage() {
     } catch (err) {
       console.error("Error assigning homework:", err);
       alert("Не удалось выдать домашнее задание");
+    } finally {
+      setSubmittingHw(false);
     }
   };
 
   const handleCloseSession = async () => {
-    if (!session) return;
+    if (!session || closingSession || session.status === "completed") return;
     if (!confirm("Вы уверены, что хотите завершить это занятие? Статус сменится на 'Проведено', и оно будет отмечено как завершенное.")) return;
 
     try {
+      setClosingSession(true);
       // First save attendance to be safe
       await handleSaveAttendance();
 
@@ -325,6 +331,8 @@ export default function LessonConductPage() {
     } catch (err) {
       console.error("Error closing session:", err);
       alert("Не удалось завершить занятие");
+    } finally {
+      setClosingSession(false);
     }
   };
 
@@ -377,9 +385,14 @@ export default function LessonConductPage() {
             </div>
           </div>
           {session.status !== "completed" && (
-            <Button variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={handleCloseSession}>
+            <Button 
+              variant="primary-crm" 
+              style={{ display: "flex", alignItems: "center", gap: "8px" }} 
+              onClick={handleCloseSession}
+              disabled={closingSession}
+            >
               <CheckCircle size={16} />
-              <span>Завершить занятие</span>
+              <span>{closingSession ? "Завершение..." : "Завершить занятие"}</span>
             </Button>
           )}
         </div>
@@ -500,10 +513,11 @@ export default function LessonConductPage() {
               <Button 
                 type="submit" 
                 variant="primary-crm"
+                disabled={submittingHw}
                 style={{ width: "100%", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               >
                 <Plus size={16} />
-                <span>Назначить группе</span>
+                <span>{submittingHw ? "Назначение..." : "Назначить группе"}</span>
               </Button>
             </form>
 

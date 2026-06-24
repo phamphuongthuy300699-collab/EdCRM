@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
 import { 
   Users, 
@@ -34,6 +35,7 @@ interface Student {
 }
 
 export default function CrmStudentsPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "archived">("all");
   const [students, setStudents] = useState<Student[]>([]);
@@ -583,7 +585,7 @@ export default function CrmStudentsPage() {
                         }}>
                           <CreditCard size={14} />
                         </button>
-                        <button onClick={() => handleOpenDrawer(student)} title="Подробнее" style={{
+                        <button onClick={() => router.push(`/crm/students/${student.id}`)} title="Подробнее" style={{
                           width: "32px",
                           height: "32px",
                           borderRadius: "6px",
