@@ -7,6 +7,8 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { Lock, Mail, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { isDemoMode } from "@/shared/utils/demo";
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
@@ -22,9 +24,7 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-      if (isDemoMode) {
+      if (isDemoMode()) {
         // Симулируем вход для тестирования интерфейса на локалхосте
         const emailLower = email.toLowerCase();
         if (emailLower.startsWith("admin")) {

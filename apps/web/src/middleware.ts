@@ -6,8 +6,28 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  // Если ключей базы данных нет в окружении, работаем в демонстрационном режиме без авторизации
+  // Если ключей базы данных нет в окружении
   if (!url || !key) {
+    const isProduction = process.env.NODE_ENV === "production";
+    const demoExplicit = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+    // В production без явного DEMO_MODE — показать ошибку конфигурации
+    if (isProduction && !demoExplicit) {
+      const pathname = request.nextUrl.pathname;
+      // Разрешить статику и API
+      if (pathname.startsWith("/_next") || pathname.startsWith("/api/public") || pathname === "/favicon.ico") {
+        return NextResponse.next();
+      }
+      // Для всех защищённых маршрутов — вернуть ошибку
+      if (pathname.startsWith("/crm") || pathname.startsWith("/teacher") || pathname.startsWith("/parent") || pathname.startsWith("/student")) {
+        return new NextResponse(
+          "Ошибка конфигурации: отсутствуют переменные SUPABASE_URL / SUPABASE_KEY. Обратитесь к администратору.",
+          { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+        );
+      }
+    }
+
+    // В dev/test или с явным DEMO_MODE — пропускаем без авторизации
     return NextResponse.next();
   }
 

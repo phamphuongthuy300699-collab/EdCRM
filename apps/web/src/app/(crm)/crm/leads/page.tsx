@@ -21,6 +21,7 @@ import {
   X
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
 
 interface Lead {
   id: string | number;
@@ -147,9 +148,9 @@ export default function CrmLeadsPage() {
 
       if (error) throw error;
 
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const demo = isDemoMode();
 
-      if (isDemoMode) {
+      if (demo) {
         setLeads(initialLeads);
       } else {
         if (leadsData && leadsData.length > 0) {

@@ -7,6 +7,8 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { Lock, Mail, ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+import { isDemoMode } from "@/shared/utils/demo";
+
 export default function ParentLoginPage() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
@@ -22,9 +24,7 @@ export default function ParentLoginPage() {
     setErrorMsg("");
 
     try {
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-      if (isDemoMode || (email === "parent@robotics-crm.ru" && password === "demo")) {
+      if (isDemoMode() || (isDemoMode() && email === "parent@robotics-crm.ru" && password === "demo")) {
         // Sign-in demo mock redirect
         window.location.href = "/parent";
         return;

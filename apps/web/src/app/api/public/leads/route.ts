@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createPublicLeadSchema } from "@/features/leads/schemas";
 import type { Database } from "@/shared/db/types";
+import { isDemoMode } from "@/shared/utils/demo";
 
 const DEFAULT_ORG_SLUG = process.env.DEFAULT_ORG_SLUG || "robotics-lipetsk";
 
@@ -17,8 +18,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    if (isDemoMode) {
+    if (isDemoMode()) {
       console.log("Demo Mode: lead submission received:", body);
       return NextResponse.json({ ok: true });
     }

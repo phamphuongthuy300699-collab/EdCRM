@@ -19,6 +19,7 @@ import {
   AlertTriangle 
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
 
 interface Invoice {
   id: string;
@@ -88,10 +89,10 @@ export default function StudentDetailPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const demo = isDemoMode();
       const isMockId = !isNaN(Number(studentId)) || studentId.startsWith("mock-") || studentId.length < 10;
 
-      if (isDemoMode || isMockId) {
+      if (demo || isMockId) {
         const found = mockStudents.find(s => s.id === studentId) || mockStudents[0];
         setStudent(found);
         setInvoices(mockInvoices[found.id] || [
@@ -222,10 +223,10 @@ export default function StudentDetailPage() {
     try {
       setPayingInvoiceId(invoiceId);
 
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const demo = isDemoMode();
       const isMockId = !isNaN(Number(studentId)) || studentId.startsWith("mock-") || studentId.length < 10;
 
-      if (isDemoMode || isMockId) {
+      if (demo || isMockId) {
         setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: "paid" } : inv));
         alert("Демонстрационный счет оплачен!");
         return;
