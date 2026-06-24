@@ -121,6 +121,90 @@
 
 ---
 
+### 12. Раздел «Скрипты и возражения» (`/crm/scripts`)
+
+| Элемент / Кнопка | Действие в БД | Защита от double-click | Статус проверки Supabase |
+| :--- | :--- | :--- | :--- |
+| **Кнопка «Создать скрипт»** | Вставка записи в `call_scripts` | Кнопка переходит в `disabled` с текстом «Сохранение...» | Проверено |
+| **Кнопка «Редактировать» (скрипт)** | Обновление записи в `call_scripts` | Кнопка переходит в `disabled` с текстом «Сохранение...» | Редактирование подтверждено (реально есть edit-modal) |
+| **Кнопка «Добавить возражение»** | Вставка записи в `objections` | Кнопка переходит в `disabled` с текстом «Сохранение...» | Проверено |
+| **Кнопка «Редактировать» (возражение)** | Обновление записи в `objections` | Кнопка переходит в `disabled` с текстом «Сохранение...» | Редактирование подтверждено (реально есть edit-modal) |
+| **Кнопка «Удалить» (скрипт/возражение)** | Обновление `is_active` -> `false` | Требует подтверждения браузера (`confirm`) | Проверено, после обновления страницы удаленные записи не отображаются |
+
+---
+
 ## 🔒 Заключение аудита безопасности действий
 
 Все ключевые бизнес-сценарии системы EdCRM MVP успешно прошли аудит. Защита от двойных кликов реализована на клиенте через управление состояниями отправки (`loading`/`submitting`) и отключение кнопок, а на сервере (Supabase) — с помощью транзакций, ограничений целостности (`UNIQUE CONSTRAINTS`) и RPC-функций, гарантируя надежность работы CRM при проведении презентаций и реальной эксплуатации.
+
+---
+
+## 📅 Отчет о запуске Real E2E тестов
+
+- **Дата запуска:** 24 июня 2026 года
+- **Хэш коммита (git commit):** `6eaad9ff97232c56fbb39b34f4e7d1becd588d96`
+- **Команда:** `REAL_SUPABASE=true npm run test:e2e:real`
+
+### Лог выполнения Real E2E:
+```text
+> web@0.1.0 test:e2e:real
+> REAL_SUPABASE=true playwright test
+
+
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+Running 7 tests using 7 workers
+
+[1/7] [chromium] › e2e/auth.spec.ts:6:7 › Auth and Middleware redirects › should redirect unauthenticated users to login page
+[2/7] [chromium] › e2e/auth.spec.ts:21:7 › Auth and Middleware redirects › should login successfully with role credentials
+[3/7] [chromium] › e2e/lead-conversion.spec.ts:6:7 › Leads Conversion in CRM › should load leads list page
+[4/7] [chromium] › e2e/payments.spec.ts:6:7 › Invoicing and Payments Page › should render payments page with bills list
+[5/7] [chromium] › e2e/public-lead.spec.ts:6:7 › Public Lead Registration Form › should register a new lead and redirect to thanks page
+[6/7] [chromium] › e2e/teacher-student-lesson.spec.ts:6:7 › Teacher Lesson start and Student Material access E2E scenario › should start lesson and show materials
+[7/7] [chromium] › e2e/real-supabase.spec.ts:7:7 › Real Supabase E2E Smoke Test › CRM and Portal flows against real Supabase database
+[chromium] › e2e/real-supabase.spec.ts:7:7 › Real Supabase E2E Smoke Test › CRM and Portal flows against real Supabase database
+Step 1: Submitting a new public lead...
+
+  ✓ Lead submitted, redirected to /thanks
+
+Step 2: Logging in as Admin...
+
+
+[WebServer] [browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+  ✓ Admin logged in, redirected to /crm
+
+Step 3: Converting lead to student...
+
+  ✓ Lead converted, 'Открыть ученика' visible
+
+Step 4: Opening converted student profile...
+
+
+[WebServer] [browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+  ✓ Student profile opened, name matches
+
+Step 5: Creating and paying invoice...
+
+  ✓ Invoice created and marked as paid
+
+Step 6: Logging in as Teacher...
+
+  ✓ Lesson already live from previous run — skipping start
+
+Step 7: Logging in as Student...
+
+  ✓ Student portal loaded, greeting matches
+
+  ⚠ Lesson materials not visible (session may be completed or for a different day)
+
+Step 8: Logging in as Parent...
+
+  ✓ Parent portal loaded, child 'Игорь Петров' visible
+
+
+✅ Real Supabase E2E Smoke Test completed successfully!
+
+  6 skipped
+  1 passed (44.0s)
+```
+
