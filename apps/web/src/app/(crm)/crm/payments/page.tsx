@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@robotics-crm/ui";
 import { CreditCard, Plus, Search, CheckCircle, Clock, AlertCircle, Sparkles } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
 
 export default function CrmPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,6 +21,7 @@ export default function CrmPaymentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
 
   const initialInvoices = [
@@ -64,9 +66,9 @@ export default function CrmPaymentsPage() {
 
         if (error) throw error;
 
-        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const demo = isDemoMode();
 
-        if (isDemoMode) {
+        if (demo) {
           setInvoices(initialInvoices);
         } else {
           if (invoicesData && invoicesData.length > 0) {
@@ -90,7 +92,11 @@ export default function CrmPaymentsPage() {
         }
       } catch (err) {
         console.error("Error loading payments:", err);
-        setInvoices(initialInvoices);
+        if (isDemoMode()) {
+          setInvoices(initialInvoices);
+        } else {
+          setInvoices([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -129,16 +135,22 @@ export default function CrmPaymentsPage() {
   };
 
   const handleMarkAsPaid = async (id: any) => {
-    if (payingInvoiceId) return;
+    if (processingMap.current[id]) return;
+    processingMap.current[id] = true;
+    if (payingInvoiceId) {
+      processingMap.current[id] = false;
+      return;
+    }
     try {
       setPayingInvoiceId(id);
 
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      const demo = isDemoMode();
       const isMockId = typeof id === "string" && (id.startsWith("i") || id.startsWith("mock-"));
 
-      if (isDemoMode || isMockId) {
+      if (demo || isMockId) {
         setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
         alert("Счет успешно отмечен как оплаченный! (Демо-режим)");
+        processingMap.current[id] = false;
         return;
       }
 
@@ -161,8 +173,8 @@ export default function CrmPaymentsPage() {
           student_id: inv.student_id,
           invoice_id: id,
           amount: parseFloat(inv.amount),
-          payment_method: "cash",
-          status: "completed",
+          provider: "cash",
+          status: "succeeded",
           paid_at: new Date().toISOString()
         });
 
@@ -183,6 +195,7 @@ export default function CrmPaymentsPage() {
       alert("Не удалось изменить статус оплаты: " + err.message);
     } finally {
       setPayingInvoiceId(null);
+      processingMap.current[id] = false;
     }
   };
 
@@ -209,10 +222,28 @@ export default function CrmPaymentsPage() {
       const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single();
       if (error) throw error;
 
+      // Fetch parent name through student_guardians -> guardians
+      let parentName = "Не указан";
+      if (!isDemoMode()) {
+        const { data: sgData } = await supabase
+          .from("student_guardians")
+          .select(`
+            guardians (
+              full_name
+            )
+          `)
+          .eq("student_id", newStudentId)
+          .limit(1)
+          .maybeSingle() as any;
+        if (sgData?.guardians?.full_name) {
+          parentName = sgData.guardians.full_name;
+        }
+      }
+
       const newInvObj = {
         id: data.id,
         studentName: selStudent?.full_name || "Неизвестно",
-        parentName: "Родитель",
+        parentName: parentName,
         groupName: "Робототехника",
         amount: data.amount,
         dueDate: new Date(data.due_date).toLocaleDateString("ru-RU"),

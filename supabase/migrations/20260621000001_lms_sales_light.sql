@@ -260,7 +260,7 @@ create policy "lesson_materials_all" on public.lesson_materials
 create policy "lesson_sessions_select" on public.lesson_sessions
   for select to authenticated using (public.is_org_member(organization_id));
 create policy "lesson_sessions_insert" on public.lesson_sessions
-  for insert to authenticated with check (public.has_org_role(organization_id, array['owner','admin','manager']::public.app_role[]));
+  for insert to authenticated with check (public.has_org_role(organization_id, array['owner','admin','manager','teacher']::public.app_role[]));
 create policy "lesson_sessions_update" on public.lesson_sessions
   for update to authenticated using (public.is_org_member(organization_id));
 create policy "lesson_sessions_delete" on public.lesson_sessions

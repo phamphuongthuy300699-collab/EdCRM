@@ -50,6 +50,15 @@ export default function HomeworkPage() {
   const [newDifficulty, setNewDifficulty] = useState("Средняя");
   const [newEstMinutes, setNewEstMinutes] = useState(30);
 
+  const [groups, setGroups] = useState<any[]>([]);
+
+  // Assign Homework Form
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignTemplateId, setAssignTemplateId] = useState("");
+  const [assignGroupId, setAssignGroupId] = useState("");
+  const [assignDueAt, setAssignDueAt] = useState("");
+  const [submittingAssign, setSubmittingAssign] = useState(false);
+
   const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
@@ -68,6 +77,13 @@ export default function HomeworkPage() {
           .eq("organization_id", orgRes.data.id)
           .order("created_at", { ascending: false });
         setTemplates(templatesData || []);
+
+        // Fetch groups
+        const { data: groupsData } = await (supabase
+          .from("groups") as any)
+          .select("id, title")
+          .eq("organization_id", orgRes.data.id);
+        setGroups(groupsData || []);
 
         // Fetch assignments
         const { data: assignmentsData } = await (supabase
@@ -162,6 +178,63 @@ export default function HomeworkPage() {
     }
   };
 
+  const handleDeleteAssignment = async (id: string) => {
+    if (!confirm("Вы уверены, что хотите удалить или отменить это назначение домашнего задания?")) return;
+    try {
+      const { error } = await (supabase
+        .from("homework_assignments") as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      setAssignments(prev => prev.filter(a => a.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Не удалось удалить назначение");
+    }
+  };
+
+  const handleCreateAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignTemplateId || !assignGroupId || submittingAssign) return;
+
+    try {
+      setSubmittingAssign(true);
+      const { data, error } = await (supabase
+        .from("homework_assignments") as any)
+        .insert({
+          organization_id: orgId,
+          homework_template_id: assignTemplateId,
+          group_id: assignGroupId,
+          due_at: assignDueAt ? new Date(assignDueAt).toISOString() : null,
+          status: "assigned"
+        })
+        .select(`
+          id,
+          homework_template_id,
+          group_id,
+          due_at,
+          status,
+          homework_templates (title),
+          groups (title)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setAssignments(prev => [data, ...prev]);
+      setAssignTemplateId("");
+      setAssignGroupId("");
+      setAssignDueAt("");
+      setShowAssignModal(false);
+      alert("Задание успешно назначено группе!");
+    } catch (err) {
+      console.error("Error creating assignment:", err);
+      alert("Не удалось назначить домашнее задание");
+    } finally {
+      setSubmittingAssign(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "assigned": return <span className="badge badge-blue">Выдано</span>;
@@ -193,7 +266,7 @@ export default function HomeworkPage() {
             Каталог самостоятельных работ и журнал выданных заданий с отслеживанием прогресса
           </p>
         </div>
-        {activeTab === "templates" && (
+        {activeTab === "templates" ? (
           <Button 
             variant="primary-crm" 
             style={{ display: "flex", alignItems: "center", gap: "8px" }}
@@ -201,6 +274,27 @@ export default function HomeworkPage() {
           >
             <Plus size={16} />
             <span>Создать шаблон ДЗ</span>
+          </Button>
+        ) : (
+          <Button 
+            variant="primary-crm" 
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+            onClick={() => {
+              if (templates.length === 0) {
+                alert("Сначала создайте хотя бы один шаблон домашнего задания!");
+                return;
+              }
+              if (groups.length === 0) {
+                alert("Сначала создайте хотя бы одну группу в CRM!");
+                return;
+              }
+              setAssignTemplateId(templates[0].id);
+              setAssignGroupId(groups[0].id);
+              setShowAssignModal(true);
+            }}
+          >
+            <Plus size={16} />
+            <span>Назначить ДЗ группе</span>
           </Button>
         )}
       </div>
@@ -324,7 +418,7 @@ export default function HomeworkPage() {
                       {getStatusBadge(as.status)}
                     </td>
                     <td style={{ padding: "16px 24px" }}>
-                      <div style={{ display: "flex", gap: "8px" }}>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                         {as.status === "assigned" && (
                           <Button 
                             variant="secondary-crm" 
@@ -346,6 +440,21 @@ export default function HomeworkPage() {
                         )}
                         {as.status === "checked" && (
                           <span style={{ fontSize: "var(--font-xs)", color: "var(--color-success)", fontWeight: 700 }}>Проверено</span>
+                        )}
+                        {as.status !== "checked" && (
+                          <button 
+                            title="Отменить назначение"
+                            onClick={() => handleDeleteAssignment(as.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "var(--color-danger)",
+                              cursor: "pointer",
+                              padding: "4px"
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -439,6 +548,74 @@ export default function HomeworkPage() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
                 <Button type="button" variant="secondary-crm" onClick={() => setShowTemplateModal(false)}>Отмена</Button>
                 <Button type="submit" variant="primary-crm">Создать</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Homework Modal */}
+      {showAssignModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100
+        }}>
+          <div className="card-crm" style={{ width: "100%", maxWidth: "500px", padding: "32px", background: "white" }}>
+            <h3 style={{ fontSize: "var(--font-h3)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>
+              Назначить ДЗ группе
+            </h3>
+            <form onSubmit={handleCreateAssignment} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="form-group">
+                <label className="form-label">Выберите задание</label>
+                <select 
+                  className="form-input"
+                  value={assignTemplateId}
+                  onChange={e => setAssignTemplateId(e.target.value)}
+                  required
+                >
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Выберите группу</label>
+                <select 
+                  className="form-input"
+                  value={assignGroupId}
+                  onChange={e => setAssignGroupId(e.target.value)}
+                  required
+                >
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Срок сдачи (Due date)</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  value={assignDueAt}
+                  onChange={e => setAssignDueAt(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
+                <Button type="button" variant="secondary-crm" onClick={() => setShowAssignModal(false)}>Отмена</Button>
+                <Button type="submit" variant="primary-crm" disabled={submittingAssign}>
+                  {submittingAssign ? "Назначение..." : "Назначить"}
+                </Button>
               </div>
             </form>
           </div>

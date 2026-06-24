@@ -250,24 +250,23 @@ export default function CrmSettingsPage() {
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Email для уведомлений *</label>
+                  <label className="form-label">Email для уведомлений (не редактируется)</label>
                   <input 
                     type="email" 
                     className="form-input" 
-                    required 
+                    disabled 
                     value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
                   />
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Режим работы</label>
+                <label className="form-label">Режим работы (не редактируется)</label>
                 <input 
                   type="text" 
                   className="form-input" 
+                  disabled 
                   value={hours} 
-                  onChange={(e) => setHours(e.target.value)} 
                 />
               </div>
 
@@ -338,9 +337,9 @@ export default function CrmSettingsPage() {
                       </span>
                       <input 
                         type="checkbox" 
+                        disabled
                         checked={teacher.active} 
-                        onChange={() => setTeachers(teachers.map(t => t.id === teacher.id ? { ...t, active: !t.active } : t))}
-                        style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)" }}
+                        style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)", cursor: "not-allowed" }}
                       />
                     </div>
                   </div>
@@ -371,35 +370,35 @@ export default function CrmSettingsPage() {
                   />
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", border: "1px solid var(--color-border)", borderRadius: "12px", opacity: yookassaActive ? 1 : 0.75 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", border: "1px solid var(--color-border)", borderRadius: "12px", opacity: 0.5 }}>
                   <div>
                     <h4 style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                       <span>ЮKassa</span>
-                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Скоро в CRM</span>
+                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Подключается на следующем этапе</span>
                     </h4>
                     <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>Прием платежей картами, СБП, SberPay</p>
                   </div>
                   <input 
                     type="checkbox" 
+                    disabled
                     checked={yookassaActive} 
-                    onChange={() => setYookassaActive(!yookassaActive)}
-                    style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)" }}
+                    style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)", cursor: "not-allowed" }}
                   />
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", border: "1px solid var(--color-border)", borderRadius: "12px", opacity: robokassaActive ? 1 : 0.75 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", border: "1px solid var(--color-border)", borderRadius: "12px", opacity: 0.5 }}>
                   <div>
                     <h4 style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                       <span>Robokassa</span>
-                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Скоро в CRM</span>
+                      <span className="badge badge-gray" style={{ fontSize: "9px" }}>Подключается на следующем этапе</span>
                     </h4>
                     <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>Прием международных и локальных онлайн-карт</p>
                   </div>
                   <input 
                     type="checkbox" 
+                    disabled
                     checked={robokassaActive} 
-                    onChange={() => setRobokassaActive(!robokassaActive)}
-                    style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)" }}
+                    style={{ width: "36px", height: "20px", accentColor: "var(--color-primary)", cursor: "not-allowed" }}
                   />
                 </div>
               </div>

@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Public Lead Registration Form", () => {
+  test.skip(process.env.REAL_SUPABASE === "true", "Skipping demo E2E in Real Mode");
+
   test("should register a new lead and redirect to thanks page", async ({ page }) => {
     // Navigate to landing page
     await page.goto("/");

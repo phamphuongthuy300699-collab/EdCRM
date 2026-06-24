@@ -16,6 +16,7 @@ import {
   ArrowRight, 
   AlertTriangle 
 } from "lucide-react";
+import { isDemoMode } from "@/shared/utils/demo";
 
 export default function CrmDashboard() {
   const [loading, setLoading] = useState(true);
@@ -30,27 +31,43 @@ export default function CrmDashboard() {
     enrolledCount: 0
   });
 
-  // Lists state with initial mock fallback
-  const [leads, setLeads] = useState<any[]>([
-    { id: "l1", name: "Анна Петрова", phone: "+7 (905) 555-12-34", child: "Игорь, 8 лет", course: "LEGO Start", date: "Сегодня, 11:32", status: "new" },
-    { id: "l2", name: "Сергей Волков", phone: "+7 (920) 222-33-44", child: "Алиса, 10 лет", course: "Scratch", date: "Сегодня, 09:15", status: "new" },
-    { id: "l3", name: "Ольга Семенова", phone: "+7 (915) 333-55-66", child: "Кирилл, 7 лет", course: "LEGO Start", date: "Вчера, 18:20", status: "contacted" }
-  ]);
-
-  const [schedule, setSchedule] = useState<any[]>([
-    { time: "17:00", name: "LEGO Start (6-8 лет)", room: "Каб. 101", teacher: "Алексей Д.", filled: "7/8 мест" },
-    { time: "18:30", name: "Scratch (8-11 лет)", room: "Каб. 102", teacher: "Мария С.", filled: "6/8 мест" }
-  ]);
-
-  const [invoices, setInvoices] = useState<any[]>([
-    { id: "i1", student: "Миша Сидоров", parent: "Дмитрий С.", amount: "4 000 ₽", due: "18.06.2026" },
-    { id: "i2", student: "Лера Козлова", parent: "Елена К.", amount: "4 500 ₽", due: "15.06.2026" }
-  ]);
+  // Lists state (empty by default)
+  const [leads, setLeads] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
         setLoading(true);
+
+        if (isDemoMode()) {
+          setLeads([
+            { id: "l1", name: "Анна Петрова", phone: "+7 (905) 555-12-34", child: "Игорь, 8 лет", course: "LEGO Start", date: "Сегодня, 11:32", status: "new" },
+            { id: "l2", name: "Сергей Волков", phone: "+7 (920) 222-33-44", child: "Алиса, 10 лет", course: "Scratch", date: "Сегодня, 09:15", status: "new" },
+            { id: "l3", name: "Ольга Семенова", phone: "+7 (915) 333-55-66", child: "Кирилл, 7 лет", course: "LEGO Start", date: "Вчера, 18:20", status: "contacted" }
+          ]);
+          setSchedule([
+            { time: "17:00", name: "LEGO Start (6-8 лет)", room: "Каб. 101", teacher: "Алексей Д.", filled: "7/8 мест" },
+            { time: "18:30", name: "Scratch (8-11 лет)", room: "Каб. 102", teacher: "Мария С.", filled: "6/8 мест" }
+          ]);
+          setInvoices([
+            { id: "i1", student: "Миша Сидоров", parent: "Дмитрий С.", amount: "4 000 ₽", due: "18.06.2026" },
+            { id: "i2", student: "Лера Козлова", parent: "Елена К.", amount: "4 500 ₽", due: "15.06.2026" }
+          ]);
+          setStatsData({
+            newLeadsCount: 3,
+            newLeadsToday: 2,
+            overdueAmount: 8500,
+            overdueCount: 2,
+            activeGroupsCount: 2,
+            activeStudentsCount: 5,
+            totalCapacity: 16,
+            enrolledCount: 13
+          });
+          return;
+        }
+
         const supabase = createSupabaseBrowserClient();
 
         // 1. Leads
@@ -87,7 +104,7 @@ export default function CrmDashboard() {
         // 4. Groups & Enrollments
         const { data: groupsData } = await supabase
           .from("groups")
-          .select("id, title, capacity, profiles(full_name), courses(title)")
+          .select("id, title, capacity, profiles(full_name), courses(title), group_schedule_rules(weekday, starts_at)")
           .eq("status", "active");
 
         const { data: enrollmentsData } = await supabase
@@ -118,7 +135,7 @@ export default function CrmDashboard() {
           enrolledCount: enrolled
         });
 
-        // Set recent leads if database has any
+        // Set recent leads
         if (leadsData && leadsData.length > 0) {
           setLeads(leadsData.slice(0, 3).map((l: any) => ({
             id: l.id,
@@ -129,9 +146,11 @@ export default function CrmDashboard() {
             date: new Date(l.created_at).toLocaleDateString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
             status: l.status
           })));
+        } else {
+          setLeads([]);
         }
 
-        // Set overdue invoices list if database has any
+        // Set overdue invoices list
         if (overdueInvs.length > 0) {
           setInvoices(overdueInvs.slice(0, 3).map((i: any) => {
             const firstGuardian = i.students?.student_guardians?.[0]?.guardians;
@@ -143,24 +162,31 @@ export default function CrmDashboard() {
               due: i.due_date ? new Date(i.due_date).toLocaleDateString("ru-RU") : "Не установлен"
             };
           }));
+        } else {
+          setInvoices([]);
         }
 
-        // Set schedule if database has any
+        // Set schedule
         if (groupsData && groupsData.length > 0) {
           setSchedule(groupsData.slice(0, 3).map((g: any, idx: number) => {
-            const times = ["17:00", "18:30", "15:30"];
-            const rooms = ["Каб. 101", "Каб. 102", "Каб. 103"];
+            const rule = g.group_schedule_rules?.[0];
+            const time = rule ? rule.starts_at.slice(0, 5) : "18:00";
             return {
-              time: times[idx % times.length],
+              time,
               name: g.title,
-              room: rooms[idx % rooms.length],
+              room: `Каб. ${101 + idx}`,
               teacher: g.profiles?.full_name || "Не назначен",
-              filled: `${enrolled} / ${g.capacity || 8} мест`
+              filled: `${enrolled} мест`
             };
           }));
+        } else {
+          setSchedule([]);
         }
       } catch (err) {
         console.error("Error loading dashboard data:", err);
+        setLeads([]);
+        setSchedule([]);
+        setInvoices([]);
       } finally {
         setLoading(false);
       }

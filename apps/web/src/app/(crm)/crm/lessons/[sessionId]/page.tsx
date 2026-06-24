@@ -25,7 +25,8 @@ interface LessonSession {
   id: string;
   starts_at: string;
   ends_at: string | null;
-  status: "planned" | "completed" | "cancelled" | "moved";
+  status: "planned" | "completed" | "cancelled" | "moved" | "live";
+  materials_unlocked?: boolean;
   topic: string | null;
   group_id: string;
   course_id: string | null;
@@ -120,6 +121,7 @@ export default function LessonConductPage() {
             teacher_id,
             room_id,
             teacher_comment,
+            materials_unlocked,
             groups (title),
             courses (title),
             lesson_templates (id, title, description, goals, plan, equipment),
@@ -359,9 +361,14 @@ export default function LessonConductPage() {
               <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)" }}>
                 Панель преподавателя: {session.groups ? session.groups.title : "Группа"}
               </h1>
-              <span className={`badge ${session.status === "completed" ? "badge-green" : "badge-blue"}`}>
-                {session.status === "completed" ? "Проведено" : "Запланировано"}
+              <span className={`badge ${session.status === "completed" ? "badge-green" : session.status === "live" ? "badge-green animation-pulse" : "badge-blue"}`} style={session.status === "live" ? { background: "var(--color-success)", color: "white" } : {}}>
+                {session.status === "completed" ? "Проведено" : session.status === "live" ? "Идет урок" : "Запланировано"}
               </span>
+              {session.status === "live" && (
+                <span className={`badge ${session.materials_unlocked ? "badge-blue" : "badge-amber"}`}>
+                  Материалы: {session.materials_unlocked ? "Открыты" : "Закрыты"}
+                </span>
+              )}
             </div>
             <div style={{ display: "flex", gap: "16px", color: "var(--color-text-muted)", fontSize: "var(--font-small)", marginTop: "4px" }}>
               <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Calendar size={14} /> {dateStr}</span>

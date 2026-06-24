@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
           // Unassigned role fallback
-          return NextResponse.redirect(new URL("/login", request.url));
+          return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
         }
       }
 
@@ -126,7 +126,7 @@ export async function middleware(request: NextRequest) {
         } else if (isGuardian) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
-          return NextResponse.redirect(new URL("/login", request.url));
+          return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
         }
       }
 
@@ -141,7 +141,7 @@ export async function middleware(request: NextRequest) {
         } else if (isStudent) {
           return NextResponse.redirect(new URL("/student", request.url));
         } else {
-          return NextResponse.redirect(new URL("/login", request.url));
+          return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
         }
       }
 
@@ -156,13 +156,15 @@ export async function middleware(request: NextRequest) {
         } else if (isGuardian) {
           return NextResponse.redirect(new URL("/parent", request.url));
         } else {
-          return NextResponse.redirect(new URL("/login", request.url));
+          return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
         }
       }
     } catch (err) {
       console.error("Middleware role check error:", err);
-      // Fallback: allow request if check failed to prevent lockouts
-      return response;
+      if (isLoginPath) {
+        return response;
+      }
+      return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
     }
   }
 

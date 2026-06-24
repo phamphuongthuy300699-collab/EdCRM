@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Auth and Middleware redirects", () => {
+  test.skip(process.env.REAL_SUPABASE === "true", "Skipping demo E2E in Real Mode");
+
   test("should redirect unauthenticated users to login page", async ({ page }) => {
     // Navigate to protected page
     await page.goto("/crm");

@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
 
 interface Student {
   id: string | number;
@@ -139,9 +140,9 @@ export default function CrmStudentsPage() {
           .select("student_id, is_present")
           .eq("organization_id", orgRes.data.id);
 
-        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const demo = isDemoMode();
 
-        if (isDemoMode) {
+        if (demo) {
           setStudents(initialStudents);
         } else {
           if (studentsData && studentsData.length > 0) {
@@ -192,7 +193,11 @@ export default function CrmStudentsPage() {
         }
       } catch (err) {
         console.error("Error loading students list:", err);
-        setStudents(initialStudents);
+        if (isDemoMode()) {
+          setStudents(initialStudents);
+        } else {
+          setStudents([]);
+        }
       } finally {
         setLoading(false);
       }

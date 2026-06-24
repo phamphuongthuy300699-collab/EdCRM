@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Teacher Lesson start and Student Material access E2E scenario", () => {
+  test.skip(process.env.REAL_SUPABASE === "true", "Skipping demo E2E in Real Mode");
+
   test("should start lesson and show materials", async ({ page }) => {
     // 1. Open student page (simulated)
     await page.goto("/student");

@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const isReal = process.env.REAL_SUPABASE === "true";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -24,8 +26,10 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       PORT: "3001",
-      NEXT_PUBLIC_SUPABASE_URL: "",
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+      ...(isReal ? {} : {
+        NEXT_PUBLIC_SUPABASE_URL: "",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+      }),
     },
   },
 });

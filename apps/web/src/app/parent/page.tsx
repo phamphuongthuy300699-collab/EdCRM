@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
+import { isDemoMode } from "@/shared/utils/demo";
 import { 
   Smile, 
   Cpu, 
@@ -14,9 +15,63 @@ import {
   MessageSquare,
   CheckCircle,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Clock,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@robotics-crm/ui";
+
+const daysMap: Record<number, string> = {
+  1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
+};
+
+function formatScheduleRules(rules: any[]) {
+  if (!rules || rules.length === 0) return "Не определено";
+  return rules
+    .map(rule => `${daysMap[rule.weekday] || rule.weekday} ${rule.starts_at.slice(0, 5)}`)
+    .join(", ");
+}
+
+function getNextClass(scheduleRules: any[]) {
+  if (!scheduleRules || scheduleRules.length === 0) return "Не определено";
+  
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 is Sunday, 1-6 are Mon-Sat
+  const currentDayMapped = currentDay === 0 ? 7 : currentDay;
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  let minDiff = 8;
+  let nextRule = null;
+  
+  for (const rule of scheduleRules) {
+    let diff = rule.weekday - currentDayMapped;
+    if (diff < 0) {
+      diff += 7;
+    } else if (diff === 0) {
+      const [sh, sm] = rule.starts_at.split(":").map(Number);
+      if (currentHour > sh || (currentHour === sh && currentMinute >= sm)) {
+        diff = 7;
+      }
+    }
+    
+    if (diff < minDiff) {
+      minDiff = diff;
+      nextRule = rule;
+    }
+  }
+  
+  if (!nextRule) return "Не определено";
+  
+  const startsShort = nextRule.starts_at.slice(0, 5);
+  if (minDiff === 0) {
+    return `Сегодня, ${startsShort}`;
+  } else if (minDiff === 1) {
+    return `Завтра, ${startsShort}`;
+  } else {
+    return `${daysMap[nextRule.weekday]}, ${startsShort}`;
+  }
+}
 
 export default function ParentDashboard() {
   const router = useRouter();
@@ -71,10 +126,21 @@ export default function ParentDashboard() {
         }
 
         // We have a user. Let's fetch their guardian profile using the service-free browser client (restricted by RLS or custom query)
-        // Since we altered database schema to link guardians.user_id, let's query it
+        // Query guardian_users to link logged-in user to CRM guardian
+        const { data: linkData, error: linkErr } = await (supabase.from("guardian_users") as any)
+          .select("guardian_id")
+          .eq("user_id", user.id)
+          .single();
+
+        if (linkErr || !linkData) {
+          console.log("No linked guardian found for user_id:", user.id);
+          setLoading(false);
+          return;
+        }
+
         const { data: guardianData } = await (supabase.from("guardians") as any)
           .select("*")
-          .eq("user_id", user.id)
+          .eq("id", linkData.guardian_id)
           .single();
 
         if (guardianData) {
@@ -108,7 +174,8 @@ export default function ParentDashboard() {
                       title,
                       courses (title),
                       profiles (full_name),
-                      rooms (name)
+                      rooms (name),
+                      group_schedule_rules (weekday, starts_at, ends_at)
                     `)
                     .eq("id", enroll.group_id)
                     .single();
@@ -163,9 +230,9 @@ export default function ParentDashboard() {
   }
 
   // Determine whether we display real DB kids or fallback demo
-  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const isDemo = isDemoMode();
   const hasRealData = childrenList.length > 0;
-  const showDemoData = isDemoMode && !hasRealData;
+  const showDemoData = isDemo && !hasRealData;
   
   // Robo message based on state
   const isBalanceLow = !showDemoData 
@@ -491,6 +558,20 @@ export default function ParentDashboard() {
                           <div style={{ fontWeight: 600 }}>{kid.group?.rooms?.name || "Кабинет 101"}</div>
                         </div>
                       </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                        <Clock size={16} style={{ color: "var(--color-primary)" }} />
+                        <div>
+                          <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>Расписание</div>
+                          <div style={{ fontWeight: 600 }}>{formatScheduleRules(kid.group?.group_schedule_rules)}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                        <Sparkles size={16} style={{ color: "var(--color-primary)" }} />
+                        <div>
+                          <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>Ближайшее занятие</div>
+                          <div style={{ fontWeight: 600 }}>{getNextClass(kid.group?.group_schedule_rules)}</div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Attendance check */}
@@ -566,11 +647,19 @@ export default function ParentDashboard() {
 
                             {inv.status !== "paid" && (
                               <Button 
-                                onClick={handleRequestPaymentLink}
+                                onClick={isDemo ? handleRequestPaymentLink : undefined}
+                                disabled={!isDemo}
                                 variant="primary-site" 
-                                style={{ background: "var(--color-accent)", height: "36px", fontSize: "12px", width: "100%", marginTop: "4px" }}
+                                style={{ 
+                                  background: isDemo ? "var(--color-accent)" : "var(--color-text-muted)", 
+                                  cursor: isDemo ? "pointer" : "not-allowed",
+                                  height: "36px", 
+                                  fontSize: "12px", 
+                                  width: "100%", 
+                                  marginTop: "4px" 
+                                }}
                               >
-                                Запросить ссылку
+                                {isDemo ? "Запросить ссылку" : "Оплата будет подключена после выдачи ключей"}
                               </Button>
                             )}
                           </div>

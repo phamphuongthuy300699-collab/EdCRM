@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
+import { isDemoMode } from "@/shared/utils/demo";
 import { 
   BookOpen, 
   Clock, 
@@ -72,10 +73,10 @@ export default function StudentPortal() {
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
-        const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const isDemo = isDemoMode();
 
         if (isDemo) {
-          setProfile({ full_name: "Данил Соловьев (Родитель)" });
+          setProfile({ full_name: "Данил Соловьев" });
           setStudentInfo(demoStudent);
           setGroup(demoGroup);
           setLoading(false);
@@ -89,8 +90,7 @@ export default function StudentPortal() {
 
         setProfile(user);
 
-        // Fetch student linked to this user profile
-        // profiles -> student_users -> students
+        // Fetch student linked to this user profile strictly via student_users
         const { data: linkData } = await (supabase
           .from("student_users") as any)
           .select(`
@@ -114,48 +114,11 @@ export default function StudentPortal() {
           .eq("user_id", user.id)
           .maybeSingle();
 
-        // Fallback: search guardians link (guardian_users -> guardians -> student_guardians -> students)
-        let student = linkData?.students;
+        const student = linkData?.students;
 
         if (!student) {
-          const { data: guardLink } = await (supabase
-            .from("guardian_users") as any)
-            .select(`
-              guardian_id,
-              guardians (
-                student_guardians (
-                  student_id,
-                  students (
-                    id,
-                    full_name,
-                    birth_date,
-                    enrollments (
-                      group_id,
-                      groups (
-                        id,
-                        title,
-                        teacher_id,
-                        courses (title),
-                        profiles (full_name)
-                      )
-                    )
-                  )
-                )
-              )
-            `)
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-          const stLink = guardLink?.guardians?.student_guardians?.[0]?.students;
-          if (stLink) {
-            student = stLink;
-          }
-        }
-
-        if (!student) {
-          // If authenticated but no links, fallback to demo mode representation
-          setStudentInfo(demoStudent);
-          setGroup(demoGroup);
+          setStudentInfo(null);
+          setGroup(null);
           setLoading(false);
           return;
         }
@@ -180,9 +143,11 @@ export default function StudentPortal() {
             id: gData.id,
             title: gData.title,
             courseName: gData.courses?.title || "Робототехника",
-            schedule: "Пн / Чт 18:00",
+            schedule: "Расписание группы",
             teacherName: gData.profiles?.full_name || "Инженер-наставник"
           });
+        } else {
+          setGroup(null);
         }
       } catch (err) {
         console.error("Error loading student portal data:", err);
@@ -194,12 +159,11 @@ export default function StudentPortal() {
     loadStudentData();
   }, []);
 
-  // Fetch today's lesson session and materials
   useEffect(() => {
     if (!group || !group.id) return;
-    const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const isDemo = isDemoMode();
 
-    if (isDemo || group.id.startsWith("g")) {
+    if (isDemo || (typeof group.id === "string" && group.id.startsWith("g"))) {
       if (demoActiveSession) {
         setSessionToday({
           status: "live",
@@ -232,7 +196,7 @@ export default function StudentPortal() {
         setSessionToday(sess);
 
         if (sess && sess.materials_unlocked && (sess.status === "live" || sess.status === "completed")) {
-          // Fetch student visible materials for this lesson template
+          // Fetch student visible materials for this lesson template strictly
           if (sess.lesson_template_id) {
             const { data: mats } = await (supabase
               .from("lesson_materials") as any)
@@ -243,8 +207,7 @@ export default function StudentPortal() {
 
             setMaterials(mats || []);
           } else {
-            // If session is live but no template, show generic demo materials
-            setMaterials(demoMaterials);
+            setMaterials([]);
           }
         } else {
           setMaterials([]);
@@ -323,18 +286,29 @@ export default function StudentPortal() {
 
       {/* Main Content */}
       <div className="container" style={{ maxWidth: "1000px", margin: "32px auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: "24px" }}>
-        
-        {/* Welcome Block */}
-        <div style={{
-          background: "white",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-card-site)",
-          padding: "28px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.01)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}>
+        {!studentInfo && !isDemoMode() ? (
+          <div className="card-crm" style={{ background: "white", padding: "48px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
+            <HelpCircle size={48} style={{ color: "var(--color-text-muted)", opacity: 0.5 }} />
+            <div>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Профиль не привязан</h3>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-small)", marginTop: "8px" }}>
+                Ваша учетная запись пока не связана ни с одной карточкой ученика. Пожалуйста, обратитесь к администратору или преподавателю для настройки доступа.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Welcome Block */}
+            <div style={{
+              background: "white",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-card-site)",
+              padding: "28px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.01)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--color-primary-soft)", color: "var(--color-primary-dark)", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 800, textTransform: "uppercase", marginBottom: "12px" }}>
               <Sparkles size={12} />
@@ -538,9 +512,9 @@ export default function StudentPortal() {
               </div>
             )}
           </div>
-
         </div>
-
+      </>
+    )}
       </div>
     </div>
   );

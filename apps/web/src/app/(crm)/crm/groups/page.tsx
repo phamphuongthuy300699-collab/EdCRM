@@ -4,6 +4,64 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
 import { GraduationCap, Plus, Search, Users, Calendar, Clock, Sparkles } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { isDemoMode } from "@/shared/utils/demo";
+
+const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+function formatScheduleRules(rules: any[]) {
+  if (!rules || rules.length === 0) return "Не задано";
+  const sorted = [...rules].sort((a, b) => {
+    if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+    return a.starts_at.localeCompare(b.starts_at);
+  });
+  
+  const timeGroups: Record<string, number[]> = {};
+  sorted.forEach(r => {
+    const time = r.starts_at.slice(0, 5);
+    if (!timeGroups[time]) timeGroups[time] = [];
+    timeGroups[time].push(r.weekday);
+  });
+
+  return Object.entries(timeGroups)
+    .map(([time, days]) => {
+      const daysStr = days.map(d => weekdaysRu[d - 1]).join(" / ");
+      return `${daysStr} ${time}`;
+    })
+    .join(", ");
+}
+
+function parseSchedule(scheduleText: string): { weekday: number; starts_at: string; ends_at: string }[] {
+  const timeMatch = scheduleText.match(/(\d{2}):(\d{2})/);
+  const time = timeMatch ? timeMatch[0] : "18:00";
+  const starts_at = `${time}:00`;
+  const [h, m] = time.split(":").map(Number);
+  const endH = String((h + 1) % 24).padStart(2, '0');
+  const ends_at = `${endH}:${String(m).padStart(2, '0')}:00`;
+
+  const dayNames = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+  const rules: { weekday: number; starts_at: string; ends_at: string }[] = [];
+  
+  const textLower = scheduleText.toLowerCase();
+  dayNames.forEach((day, index) => {
+    if (textLower.includes(day)) {
+      rules.push({
+        weekday: index + 1,
+        starts_at,
+        ends_at
+      });
+    }
+  });
+
+  if (rules.length === 0) {
+    rules.push({
+      weekday: 1,
+      starts_at,
+      ends_at
+    });
+  }
+
+  return rules;
+}
 
 export default function CrmGroupsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,7 +156,8 @@ export default function CrmGroupsPage() {
             age_to,
             status,
             courses (title),
-            profiles (full_name)
+            profiles (full_name),
+            group_schedule_rules (weekday, starts_at, ends_at)
           `);
 
         if (error) throw error;
@@ -114,9 +173,9 @@ export default function CrmGroupsPage() {
           enrollCountMap.set(e.group_id, (enrollCountMap.get(e.group_id) || 0) + 1);
         });
 
-        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const demo = isDemoMode();
 
-        if (isDemoMode) {
+        if (demo) {
           setGroups(initialGroups);
         } else {
           if (groupsData && groupsData.length > 0) {
@@ -124,7 +183,7 @@ export default function CrmGroupsPage() {
               id: g.id,
               title: g.title,
               courseName: g.courses?.title || "Не указан",
-              schedule: "Пн / Чт 18:00 (демо)", // fallback schedule
+              schedule: formatScheduleRules(g.group_schedule_rules),
               teacherName: g.profiles?.full_name || "Не назначен",
               ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
               capacity: g.capacity || 8,
@@ -138,7 +197,11 @@ export default function CrmGroupsPage() {
         }
       } catch (err) {
         console.error("Error loading groups:", err);
-        setGroups(initialGroups);
+        if (isDemoMode()) {
+          setGroups(initialGroups);
+        } else {
+          setGroups([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -224,11 +287,25 @@ export default function CrmGroupsPage() {
 
       if (error) throw error;
 
+      // Parse and save schedule rules
+      const rules = parseSchedule(newSchedule);
+      if (!isDemoMode()) {
+        for (const rule of rules) {
+          await (supabase.from("group_schedule_rules") as any).insert({
+            organization_id: orgRes.data.id,
+            group_id: data.id,
+            weekday: rule.weekday,
+            starts_at: rule.starts_at,
+            ends_at: rule.ends_at
+          });
+        }
+      }
+
       const newGroupObj = {
         id: data.id,
         title: data.title,
         courseName: data.courses?.title || "Не указан",
-        schedule: newSchedule || "Пн / Чт 18:00",
+        schedule: formatScheduleRules(rules),
         teacherName: data.profiles?.full_name || "Не назначен",
         ageRange: `${data.age_from}–${data.age_to} лет`,
         capacity: data.capacity,
@@ -361,8 +438,8 @@ export default function CrmGroupsPage() {
               <Button onClick={() => handleOpenGroupDrawer(group)} variant="secondary-site" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
                 Список учеников
               </Button>
-              <Button variant="primary-crm" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
-                Редактировать
+              <Button variant="primary-crm" disabled style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
+                Будет позже
               </Button>
             </div>
           </div>

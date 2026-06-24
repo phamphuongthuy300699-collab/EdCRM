@@ -12,7 +12,8 @@ import {
   CheckSquare, 
   AlertCircle,
   HelpCircle,
-  Hash
+  Hash,
+  Edit
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 
@@ -60,6 +61,11 @@ export default function ScriptsPage() {
   const [objRecAnswer, setObjRecAnswer] = useState("");
   const [objTagsInput, setObjTagsInput] = useState("");
 
+  const [editingScriptId, setEditingScriptId] = useState<string | null>(null);
+  const [editingObjectionId, setEditingObjectionId] = useState<string | null>(null);
+  const [submittingScript, setSubmittingScript] = useState(false);
+  const [submittingObjection, setSubmittingObjection] = useState(false);
+
   const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
@@ -99,78 +105,144 @@ export default function ScriptsPage() {
 
   const handleCreateScript = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!scriptTitle || !scriptContent) return;
+    if (!scriptTitle || !scriptContent || submittingScript) return;
 
     try {
+      setSubmittingScript(true);
       const checklistArray = scriptChecklistInput
         .split("\n")
         .map(item => item.trim())
         .filter(Boolean);
 
-      const { data, error } = await (supabase
-        .from("call_scripts") as any)
-        .insert({
-          organization_id: orgId,
-          title: scriptTitle,
-          stage: scriptStage,
-          content: scriptContent,
-          checklist: checklistArray,
-          is_active: true
-        })
-        .select()
-        .single();
+      if (editingScriptId) {
+        const { data, error } = await (supabase
+          .from("call_scripts") as any)
+          .update({
+            title: scriptTitle,
+            stage: scriptStage,
+            content: scriptContent,
+            checklist: checklistArray
+          })
+          .eq("id", editingScriptId)
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setScripts(prev => [...prev, data]);
+        setScripts(prev => prev.map(s => s.id === editingScriptId ? data : s));
+        setEditingScriptId(null);
+        alert("Скрипт успешно сохранен!");
+      } else {
+        const { data, error } = await (supabase
+          .from("call_scripts") as any)
+          .insert({
+            organization_id: orgId,
+            title: scriptTitle,
+            stage: scriptStage,
+            content: scriptContent,
+            checklist: checklistArray,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setScripts(prev => [...prev, data]);
+        alert("Скрипт звонка успешно добавлен!");
+      }
+
       setScriptTitle("");
       setScriptStage("Знакомство");
       setScriptContent("");
       setScriptChecklistInput("");
       setShowScriptModal(false);
-      alert("Скрипт звонка успешно добавлен!");
     } catch (err) {
-      console.error("Error creating script:", err);
-      alert("Не удалось добавить скрипт");
+      console.error("Error saving script:", err);
+      alert("Не удалось сохранить скрипт");
+    } finally {
+      setSubmittingScript(false);
     }
   };
 
   const handleCreateObjection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!objTitle || !objRecAnswer) return;
+    if (!objTitle || !objRecAnswer || submittingObjection) return;
 
     try {
+      setSubmittingObjection(true);
       const tagsArray = objTagsInput
         .split(",")
         .map(tag => tag.trim())
         .filter(Boolean);
 
-      const { data, error } = await (supabase
-        .from("objections") as any)
-        .insert({
-          organization_id: orgId,
-          title: objTitle,
-          category: objCategory,
-          recommended_answer: objRecAnswer,
-          tags: tagsArray,
-          is_active: true
-        })
-        .select()
-        .single();
+      if (editingObjectionId) {
+        const { data, error } = await (supabase
+          .from("objections") as any)
+          .update({
+            title: objTitle,
+            category: objCategory,
+            recommended_answer: objRecAnswer,
+            tags: tagsArray
+          })
+          .eq("id", editingObjectionId)
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setObjections(prev => [...prev, data]);
+        setObjections(prev => prev.map(o => o.id === editingObjectionId ? data : o));
+        setEditingObjectionId(null);
+        alert("Возражение успешно сохранено!");
+      } else {
+        const { data, error } = await (supabase
+          .from("objections") as any)
+          .insert({
+            organization_id: orgId,
+            title: objTitle,
+            category: objCategory,
+            recommended_answer: objRecAnswer,
+            tags: tagsArray,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setObjections(prev => [...prev, data]);
+        alert("Возражение успешно добавлено в справочник!");
+      }
+
       setObjTitle("");
       setObjCategory("Цена");
       setObjRecAnswer("");
       setObjTagsInput("");
       setShowObjectionModal(false);
-      alert("Возражение успешно добавлено в справочник!");
     } catch (err) {
-      console.error("Error creating objection:", err);
-      alert("Не удалось добавить возражение");
+      console.error("Error saving objection:", err);
+      alert("Не удалось сохранить возражение");
+    } finally {
+      setSubmittingObjection(false);
     }
+  };
+
+  const handleEditScript = (script: CallScript) => {
+    setScriptTitle(script.title);
+    setScriptStage(script.stage || "Знакомство");
+    setScriptContent(script.content);
+    setScriptChecklistInput(script.checklist ? script.checklist.join("\n") : "");
+    setEditingScriptId(script.id);
+    setShowScriptModal(true);
+  };
+
+  const handleEditObjection = (obj: Objection) => {
+    setObjTitle(obj.title);
+    setObjCategory(obj.category || "Цена");
+    setObjRecAnswer(obj.recommended_answer);
+    setObjTagsInput(obj.tags ? obj.tags.join(", ") : "");
+    setEditingObjectionId(obj.id);
+    setShowObjectionModal(true);
   };
 
   const handleDeleteScript = async (id: string) => {
@@ -332,19 +404,34 @@ export default function ScriptsPage() {
                     )}
                   </div>
                 </div>
-                <button 
-                  title="Удалить скрипт"
-                  onClick={() => handleDeleteScript(script.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--color-danger)",
-                    cursor: "pointer",
-                    padding: "4px"
-                  }}
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button 
+                    title="Редактировать скрипт"
+                    onClick={() => handleEditScript(script)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-primary)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button 
+                    title="Удалить скрипт"
+                    onClick={() => handleDeleteScript(script.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-danger)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Grid content: Script body vs Checklist */}
@@ -356,7 +443,7 @@ export default function ScriptsPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>
                     <CheckSquare size={14} />
-                    <span>Чек-лист обязательных действий</span>
+                    <span>Чек-лист (локальный для текущего звонка, не сохраняется)</span>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -425,19 +512,34 @@ export default function ScriptsPage() {
                     ))}
                   </div>
                 </div>
-                <button 
-                  title="Удалить"
-                  onClick={() => handleDeleteObjection(obj.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--color-danger)",
-                    cursor: "pointer",
-                    padding: "4px"
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button 
+                    title="Редактировать"
+                    onClick={() => handleEditObjection(obj)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-primary)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button 
+                    title="Удалить"
+                    onClick={() => handleDeleteObjection(obj.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-danger)",
+                      cursor: "pointer",
+                      padding: "4px"
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
 
               <div style={{ background: "#F0FDF4", padding: "16px", borderRadius: "8px", border: "1px solid #DCFCE7", fontSize: "12px", lineHeight: 1.6, color: "#166534" }}>
@@ -525,8 +627,23 @@ export default function ScriptsPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
-                <Button type="button" variant="secondary-crm" onClick={() => setShowScriptModal(false)}>Отмена</Button>
-                <Button type="submit" variant="primary-crm">Добавить</Button>
+                <Button 
+                  type="button" 
+                  variant="secondary-crm" 
+                  onClick={() => { 
+                    setShowScriptModal(false); 
+                    setEditingScriptId(null); 
+                    setScriptTitle(""); 
+                    setScriptStage("Знакомство"); 
+                    setScriptContent(""); 
+                    setScriptChecklistInput(""); 
+                  }}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" variant="primary-crm" disabled={submittingScript}>
+                  {submittingScript ? "Сохранение..." : editingScriptId ? "Сохранить" : "Добавить"}
+                </Button>
               </div>
             </form>
           </div>
@@ -599,8 +716,23 @@ export default function ScriptsPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "12px" }}>
-                <Button type="button" variant="secondary-crm" onClick={() => setShowObjectionModal(false)}>Отмена</Button>
-                <Button type="submit" variant="primary-crm">Добавить</Button>
+                <Button 
+                  type="button" 
+                  variant="secondary-crm" 
+                  onClick={() => { 
+                    setShowObjectionModal(false); 
+                    setEditingObjectionId(null); 
+                    setObjTitle(""); 
+                    setObjCategory("Цена"); 
+                    setObjRecAnswer(""); 
+                    setObjTagsInput(""); 
+                  }}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" variant="primary-crm" disabled={submittingObjection}>
+                  {submittingObjection ? "Сохранение..." : editingObjectionId ? "Сохранить" : "Добавить"}
+                </Button>
               </div>
             </form>
           </div>

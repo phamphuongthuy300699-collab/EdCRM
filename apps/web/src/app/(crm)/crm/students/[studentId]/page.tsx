@@ -242,8 +242,8 @@ export default function StudentDetailPage() {
           student_id: student.id,
           invoice_id: invoiceId,
           amount: targetInvoice.amount,
-          payment_method: "card",
-          status: "completed",
+          provider: "yookassa",
+          status: "succeeded",
           paid_at: new Date().toISOString()
         });
 

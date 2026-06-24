@@ -95,11 +95,11 @@ export async function POST(request: Request) {
     if (parentUserId) {
       await supabase
         .from("guardian_users")
-        .insert({
+        .upsert({
           organization_id: lead.organization_id,
           guardian_id: guardianId,
           user_id: parentUserId
-        });
+        }, { onConflict: "organization_id,guardian_id,user_id" });
       console.log("Linked auth user to guardian in guardian_users.");
     }
 

@@ -22,7 +22,7 @@ interface LessonSession {
   id: string;
   starts_at: string;
   ends_at: string | null;
-  status: "planned" | "completed" | "cancelled" | "moved";
+  status: "planned" | "completed" | "cancelled" | "moved" | "live";
   topic: string | null;
   groups: { title: string } | null;
   courses: { title: string } | null;
@@ -91,6 +91,7 @@ export default function LessonsPage() {
       case "completed": return <span className="badge badge-green">Проведено</span>;
       case "cancelled": return <span className="badge badge-red">Отменено</span>;
       case "moved": return <span className="badge badge-amber">Перенесено</span>;
+      case "live": return <span className="badge badge-green animation-pulse" style={{ background: "var(--color-success)", color: "white" }}>Идет урок</span>;
       default: return <span className="badge badge-gray">{status}</span>;
     }
   };
@@ -131,6 +132,7 @@ export default function LessonsPage() {
               onChange={e => setStatusFilter(e.target.value)}
             >
               <option value="all">Все статусы</option>
+              <option value="live">Идет урок</option>
               <option value="planned">Запланировано</option>
               <option value="completed">Проведено</option>
               <option value="cancelled">Отменено</option>
@@ -269,6 +271,23 @@ export default function LessonsPage() {
                           >
                             <FileText size={12} />
                             <span>Журнал</span>
+                          </Button>
+                        ) : session.status === "live" ? (
+                          <Button 
+                            variant="primary-crm" 
+                            style={{ 
+                              display: "inline-flex", 
+                              alignItems: "center", 
+                              gap: "4px", 
+                              height: "32px", 
+                              fontSize: "11px", 
+                              padding: "0 12px", 
+                              borderRadius: "8px",
+                              background: "var(--color-success)",
+                              color: "white"
+                            }}
+                          >
+                            <span>Следить</span>
                           </Button>
                         ) : (
                           <Button 
