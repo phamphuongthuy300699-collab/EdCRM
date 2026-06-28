@@ -7,6 +7,7 @@ export const createPublicLeadSchema = z.object({
   childName: z.string().max(120).optional().nullable(),
   childAge: z.coerce.number().int().min(3).max(18).optional().nullable(),
   courseId: z.string().uuid().optional().nullable(),
+  convenientTime: z.string().max(100).optional().nullable(),
   message: z.string().max(1000).optional().nullable(),
 });
 

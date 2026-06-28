@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { Button } from "@robotics-crm/ui";
 import { Phone, Menu } from "lucide-react";
 
@@ -8,8 +9,43 @@ export default function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const ymId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
+  const ymScript = ymId ? `
+    (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+    m[i].l=1*new Date();
+    for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+    k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+    (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+    ym(${ymId}, "init", {
+         clickmap:true,
+         trackLinks:true,
+         accurateTrackBounce:true,
+         webvisor:true
+    });
+  ` : "";
+
+  const gaScript = gaId ? `
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '${gaId}');
+  ` : "";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <>
+      {ymId && (
+        <Script id="yandex-metrika" strategy="afterInteractive" dangerouslySetInnerHTML={{ __html: ymScript }} />
+      )}
+      {gaId && (
+        <>
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />
+          <Script id="google-analytics" strategy="afterInteractive" dangerouslySetInnerHTML={{ __html: gaScript }} />
+        </>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {/* Header */}
       <header style={{
         position: "sticky",
@@ -141,18 +177,18 @@ export default function PublicLayout({
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Навигация</h4>
               <ul style={{ listStyle: "none", display: "grid", gap: "12px", fontSize: "var(--font-small)" }}>
-                <li><a href="#courses" style={{ color: "#E5E7EB" }}>Направления</a></li>
-                <li><a href="#schedule" style={{ color: "#E5E7EB" }}>Расписание</a></li>
-                <li><a href="#prices" style={{ color: "#E5E7EB" }}>Стоимость</a></li>
-                <li><a href="#faq" style={{ color: "#E5E7EB" }}>FAQ</a></li>
+                <li><Link href="/robototekhnika-dlya-detey-lipetsk" style={{ color: "#E5E7EB" }}>Робототехника</Link></li>
+                <li><Link href="/programmirovanie-dlya-detey-lipetsk" style={{ color: "#E5E7EB" }}>Программирование</Link></li>
+                <li><Link href="/raspisanie" style={{ color: "#E5E7EB" }}>Расписание</Link></li>
+                <li><Link href="/stoimost" style={{ color: "#E5E7EB" }}>Стоимость</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Для сотрудников</h4>
+              <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Документы</h4>
               <ul style={{ listStyle: "none", display: "grid", gap: "12px", fontSize: "var(--font-small)" }}>
-                <li><Link href="/login" style={{ color: "#E5E7EB" }}>Вход в CRM</Link></li>
-                <li><Link href="/crm" style={{ color: "#E5E7EB" }}>Панель управления</Link></li>
+                <li><Link href="/privacy-policy" style={{ color: "#E5E7EB" }}>Конфиденциальность</Link></li>
+                <li><Link href="/consent" style={{ color: "#E5E7EB" }}>Согласие на ОПД</Link></li>
               </ul>
             </div>
 
@@ -180,10 +216,13 @@ export default function PublicLayout({
             color: "#9CA3AF"
           }}>
             <span>© {new Date().getFullYear()} Robotics Липецк. Все права защищены.</span>
-            <span>Разработано для будущего инженеров</span>
+            <Link href="/login" style={{ color: "#6B7280", textDecoration: "underline" }} className="hover-link-primary">
+              Вход для сотрудников
+            </Link>
           </div>
         </div>
       </footer>
     </div>
+    </>
   );
 }

@@ -41,6 +41,11 @@ export async function POST(request: Request) {
 
     const input = parsed.data;
 
+    let finalMessage = input.message || null;
+    if (input.convenientTime) {
+      finalMessage = `[Удобное время: ${input.convenientTime}]${finalMessage ? `\n\nКомментарий: ${finalMessage}` : ""}`;
+    }
+
     const leadData: Database["public"]["Tables"]["leads"]["Insert"] = {
       organization_id: org.id,
       status: "new",
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
       child_name: input.childName || null,
       child_age: input.childAge || null,
       course_id: input.courseId || null,
-      message: input.message || null,
+      message: finalMessage,
     };
 
     const { error } = await supabase.from("leads").insert(leadData);
