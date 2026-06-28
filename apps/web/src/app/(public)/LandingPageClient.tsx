@@ -43,7 +43,19 @@ const triggerGoal = (goalName: string) => {
   }
 };
 
-export default function LandingPageClient() {
+interface LandingPageClientProps {
+  initialCourses?: any[];
+  initialSchedule?: any[];
+  initialPrices?: any;
+  initialBlocks?: any[];
+}
+
+export default function LandingPageClient({
+  initialCourses,
+  initialSchedule,
+  initialPrices,
+  initialBlocks,
+}: LandingPageClientProps) {
   const router = useRouter();
   
   // Form State
@@ -129,6 +141,7 @@ export default function LandingPageClient() {
     }
   };
 
+  // Static Fallback Data
   const coursesList = [
     {
       id: "4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a",
@@ -191,6 +204,116 @@ export default function LandingPageClient() {
     { q: "Как происходит оплата?", a: "Оплата производится помесячно. Все расходные материалы и оборудование уже включены в стоимость." }
   ];
 
+  // Dynamic Block Helper
+  const getBlock = (key: string) => {
+    return initialBlocks?.find(b => b.block_key === key);
+  };
+
+  // Block Mappings & Fallbacks
+  const heroBlock = getBlock('home.hero');
+  const heroTitle = heroBlock?.title || "Бесплатное пробное занятие 90 минут: ребенок соберет и запрограммирует первого робота";
+  const heroSubtitle = heroBlock?.subtitle || "Курсы робототехники и программирования для детей 6–14 лет в Липецке. Практика на реальном оборудовании в мини-группах.";
+  const heroBullets = heroBlock?.content?.bullets || ["Без предоплаты", "Оборудование включено", "Мини-группы до 8 детей", "Подберем группу по возрасту"];
+  const heroBadge = heroBlock?.content?.badge || "Школа робототехники в Липецке";
+  const heroCtaText = heroBlock?.content?.ctaText || "Записаться на пробный урок";
+  const heroSecondaryCtaText = heroBlock?.content?.secondaryCtaText || "Посмотреть проекты";
+
+  const teachersBlock = getBlock('home.teachers');
+  const teachersTitle = teachersBlock?.title || "Наши преподаватели";
+  const teachersSubtitle = teachersBlock?.subtitle || "Практикующие наставники, которые умеют объяснять сложное детям простым языком";
+  const teachersListToRender = teachersBlock?.content?.items || [
+    {
+      name: "Алексей Дмитриев",
+      role: "Старший наставник LEGO & Arduino",
+      text: "Помогает детям не бояться ошибок и доводить инженерные проекты до рабочего результата.",
+      imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
+      alt: "Алексей Дмитриев — преподаватель робототехники"
+    },
+    {
+      name: "Мария Соколова",
+      role: "Преподаватель Scratch и основ программирования",
+      text: "Учит мыслить алгоритмами через игры, мультфильмы и первые интерактивные проекты.",
+      imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
+      alt: "Мария Соколова — преподаватель программирования"
+    },
+    {
+      name: "Егор Смирнов",
+      role: "Python / Arduino наставник",
+      text: "Объясняет Python, электронику и датчики через практические задачи и мини-проекты.",
+      imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
+      alt: "Егор Смирнов — наставник Python/Arduino"
+    }
+  ];
+
+  const portalPreviewBlock = getBlock('home.parent_student_portal_preview');
+  const portalPreviewTitle = portalPreviewBlock?.title || "Родители видят прогресс ребенка в личном кабинете";
+  const portalPreviewSubtitle = portalPreviewBlock?.subtitle || "Расписание, посещаемость, баланс, материалы урока и отчеты наставника — в одном месте.";
+  const portalData = portalPreviewBlock?.content || {
+    studentName: "Миша Иванов",
+    age: "8 лет",
+    course: "Робототехника LEGO",
+    nextLesson: "Суббота, 12:00",
+    cabinet: "Кабинет 3",
+    attendance: "7 из 8",
+    project: "Робот RoboSort-3000",
+    balance: "Осталось 2 занятия",
+    teacherNote: "Миша отлично справился с логикой ветвления и доработал алгоритм захвата кубиков."
+  };
+
+  const pricesBlock = getBlock('home.prices');
+  const trialPrice = pricesBlock?.content?.trialPrice || "0 ₽";
+  const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
+  const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
+
+  // Dynamic Courses Mapping
+  const coursesToRender = (initialCourses && initialCourses.length > 0)
+    ? initialCourses.map(dbCourse => {
+        const localConfig = coursesList.find(c => c.id === dbCourse.id || c.title.toLowerCase().includes(dbCourse.title.toLowerCase()));
+        return {
+          id: dbCourse.id,
+          title: dbCourse.title,
+          slug: dbCourse.slug ? `/${dbCourse.slug}` : (localConfig?.slug || "/"),
+          age: dbCourse.min_age && dbCourse.max_age ? `${dbCourse.min_age}–${dbCourse.max_age} лет` : (localConfig?.age || "6-14 лет"),
+          desc: dbCourse.short_description || dbCourse.full_description || (localConfig?.desc || ""),
+          mission: localConfig?.mission || "Собрать и запрограммировать собственный проект",
+          results: localConfig?.results || ["первые навыки", "логическое мышление"],
+          icon: localConfig?.icon || Cpu,
+          price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : (localConfig?.price || "4 000 ₽ / мес")
+        };
+      })
+    : coursesList;
+
+  // Dynamic Schedule Mapping
+  const scheduleToRender = (initialSchedule && initialSchedule.length > 0)
+    ? initialSchedule.map((item: any) => {
+        let spotsText = "Осталось несколько мест";
+        let badgeClass = "badge-green";
+        const spots = item.spots ?? 0;
+        if (spots <= 0) {
+          spotsText = "Группа заполнена";
+          badgeClass = "badge-red";
+        } else if (spots === 1 || spots === 2) {
+          spotsText = `Осталось ${spots} места`;
+          badgeClass = "badge-amber";
+        } else {
+          spotsText = `Осталось ${spots} мест`;
+          badgeClass = "badge-green";
+        }
+        return {
+          age: item.age,
+          course: item.course,
+          time: item.time,
+          spotsText,
+          badgeClass,
+        };
+      })
+    : [
+        { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
+        { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
+        { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
+        { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
+      ];
+
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
       
@@ -236,7 +359,7 @@ export default function LandingPageClient() {
               textTransform: "uppercase",
               letterSpacing: "0.05em"
             }}>
-              Школа робототехники в Липецке
+              {heroBadge}
             </div>
 
             <h1 style={{
@@ -246,7 +369,7 @@ export default function LandingPageClient() {
               fontFamily: "var(--font-geologica)",
               maxWidth: "600px"
             }}>
-              Бесплатное пробное занятие 90 минут: ребенок соберет и запрограммирует первого робота
+              {heroTitle}
             </h1>
 
             <p style={{
@@ -255,22 +378,22 @@ export default function LandingPageClient() {
               maxWidth: "500px",
               lineHeight: 1.6
             }}>
-              Курсы робототехники и программирования для детей 6–14 лет в Липецке. Практика на реальном оборудовании в мини-группах.
+              {heroSubtitle}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
               <div style={{ display: "flex", gap: "16px" }}>
-                <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+                <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
                   <Button variant="primary-site" style={{ background: "var(--color-accent)", height: "52px", padding: "0 28px" }}>
-                    Записаться на пробный урок
+                    {heroCtaText}
                     <ArrowRight size={18} />
                   </Button>
-                </a>
-                <a href="#projects">
+                </Link>
+                <Link href="/#projects">
                   <Button variant="secondary-site" style={{ height: "52px", padding: "0 28px" }}>
-                    Посмотреть проекты
+                    {heroSecondaryCtaText}
                   </Button>
-                </a>
+                </Link>
               </div>
               
               {/* Bullet points under Hero CTA */}
@@ -284,22 +407,12 @@ export default function LandingPageClient() {
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
-                  <Check size={16} style={{ color: "var(--color-success)" }} />
-                  <span>Без предоплаты</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
-                  <Check size={16} style={{ color: "var(--color-success)" }} />
-                  <span>Оборудование включено</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
-                  <Check size={16} style={{ color: "var(--color-success)" }} />
-                  <span>Мини-группы до 8 детей</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
-                  <Check size={16} style={{ color: "var(--color-success)" }} />
-                  <span>Подберем группу по возрасту</span>
-                </div>
+                {heroBullets.map((bullet: string, idx: number) => (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
+                    <Check size={16} style={{ color: "var(--color-success)" }} />
+                    <span>{bullet}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -365,7 +478,7 @@ export default function LandingPageClient() {
               </div>
             </div>
 
-            {/* Floating Info Card */}
+            {/* Floating Info Cards */}
             <div className="card-site floating-card-anim" style={{
               position: "absolute",
               bottom: "40px",
@@ -512,7 +625,7 @@ export default function LandingPageClient() {
             gridTemplateColumns: "1fr 1fr",
             gap: "32px"
           }}>
-            {coursesList.map((course) => {
+            {coursesToRender.map((course) => {
               const IconComp = course.icon;
               return (
                 <div key={course.id} className="card-site" style={{
@@ -557,7 +670,7 @@ export default function LandingPageClient() {
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {course.results.map((res, i) => (
+                        {course.results.map((res: string, i: number) => (
                           <span key={i} style={{
                             background: "rgba(37, 99, 235, 0.05)",
                             color: "var(--color-primary-dark)",
@@ -580,11 +693,11 @@ export default function LandingPageClient() {
                           Подробнее
                         </Button>
                       </Link>
-                      <a href="#lead-form" onClick={() => { setCourseId(course.id); triggerGoal("cta_button_clicked"); }}>
+                      <Link href="/#lead-form" onClick={() => { setCourseId(course.id); triggerGoal("cta_button_clicked"); }}>
                         <Button variant="primary-site" style={{ height: "38px", padding: "0 16px", fontSize: "12px" }}>
                           Записаться
                         </Button>
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -771,6 +884,193 @@ export default function LandingPageClient() {
         </div>
       </section>
 
+      {/* PORTAL PREVIEW SECTION */}
+      <section id="portal-preview" style={{ padding: "100px 0", background: "white", borderBottom: "1px solid var(--color-border)" }}>
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: "64px" }}>
+            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+              {portalPreviewTitle}
+            </h2>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+              {portalPreviewSubtitle}
+            </p>
+          </div>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1.2fr 1fr",
+            gap: "48px",
+            alignItems: "start"
+          }}>
+            {/* Parent Portal Preview Card */}
+            <div style={{
+              background: "white",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-card-site)",
+              padding: "32px",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.04)",
+              position: "relative",
+              overflow: "hidden"
+            }}>
+              {/* Header */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "20px",
+                borderBottom: "1px solid var(--color-border)",
+                paddingBottom: "16px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, var(--color-primary) 0%, #3b82f6 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "var(--font-small)"
+                  }}>
+                    МИ
+                  </div>
+                  <div>
+                    <h4 style={{ fontWeight: 700, fontSize: "0.95rem", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                      {portalData.studentName} <span style={{ fontSize: "0.75rem", fontWeight: 400, color: "var(--color-text-muted)" }}>({portalData.age})</span>
+                    </h4>
+                    <span style={{ fontSize: "0.75rem", color: "var(--color-primary)", fontWeight: 600 }}>
+                      Курс: {portalData.course}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <span style={{
+                    display: "inline-block",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    background: "rgba(34, 197, 94, 0.1)",
+                    color: "rgb(34, 197, 94)",
+                    fontSize: "0.7rem",
+                    fontWeight: 600
+                  }}>
+                    Активен
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid content */}
+              <div style={{ display: "grid", gap: "12px", marginBottom: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem", marginBottom: "4px" }}>
+                      <Calendar size={12} style={{ color: "var(--color-primary)" }} />
+                      <span>Следующее занятие</span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{portalData.nextLesson}</div>
+                    <div style={{ fontSize: "0.65rem", color: "var(--color-text-muted)", marginTop: "2px" }}>{portalData.cabinet}</div>
+                  </div>
+
+                  <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem", marginBottom: "4px" }}>
+                      <Check size={12} style={{ color: "rgb(34, 197, 94)" }} />
+                      <span>Посещаемость</span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{portalData.attendance}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "3px", marginTop: "6px" }}>
+                      {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                        <span key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "rgb(34, 197, 94)" }} />
+                      ))}
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-border)" }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-text-muted)", fontSize: "0.7rem" }}>
+                      <Cpu size={12} style={{ color: "var(--color-primary)" }} />
+                      <span>Текущий проект (Миссия)</span>
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: "2px" }}>{portalData.project}</div>
+                </div>
+
+                <div style={{ background: "rgba(249, 115, 22, 0.04)", border: "1px dashed rgba(249, 115, 22, 0.3)", borderRadius: "12px", padding: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--color-warning-dark)", fontSize: "0.7rem", fontWeight: 600, marginBottom: "4px" }}>
+                    <Smile size={12} />
+                    <span>Отчет наставника</span>
+                  </div>
+                  <p style={{ fontSize: "0.75rem", lineHeight: "1.3", fontStyle: "italic", margin: 0, color: "var(--color-text)" }}>
+                    «{portalData.teacherNote}»
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom part */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--color-bg)", borderRadius: "12px", padding: "12px 16px", border: "1px solid var(--color-border)" }}>
+                <div>
+                  <span style={{ fontSize: "0.65rem", color: "var(--color-text-muted)", display: "block" }}>Баланс абонемента</span>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--color-warning-dark)" }}>{portalData.balance}</span>
+                </div>
+                <Link href="/#lead-form">
+                  <Button variant="primary-site" style={{ padding: "6px 12px", fontSize: "0.75rem", height: "auto" }}>
+                    Посмотреть пример кабинета
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Student Portal Preview Card */}
+            <div style={{
+              background: "white",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-card-site)",
+              padding: "32px",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.04)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px"
+            }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 700, fontFamily: "var(--font-geologica)", margin: 0 }}>
+                Ученик видит материалы урока после старта занятия
+              </h3>
+              <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}>
+                В личном кабинете ученика открывается интерактивная рабочая тетрадь: схемы сборки, примеры кода и домашние задания. Доступ открывает преподаватель в один клик при начале урока.
+              </p>
+
+              <div style={{ display: "grid", gap: "12px" }}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", background: "var(--color-bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+                  <div style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)", padding: "6px", borderRadius: "6px" }}>
+                    <Calendar size={16} />
+                  </div>
+                  <div style={{ fontSize: "var(--font-small)", fontWeight: 700 }}>Интерактивное расписание занятий</div>
+                </div>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", background: "var(--color-bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+                  <div style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)", padding: "6px", borderRadius: "6px" }}>
+                    <Code size={16} />
+                  </div>
+                  <div style={{ fontSize: "var(--font-small)", fontWeight: 700 }}>Домашние задания и статус их проверки</div>
+                </div>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", background: "var(--color-bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+                  <div style={{ background: "var(--color-success-soft)", color: "var(--color-success)", padding: "6px", borderRadius: "6px" }}>
+                    <Layers size={16} />
+                  </div>
+                  <div style={{ fontSize: "var(--font-small)", fontWeight: 700 }}>Материалы текущей и прошлых миссий</div>
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(34, 197, 94, 0.05)", borderLeft: "3px solid rgb(34, 197, 94)", padding: "12px", borderRadius: "4px", fontSize: "12px", color: "rgb(21, 128, 61)", fontWeight: 600 }}>
+                🔒 Доступ к материалам контролируется преподавателем
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 8. TRUST / REVIEWS SECTION */}
       <section style={{ padding: "100px 0", borderBottom: "1px solid var(--color-border)" }}>
         <div className="container">
@@ -799,7 +1099,7 @@ export default function LandingPageClient() {
 
             <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Сын увлекался играми, решили направить интерес в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Robotics Липецк!»
+                «Сын увлекался играми, решили направить interest в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Robotics Липецк!»
               </p>
               <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
                 <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-accent-dark)" }}>ДП</div>
@@ -852,26 +1152,14 @@ export default function LandingPageClient() {
               <span>Наличие мест</span>
             </div>
             
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center" }}>
-              <span style={{ fontWeight: 700 }}>6–8 лет</span>
-              <span>Робототехника Lego (Старт)</span>
-              <span>Вторник / Четверг 17:00</span>
-              <span className="badge badge-amber">Осталось 2 места</span>
-            </div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center" }}>
-              <span style={{ fontWeight: 700 }}>8–10 лет</span>
-              <span>Программирование Scratch</span>
-              <span>Среда / Пятница 18:00</span>
-              <span className="badge badge-green">Осталось 3 места</span>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", alignItems: "center" }}>
-              <span style={{ fontWeight: 700 }}>10–14 лет</span>
-              <span>Разработка на Python</span>
-              <span>Суббота 12:00</span>
-              <span className="badge badge-red">Группа заполнена</span>
-            </div>
+            {scheduleToRender.map((sched: any, idx: number) => (
+              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center" }}>
+                <span style={{ fontWeight: 700 }}>{sched.age}</span>
+                <span>{sched.course}</span>
+                <span>{sched.time}</span>
+                <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -898,12 +1186,12 @@ export default function LandingPageClient() {
                   Ознакомительное занятие 90 минут. Ребенок соберет первого робота.
                 </p>
                 <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  0 ₽
+                  {trialPrice}
                 </div>
               </div>
-              <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
                 <Button variant="secondary-site" style={{ width: "100%" }}>Записаться бесплатно</Button>
-              </a>
+              </Link>
             </div>
 
             <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px", border: "2px solid var(--color-primary)" }}>
@@ -914,12 +1202,12 @@ export default function LandingPageClient() {
                   4 занятия по 90 минут. Все учебные материалы и LEGO включены.
                 </p>
                 <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  от 4 000 ₽ <span style={{ fontSize: "var(--font-body)", fontWeight: 500, color: "var(--color-text-muted)" }}>/ 4 урока</span>
+                  {monthlyPrice}
                 </div>
               </div>
-              <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
                 <Button variant="primary-site" style={{ width: "100%" }}>Купить абонемент</Button>
-              </a>
+              </Link>
             </div>
 
             <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px" }}>
@@ -930,19 +1218,62 @@ export default function LandingPageClient() {
                   Персональный урок с наставником. Индивидуальный разбор сложных проектов.
                 </p>
                 <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  от 1 500 ₽ <span style={{ fontSize: "var(--font-body)", fontWeight: 500, color: "var(--color-text-muted)" }}>/ урок</span>
+                  {individualPrice}
                 </div>
               </div>
-              <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
                 <Button variant="secondary-site" style={{ width: "100%" }}>Заказать разбор</Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
+      {/* TEACHERS SECTION */}
+      <section id="teachers" style={{ padding: "100px 0" }}>
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: "64px" }}>
+            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+              {teachersTitle}
+            </h2>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+              {teachersSubtitle}
+            </p>
+          </div>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "32px"
+          }}>
+            {teachersListToRender.map((teacher: any, idx: number) => (
+              <div key={idx} className="card-site" style={{ textAlign: "center" }}>
+                <div style={{
+                  width: "120px",
+                  height: "120px",
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  margin: "0 auto 20px auto",
+                  border: "3px solid var(--color-primary-soft)",
+                  boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                  position: "relative"
+                }}>
+                  <img src={teacher.imageUrl} alt={teacher.alt || teacher.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
+                </div>
+                <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>{teacher.name}</h4>
+                <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>{teacher.role}</p>
+                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
+                  «{teacher.text}»
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* 11. FAQ */}
-      <section id="faq" style={{ padding: "100px 0" }}>
+      <section id="faq" style={{ padding: "100px 0", background: "var(--color-bg)" }}>
         <div className="container" style={{ maxWidth: "800px" }}>
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
@@ -1001,7 +1332,7 @@ export default function LandingPageClient() {
       </section>
 
       {/* 12. LEAD FORM SECTION */}
-      <section id="lead-form" style={{ padding: "100px 0", background: "var(--color-bg)" }} ref={formRef}>
+      <section id="lead-form" style={{ padding: "100px 0" }} ref={formRef}>
         <div className="container" style={{ maxWidth: "600px" }}>
           <div style={{
             background: "white",
@@ -1071,30 +1402,28 @@ export default function LandingPageClient() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                 <div className="form-group">
-                  <label className="form-label">Возраст ребенка *</label>
+                  <label className="form-label">Возраст ребенка</label>
                   <input 
                     type="number" 
                     className="form-input" 
                     placeholder="8" 
                     min="3"
                     max="18"
-                    required
                     value={childAge}
                     onChange={(e) => setChildAge(e.target.value)}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Направление *</label>
+                  <label className="form-label">Направление</label>
                   <select 
                     className="form-input" 
                     style={{ padding: "0 12px" }}
-                    required
                     value={courseId}
                     onChange={(e) => setCourseId(e.target.value)}
                   >
                     <option value="">Выберите курс</option>
-                    {coursesList.map((course) => (
+                    {coursesToRender.map((course) => (
                       <option key={course.id} value={course.id}>{course.title}</option>
                     ))}
                   </select>
@@ -1103,11 +1432,10 @@ export default function LandingPageClient() {
 
               {/* Selection of convenient time */}
               <div className="form-group">
-                <label className="form-label">Удобное время для занятий *</label>
+                <label className="form-label">Удобное время для занятий</label>
                 <select 
                   className="form-input" 
                   style={{ padding: "0 12px" }}
-                  required
                   value={convenientTime}
                   onChange={(e) => setConvenientTime(e.target.value)}
                 >

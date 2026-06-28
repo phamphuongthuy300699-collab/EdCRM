@@ -18,7 +18,8 @@ import {
   BookOpen,
   Calendar,
   ClipboardList,
-  FileText
+  FileText,
+  Globe
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -46,6 +47,7 @@ export default function CrmLayout({
     { name: "Занятия", path: "/crm/lessons", icon: Calendar },
     { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },
     { name: "Скрипты продаж", path: "/crm/scripts", icon: FileText },
+    { name: "Сайт", path: "/crm/site", icon: Globe },
     { name: "Настройки", path: "/crm/settings", icon: Settings },
   ];
 

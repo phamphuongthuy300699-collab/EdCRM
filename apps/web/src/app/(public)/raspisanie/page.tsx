@@ -2,7 +2,8 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
-import { Calendar, ArrowLeft, Check } from "lucide-react";
+import { Calendar, ArrowLeft } from "lucide-react";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Расписание занятий по робототехнике в Липецке",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RaspisaniePage() {
+export default async function RaspisaniePage() {
   const jsonLdBreadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -31,6 +32,92 @@ export default function RaspisaniePage() {
       }
     ]
   };
+
+  let scheduleToRender: any[] = [];
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", "robotics-lipetsk")
+      .single();
+
+    if (org) {
+      const { data: groups } = await supabase
+        .from("groups")
+        .select(`
+          id,
+          title,
+          age_from,
+          age_to,
+          capacity,
+          show_on_site,
+          course:courses(title),
+          schedule_rules:group_schedule_rules(weekday, starts_at),
+          enrollments(id, status)
+        `)
+        .eq("organization_id", org.id)
+        .eq("show_on_site", true)
+        .eq("status", "active");
+
+      if (groups && groups.length > 0) {
+        const daysMap: Record<number, string> = {
+          1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
+        };
+        const fullDaysMap: Record<number, string> = {
+          1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
+        };
+
+        scheduleToRender = groups.map(g => {
+          const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
+          const spots = g.capacity - activeEnrollments;
+
+          const rules = g.schedule_rules || [];
+          let timeStr = "Время уточняется";
+          if (rules.length > 0) {
+            const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
+            const days = sortedRules.map((r: any) => sortedRules.length > 2 ? daysMap[r.weekday] : fullDaysMap[r.weekday]).filter(Boolean).join(" / ");
+            const startsAt = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
+            timeStr = `${days} ${startsAt}`;
+          }
+
+          let spotsText = "Осталось несколько мест";
+          let badgeClass = "badge-green";
+          if (spots <= 0) {
+            spotsText = "Группа заполнена";
+            badgeClass = "badge-red";
+          } else if (spots === 1 || spots === 2) {
+            spotsText = `Осталось ${spots} места`;
+            badgeClass = "badge-amber";
+          } else {
+            spotsText = `Осталось ${spots} мест`;
+            badgeClass = "badge-green";
+          }
+
+          return {
+            age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
+            course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
+            time: timeStr,
+            spotsText,
+            badgeClass
+          };
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error loading schedule page from database:", e);
+  }
+
+  // Fallback if DB empty or error
+  if (scheduleToRender.length === 0) {
+    scheduleToRender = [
+      { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
+      { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
+      { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
+      { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
+    ];
+  }
 
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
@@ -90,33 +177,14 @@ export default function RaspisaniePage() {
                 <span>Наличие мест</span>
               </div>
               
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center", fontSize: "14px" }}>
-                <span style={{ fontWeight: 700 }}>6–8 лет</span>
-                <span>Робототехника Lego (Старт)</span>
-                <span>Вторник / Четверг 17:00</span>
-                <span className="badge badge-amber">Осталось 2 места</span>
-              </div>
-              
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center", fontSize: "14px" }}>
-                <span style={{ fontWeight: 700 }}>8–10 лет</span>
-                <span>Программирование Scratch</span>
-                <span>Среда / Пятница 18:00</span>
-                <span className="badge badge-green">Осталось 3 места</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: "1px solid var(--color-border)", alignItems: "center", fontSize: "14px" }}>
-                <span style={{ fontWeight: 700 }}>10–14 лет</span>
-                <span>Разработка на Python</span>
-                <span>Суббота 12:00</span>
-                <span className="badge badge-red">Группа заполнена</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", alignItems: "center", fontSize: "14px" }}>
-                <span style={{ fontWeight: 700 }}>10–15 лет</span>
-                <span>Схемотехника и Arduino</span>
-                <span>Суббота 15:00</span>
-                <span className="badge badge-green">Осталось 4 места</span>
-              </div>
+              {scheduleToRender.map((sched, idx) => (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px" }}>
+                  <span style={{ fontWeight: 700 }}>{sched.age}</span>
+                  <span>{sched.course}</span>
+                  <span>{sched.time}</span>
+                  <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+                </div>
+              ))}
             </div>
           </div>
 

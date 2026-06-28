@@ -36,6 +36,7 @@ interface Lead {
   source: string;
   convertedStudentId?: string | null;
   convertedGuardianId?: string | null;
+  message?: string | null;
 }
 
 interface Interaction {
@@ -166,7 +167,8 @@ export default function CrmLeadsPage() {
             date: new Date(l.created_at).toLocaleDateString("ru-RU"),
             source: l.source === "site_form" ? "Форма на сайте" : (l.source === "manual" ? "Вручную" : (l.source || "Другое")),
             convertedStudentId: l.converted_student_id,
-            convertedGuardianId: l.converted_guardian_id
+            convertedGuardianId: l.converted_guardian_id,
+            message: l.message
           }));
           setLeads(formatted);
         } else {
@@ -773,6 +775,34 @@ export default function CrmLeadsPage() {
               <X size={18} />
             </button>
           </div>
+
+          {/* Lead Original Request Info */}
+          {selectedLead.message && (
+            <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", fontSize: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+              {(() => {
+                const match = selectedLead.message.match(/^\[Удобное время:\s*([^\]]+)\]/);
+                const convenientTimeStr = match ? match[1] : null;
+                const cleanComment = match ? selectedLead.message.replace(/^\[Удобное время:\s*[^\]]+\]\n*\n*(Комментарий:\s*)?/, "") : selectedLead.message;
+                
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {convenientTimeStr && (
+                      <div>
+                        <span style={{ fontWeight: 700, color: "var(--color-primary-dark)" }}>🕒 Удобное время:</span>{" "}
+                        <span className="badge badge-blue" style={{ fontSize: "10px", padding: "2px 6px" }}>{convenientTimeStr}</span>
+                      </div>
+                    )}
+                    {cleanComment.trim() && (
+                      <div>
+                        <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>💬 Комментарий:</span>{" "}
+                        <span>{cleanComment}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Form to Log New Touchpoint */}
           <form onSubmit={handleAddInteraction} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>

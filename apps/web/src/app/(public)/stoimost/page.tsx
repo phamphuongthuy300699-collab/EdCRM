@@ -3,16 +3,17 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { CreditCard, ArrowLeft, Check } from "lucide-react";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Стоимость обучения робототехнике в Липецке | Цены кружка",
-  description: "Тарифы и стоимость обучения робототехнике и программированию для детей в Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",
+  description: "Тарифы и стоимость обучения робототехнике и программированию для детей in Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/stoimost",
   },
 };
 
-export default function StoimostPage() {
+export default async function StoimostPage() {
   const jsonLdBreadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -31,6 +32,37 @@ export default function StoimostPage() {
       }
     ]
   };
+
+  let trialPrice = "0 ₽";
+  let monthlyPrice = "от 4 000 ₽";
+  let individualPrice = "от 1 500 ₽";
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", "robotics-lipetsk")
+      .single();
+
+    if (org) {
+      const { data: pricesBlock } = await supabase
+        .from("site_content_blocks")
+        .select("content")
+        .eq("organization_id", org.id)
+        .eq("block_key", "home.prices")
+        .eq("status", "published")
+        .single();
+      
+      if (pricesBlock?.content) {
+        trialPrice = pricesBlock.content.trialPrice || trialPrice;
+        monthlyPrice = pricesBlock.content.monthlyPrice || monthlyPrice;
+        individualPrice = pricesBlock.content.individualPrice || individualPrice;
+      }
+    }
+  } catch (e) {
+    console.error("Error loading pricing page dynamic data:", e);
+  }
 
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
@@ -85,7 +117,7 @@ export default function StoimostPage() {
                   <span className="badge badge-blue" style={{ marginBottom: "12px" }}>Знакомство</span>
                   <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Пробный урок</h3>
                   <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Ознакомительное занятие для ребенка длительностью 90 минут.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>0 ₽</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{trialPrice}</div>
                 </div>
                 <Link href="/#lead-form">
                   <Button variant="secondary-site" style={{ width: "100%" }}>Записаться</Button>
@@ -97,19 +129,19 @@ export default function StoimostPage() {
                   <span className="badge badge-green" style={{ marginBottom: "12px" }}>Популярно</span>
                   <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Месячный абонемент</h3>
                   <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Регулярные занятия в мини-группе 2 раза в неделю по 90 минут.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>от 4 000 ₽</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{monthlyPrice}</div>
                 </div>
                 <Link href="/#lead-form">
-                  <Button variant="primary-site" style={{ width: "100%" }}>Купить абонемент</Button>
+                  <Button variant="primary-site" style={{ width: "100%", background: "var(--color-primary)" }}>Купить абонемент</Button>
                 </Link>
               </div>
 
               <div style={{ background: "white", padding: "32px", borderRadius: "16px", border: "1px solid var(--color-border)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "24px" }}>
                 <div>
-                  <span className="badge badge-purple" style={{ marginBottom: "12px" }}>Персонально</span>
+                  <span className="badge badge-purple" style={{ marginBottom: "12px" }}>Углубленный</span>
                   <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Индивидуальный</h3>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Один на один с наставником для подготовки к олимпиадам или хакатонам.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>от 1 500 ₽ <span style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 500 }}>/ урок</span></div>
+                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Персональный урок с наставником. Индивидуальный разбор сложных проектов.</p>
+                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{individualPrice}</div>
                 </div>
                 <Link href="/#lead-form">
                   <Button variant="secondary-site" style={{ width: "100%" }}>Заказать разбор</Button>
@@ -118,31 +150,26 @@ export default function StoimostPage() {
             </div>
           </div>
 
-          <div>
-            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "20px" }}>Что входит в стоимость абонементов?</h2>
-            <div style={{ display: "grid", gap: "16px" }}>
-              {[
-                "Обучение по лицензированной программе с квалифицированными наставниками;",
-                "Индивидуальный набор LEGO Education или электронный стенд Arduino на время урока;",
-                "Современный персональный ноутбук для программирования и написания алгоритмов;",
-                "Личный кабинет с отчетами о посещаемости, прогрессе ребенка и обратной связью от наставника;",
-                "Чай с печеньем и разминки во время перерывов."
-              ].map((text, i) => (
-                <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                  <Check size={18} style={{ color: "var(--color-success)", flexShrink: 0, marginTop: "3px" }} />
-                  <span style={{ fontSize: "var(--font-body)", lineHeight: 1.5 }}>{text}</span>
-                </div>
-              ))}
+          <div style={{ background: "rgba(37, 99, 235, 0.04)", border: "1px dashed rgba(37, 99, 235, 0.3)", borderRadius: "16px", padding: "32px", marginTop: "24px" }}>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "16px" }}>Что входит в стоимость:</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 32px" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", fontSize: "13px" }}>
+                <Check size={16} style={{ color: "var(--color-success)" }} />
+                <span>Оригинальные конструкторы LEGO Education</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", fontSize: "13px" }}>
+                <Check size={16} style={{ color: "var(--color-success)" }} />
+                <span>Датчики, моторы, платы Arduino</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", fontSize: "13px" }}>
+                <Check size={16} style={{ color: "var(--color-success)" }} />
+                <span>Личный кабинет родителя и отчетность</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", fontSize: "13px" }}>
+                <Check size={16} style={{ color: "var(--color-success)" }} />
+                <span>Оборудованные рабочие места (компьютеры)</span>
+              </div>
             </div>
-          </div>
-
-          <div style={{ textAlign: "center", borderTop: "1px solid var(--color-border)", paddingTop: "40px" }}>
-            <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "16px" }}>Начните с бесплатного знакомства</h4>
-            <Link href="/#lead-form">
-              <Button variant="primary-site" style={{ background: "var(--color-accent)" }}>
-                Записаться на бесплатный пробный урок
-              </Button>
-            </Link>
           </div>
 
         </div>

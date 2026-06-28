@@ -1,16 +1,138 @@
 import React from "react";
 import { Metadata } from "next";
 import LandingPageClient from "./LandingPageClient";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
-export const metadata: Metadata = {
-  title: "Робототехника и программирование для детей в Липецке | Школа Robotics",
-  description: "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", "robotics-lipetsk")
+      .single();
 
-export default function Page() {
+    let title = "Робототехника и программирование для детей в Липецке | Школа Robotics";
+    let description = "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.";
+
+    if (org) {
+      const { data: seoBlock } = await supabase
+        .from("site_content_blocks")
+        .select("title, subtitle")
+        .eq("organization_id", org.id)
+        .eq("block_key", "home.seo")
+        .eq("status", "published")
+        .single();
+      
+      if (seoBlock) {
+        if (seoBlock.title) title = seoBlock.title;
+        if (seoBlock.subtitle) description = seoBlock.subtitle;
+      }
+    }
+
+    return {
+      title,
+      description,
+      alternates: {
+        canonical: "https://robotics-lipetsk.ru",
+      },
+    };
+  } catch (e) {
+    console.error("Error generating metadata dynamically:", e);
+    return {
+      title: "Робототехника и программирование для детей в Липецке | Школа Robotics",
+      description: "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.",
+      alternates: {
+        canonical: "https://robotics-lipetsk.ru",
+      },
+    };
+  }
+}
+
+export default async function Page() {
+  let initialCourses: any[] = [];
+  let initialSchedule: any[] = [];
+  let initialBlocks: any[] = [];
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", "robotics-lipetsk")
+      .single();
+
+    if (org) {
+      // 1. Fetch site content blocks
+      const { data: blocks } = await supabase
+        .from("site_content_blocks")
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("status", "published");
+      if (blocks) initialBlocks = blocks;
+
+      // 2. Fetch courses
+      const { data: courses } = await supabase
+        .from("courses")
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("is_public", true)
+        .order("sort_order", { ascending: true });
+      if (courses) initialCourses = courses;
+
+      // 3. Fetch groups & schedule rules
+      const { data: groups } = await supabase
+        .from("groups")
+        .select(`
+          id,
+          title,
+          age_from,
+          age_to,
+          capacity,
+          show_on_site,
+          course:courses(title),
+          schedule_rules:group_schedule_rules(weekday, starts_at),
+          enrollments(id, status)
+        `)
+        .eq("organization_id", org.id)
+        .eq("show_on_site", true)
+        .eq("status", "active");
+
+      if (groups) {
+        const daysMap: Record<number, string> = {
+          1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
+        };
+        const fullDaysMap: Record<number, string> = {
+          1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
+        };
+
+        initialSchedule = groups.map(g => {
+          const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
+          const spots = g.capacity - activeEnrollments;
+
+          const rules = g.schedule_rules || [];
+          let timeStr = "Время уточняется";
+          if (rules.length > 0) {
+            // Sort by weekday
+            const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
+            const days = sortedRules.map((r: any) => sortedRules.length > 2 ? daysMap[r.weekday] : fullDaysMap[r.weekday]).filter(Boolean).join(" / ");
+            const startsAt = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
+            timeStr = `${days} ${startsAt}`;
+          }
+
+          return {
+            age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
+            course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
+            time: timeStr,
+            spots: spots
+          };
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error loading server side landing page data:", e);
+  }
+
   const jsonLdOrg = {
     "@context": "https://schema.org",
     "@type": ["EducationalOrganization", "LocalBusiness"],
@@ -72,7 +194,11 @@ export default function Page() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
       />
-      <LandingPageClient />
+      <LandingPageClient 
+        initialCourses={initialCourses}
+        initialSchedule={initialSchedule}
+        initialBlocks={initialBlocks}
+      />
     </>
   );
 }
