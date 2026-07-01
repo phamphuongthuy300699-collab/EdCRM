@@ -49,6 +49,7 @@ export async function POST() {
       ...(data.settings || {}),
       lastCheckedAt: new Date().toISOString(),
       lastCheckStatus: missing.length ? "error" : "ok",
+      lastCheckError: missing.length ? `Заполните обязательные поля: ${missing.join(", ")}` : null,
     };
 
     await (admin.from("payment_provider_settings") as any)

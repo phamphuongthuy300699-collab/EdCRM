@@ -89,6 +89,12 @@ export default function PaymentsSettingsClient() {
     setSaving(true);
     setNotice("");
     setError("");
+    if ((settings.is_enabled || settings.mode === "production") && (!settings.api_login || (!apiPassword && !passwordConfigured))) {
+      setError("Невозможно переключить в активный/production режим: отсутствует API логин или пароль.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/crm/payment-settings/alfabank", {
         method: "POST",
@@ -203,9 +209,9 @@ export default function PaymentsSettingsClient() {
         </div>
 
         {settings.mode === "production" && (
-          <div className="payment-alert warn">
+          <div className="payment-alert warn" style={{ background: "#FEF2F2", color: "#991B1B", border: "1px solid #FCA5A5" }}>
             <AlertTriangle size={18} />
-            Не используйте production-режим до подтверждения банка.
+            <strong>Внимание! Вы активируете продуктивный режим. Все операции будут проводиться с реальными денежными средствами.</strong>
           </div>
         )}
 
@@ -302,8 +308,13 @@ export default function PaymentsSettingsClient() {
               Секреты не выводятся после сохранения. Для смены пароля введите новый пароль и сохраните форму.
             </div>
 
-            <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
-              Последняя проверка: {lastCheckedAt}
+            <div style={{ color: "var(--color-text-muted)", fontSize: 13, display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div>Последняя успешная проверка: {lastCheckedAt}</div>
+              {settings.settings?.lastCheckError && (
+                <div style={{ color: "var(--color-danger)", fontWeight: 700 }}>
+                  Последняя ошибка подключения: {settings.settings.lastCheckError}
+                </div>
+              )}
             </div>
 
             <div className="payment-actions">
