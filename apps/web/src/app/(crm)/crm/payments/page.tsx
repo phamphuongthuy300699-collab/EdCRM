@@ -21,6 +21,8 @@ export default function CrmPaymentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [onlinePayingInvoiceId, setOnlinePayingInvoiceId] = useState<string | null>(null);
+  const [onlinePaymentError, setOnlinePaymentError] = useState("");
   const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
 
@@ -211,6 +213,29 @@ export default function CrmPaymentsPage() {
     }
   };
 
+  const handleCreateOnlinePayment = async (invoiceId: string) => {
+    try {
+      setOnlinePaymentError("");
+      setOnlinePayingInvoiceId(invoiceId);
+      const response = await fetch("/api/payments/alfa/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.paymentUrl) {
+        throw new Error(data.error || "Не удалось создать ссылку на оплату");
+      }
+
+      window.location.assign(data.paymentUrl);
+    } catch (error: any) {
+      setOnlinePaymentError(error.message || "Не удалось создать ссылку на оплату");
+    } finally {
+      setOnlinePayingInvoiceId(null);
+    }
+  };
+
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -330,6 +355,11 @@ export default function CrmPaymentsPage() {
           <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
             Общая сумма выставленных счетов: {invoices.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()} ₽
           </p>
+          {onlinePaymentError && (
+            <p style={{ fontSize: "12px", color: "var(--color-danger)", fontWeight: 700, marginTop: "8px" }}>
+              {onlinePaymentError}
+            </p>
+          )}
         </div>
         <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Plus size={16} />
@@ -432,23 +462,42 @@ export default function CrmPaymentsPage() {
                 <td>{getStatusBadge(inv.status)}</td>
                 <td style={{ padding: "0 24px", textAlign: "right" }}>
                   {inv.status !== "paid" ? (
-                    <button 
-                      onClick={() => handleMarkAsPaid(inv.id)}
-                      disabled={payingInvoiceId === inv.id}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        border: "none",
-                        background: "var(--color-success-soft)",
-                        color: "var(--color-success)",
-                        fontWeight: 700,
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        opacity: payingInvoiceId === inv.id ? 0.6 : 1
-                      }}
-                    >
-                      {payingInvoiceId === inv.id ? "Обработка..." : "Отметить оплаченным"}
-                    </button>
+                    <div style={{ display: "inline-flex", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => handleCreateOnlinePayment(inv.id)}
+                        disabled={onlinePayingInvoiceId === inv.id}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "none",
+                          background: "var(--color-primary-soft)",
+                          color: "var(--color-primary-dark)",
+                          fontWeight: 700,
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          opacity: onlinePayingInvoiceId === inv.id ? 0.6 : 1
+                        }}
+                      >
+                        {onlinePayingInvoiceId === inv.id ? "Ссылка..." : "Оплатить"}
+                      </button>
+                      <button
+                        onClick={() => handleMarkAsPaid(inv.id)}
+                        disabled={payingInvoiceId === inv.id}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "none",
+                          background: "var(--color-success-soft)",
+                          color: "var(--color-success)",
+                          fontWeight: 700,
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          opacity: payingInvoiceId === inv.id ? 0.6 : 1
+                        }}
+                      >
+                        {payingInvoiceId === inv.id ? "Обработка..." : "Отметить оплаченным"}
+                      </button>
+                    </div>
                   ) : (
                     <span style={{ color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 600 }}>Проведено</span>
                   )}

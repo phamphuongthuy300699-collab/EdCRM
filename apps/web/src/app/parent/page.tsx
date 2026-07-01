@@ -82,6 +82,8 @@ export default function ParentDashboard() {
   const [guardian, setGuardian] = useState<any>(null);
   const [childrenList, setChildrenList] = useState<any[]>([]);
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState("");
 
   // Demo Fallback Data (Anna Petrova & Igor Petrov)
   const demoData = {
@@ -223,7 +225,34 @@ export default function ParentDashboard() {
       .catch(() => setOnlinePaymentEnabled(false));
   }, []);
 
-  const handleRequestPaymentLink = () => {
+  const handleRequestPaymentLink = async (invoiceId?: string) => {
+    if (!invoiceId) {
+      alert("Для демо-счета ссылка на оплату не создается.");
+      return;
+    }
+
+    try {
+      setPaymentError("");
+      setPayingInvoiceId(invoiceId);
+      const response = await fetch("/api/payments/alfa/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.paymentUrl) {
+        throw new Error(data.error || "Не удалось создать ссылку на оплату");
+      }
+
+      window.location.assign(data.paymentUrl);
+      return;
+    } catch (error: any) {
+      setPaymentError(error.message || "Не удалось создать ссылку на оплату");
+      return;
+    } finally {
+      setPayingInvoiceId(null);
+    }
     alert("Ссылка на онлайн-оплату запрошена. Администратор отправит её вам в Telegram/WhatsApp в течение 5 минут 💳");
   };
 
@@ -478,7 +507,7 @@ export default function ParentDashboard() {
                   </div>
 
                   <Button 
-                    onClick={onlinePaymentEnabled ? handleRequestPaymentLink : undefined}
+                    onClick={onlinePaymentEnabled ? () => handleRequestPaymentLink() : undefined}
                     disabled={!onlinePaymentEnabled}
                     variant="primary-site" 
                     style={{ 
@@ -631,6 +660,11 @@ export default function ParentDashboard() {
                         Счета на оплату
                       </h3>
                     </div>
+                    {paymentError && (
+                      <div style={{ fontSize: "12px", color: "var(--color-danger)", fontWeight: 700, marginBottom: "12px" }}>
+                        {paymentError}
+                      </div>
+                    )}
 
                     {kid.invoices.length === 0 ? (
                       <div style={{ textAlign: "center", padding: "20px 0" }}>
@@ -661,8 +695,8 @@ export default function ParentDashboard() {
 
                             {inv.status !== "paid" && (
                               <Button 
-                                onClick={onlinePaymentEnabled ? handleRequestPaymentLink : undefined}
-                                disabled={!onlinePaymentEnabled}
+                                onClick={onlinePaymentEnabled ? () => handleRequestPaymentLink(inv.id) : undefined}
+                                disabled={!onlinePaymentEnabled || payingInvoiceId === inv.id}
                                 variant="primary-site" 
                                 style={{ 
                                   background: onlinePaymentEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
@@ -673,7 +707,7 @@ export default function ParentDashboard() {
                                   marginTop: "4px" 
                                 }}
                               >
-                                {onlinePaymentEnabled ? "Запросить ссылку" : "Онлайн-оплата Альфабанк пока не настроена"}
+                                {payingInvoiceId === inv.id ? "Создаем ссылку..." : onlinePaymentEnabled ? "Оплатить" : "Онлайн-оплата Альфабанк пока не настроена"}
                               </Button>
                             )}
                           </div>
