@@ -51,3 +51,14 @@ export type CreateAlfaOrderResult = {
   rawResponse: AlfaRegisterResponse;
   endpoint: string;
 };
+
+export type AlfaOrderStatusResponse = {
+  orderStatus?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  amount?: number;
+  orderNumber?: string;
+  actionCode?: number;
+  actionCodeDescription?: string;
+  [key: string]: unknown;
+};

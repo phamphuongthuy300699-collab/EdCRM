@@ -50,3 +50,13 @@ export function extractAlfaPaymentUrl(response: AlfaRegisterResponse) {
 export function extractAlfaOrderId(response: AlfaRegisterResponse) {
   return typeof response.orderId === "string" ? response.orderId : "";
 }
+
+export function mapAlfaStatusToCrmStatus(orderStatus: number | undefined): string {
+  if (orderStatus === 0) return "pending";
+  if (orderStatus === 1) return "authorized";
+  if (orderStatus === 2) return "paid";
+  if (orderStatus === 3) return "cancelled";
+  if (orderStatus === 4) return "refunded";
+  if (orderStatus === 6) return "failed";
+  return "unknown";
+}
