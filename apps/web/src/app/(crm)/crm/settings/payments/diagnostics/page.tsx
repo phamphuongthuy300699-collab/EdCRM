@@ -161,7 +161,7 @@ export default async function PaymentDiagnosticsPage() {
             <div>
               <div style={{ fontWeight: 700, fontSize: "14px" }}>Пароль API (Secret)</div>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-                {hasPassword ? "Надежно сохранен в зашифрованном виде." : "Ошибка: Пароль API не задан."}
+                {hasPassword ? "Пароль сохранён на сервере и не отображается в интерфейсе." : "Ошибка: Пароль API не задан."}
               </div>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default async function PaymentDiagnosticsPage() {
         <div>
           <div style={{ fontWeight: 700, color: "var(--color-primary-dark)", fontSize: "13px" }}>Безопасность конфигурации</div>
           <div style={{ fontSize: "12px", color: "var(--color-text)", marginTop: "2px", lineHeight: "1.4" }}>
-            Данный отчет не содержит секретных ключей или паролей и полностью безопасен для отображения персоналу. Все секретные токены защищены RLS и шифрованием.
+            Данный отчет не содержит секретных ключей или паролей и полностью безопасен для отображения персоналу. Все секретные токены защищены RLS на стороне СУБД.
           </div>
         </div>
       </div>

@@ -18,15 +18,16 @@ function jsonError(message: string, status = 400, code = "PAYMENT_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
 }
 
-function absoluteUrl(pathOrUrl: string | null | undefined, request: NextRequest, invoiceId: string) {
+function absoluteUrl(pathOrUrl: string | null | undefined, request: NextRequest, invoiceId: string, paymentId: string) {
   const origin = request.nextUrl.origin;
-  const fallbackPath = "/parent/payments";
+  const fallbackPath = "/payments/success";
   const raw = pathOrUrl?.trim() || fallbackPath;
   const url = raw.startsWith("http://") || raw.startsWith("https://")
     ? new URL(raw)
     : new URL(raw.startsWith("/") ? raw : `/${raw}`, origin);
 
   url.searchParams.set("invoiceId", invoiceId);
+  url.searchParams.set("paymentId", paymentId);
   return url.toString();
 }
 
@@ -184,7 +185,23 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (paymentError || !payment) {
-      return jsonError("Не удалось создать запись платежа", 500, "PAYMENT_CREATE_FAILED");
+      if (paymentError?.code === "23505") {
+        // Unique key constraint violation: fetch the existing active payment
+        const { data: activePay } = await (admin.from("payments") as any)
+          .select("id, payment_url")
+          .eq("invoice_id", invoice.id)
+          .eq("provider", "alfabank")
+          .in("status", reusablePaymentStatuses)
+          .not("payment_url", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (activePay?.payment_url) {
+          return NextResponse.json({ ok: true, paymentUrl: activePay.payment_url, reused: true });
+        }
+      }
+      return jsonError("Не удалось создать запись платежа: " + (paymentError?.message || ""), 500, "PAYMENT_CREATE_FAILED");
     }
 
     const orderNumber = `${invoice.number || `INV-${invoice.id.slice(0, 8)}`}-${payment.id.slice(0, 8)}`;
@@ -198,8 +215,8 @@ export async function POST(request: NextRequest) {
           currency: "RUB",
           description,
           orderNumber,
-          returnUrl: absoluteUrl(settings.success_path, request, invoice.id),
-          failUrl: absoluteUrl(settings.fail_path, request, invoice.id),
+          returnUrl: absoluteUrl(settings.success_path || "/payments/success", request, invoice.id, payment.id),
+          failUrl: absoluteUrl(settings.fail_path || "/payments/fail", request, invoice.id, payment.id),
         },
         {
           mode,

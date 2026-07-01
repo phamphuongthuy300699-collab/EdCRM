@@ -110,8 +110,8 @@ select
   'https://web.rbsuat.com/ab/rest/',
   'https://engine.paymentgate.ru/payment/rest/',
   '/api/payments/alfabank/callback',
-  '/parent/payments?payment=success',
-  '/parent/payments?payment=fail',
+  '/payments/success',
+  '/payments/fail',
   'RUB',
   'one_step'
 from public.organizations

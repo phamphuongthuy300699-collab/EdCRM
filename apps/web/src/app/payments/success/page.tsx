@@ -14,17 +14,32 @@ function PaymentSuccessInner() {
 
   useEffect(() => {
     const orderId = searchParams.get("orderId");
-    if (!orderId) return;
+    const paymentId = searchParams.get("paymentId");
+    if (!orderId && !paymentId) return;
+
+    const isUuid = (val: string | null): val is string => {
+      if (!val) return false;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    };
 
     async function verifyPayment() {
       try {
         setChecking(true);
         setStatusText("Проверяем статус платежа в банке...");
 
+        const bodyPayload: Record<string, string> = {};
+        if (isUuid(paymentId)) {
+          bodyPayload.paymentId = paymentId;
+        } else if (isUuid(orderId)) {
+          bodyPayload.paymentId = orderId;
+        } else if (orderId) {
+          bodyPayload.providerOrderId = orderId;
+        }
+
         const res = await fetch("/api/payments/alfabank/status", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ paymentId: orderId }),
+          body: JSON.stringify(bodyPayload),
         });
 
         const data = await res.json();

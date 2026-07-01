@@ -299,21 +299,28 @@ export default function ParentPaymentsPage() {
                   </div>
 
                   {inv.status !== "paid" && inv.status !== "cancelled" && (
-                    <Button 
-                      onClick={() => handleRequestPaymentLink(inv.id)}
-                      disabled={payingInvoiceId === inv.id}
-                      variant="primary-site" 
-                      style={{ 
-                        background: onlinePaymentEnabled || isDemoMode() ? "var(--color-accent)" : "var(--color-text-muted)",
-                        cursor: onlinePaymentEnabled || isDemoMode() ? "pointer" : "not-allowed",
-                        height: "40px", 
-                        fontSize: "13px", 
-                        width: "100%",
-                        marginTop: "4px"
-                      }}
-                    >
-                      {payingInvoiceId === inv.id ? "Генерация ссылки..." : onlinePaymentEnabled || isDemoMode() ? "Оплатить картой онлайн" : "Онлайн-оплата временно недоступна"}
-                    </Button>
+                    <>
+                      <Button 
+                        onClick={() => handleRequestPaymentLink(inv.id)}
+                        disabled={payingInvoiceId === inv.id || (!onlinePaymentEnabled && !isDemoMode())}
+                        variant="primary-site" 
+                        style={{ 
+                          background: onlinePaymentEnabled || isDemoMode() ? "var(--color-accent)" : "var(--color-text-muted)",
+                          cursor: onlinePaymentEnabled || isDemoMode() ? "pointer" : "not-allowed",
+                          height: "40px", 
+                          fontSize: "13px", 
+                          width: "100%",
+                          marginTop: "4px"
+                        }}
+                      >
+                        {payingInvoiceId === inv.id ? "Генерация ссылки..." : onlinePaymentEnabled || isDemoMode() ? "Оплатить картой онлайн" : "Онлайн-оплата временно недоступна"}
+                      </Button>
+                      {!onlinePaymentEnabled && !isDemoMode() && (
+                        <p style={{ fontSize: "11px", color: "var(--color-danger)", margin: "4px 0 0 0", fontWeight: 650 }}>
+                          * Онлайн-оплата отключена. Пожалуйста, обратитесь к менеджеру для оплаты по реквизитам или наличными.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

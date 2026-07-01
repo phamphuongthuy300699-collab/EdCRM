@@ -5,9 +5,10 @@ import { mapAlfaStatusToCrmStatus, redactSensitivePaymentPayload } from "@/lib/p
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
-const bodySchema = z.object({
+export const statusSchema = z.object({
   paymentId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
+  providerOrderId: z.string().optional(),
 });
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
@@ -18,14 +19,14 @@ function jsonError(message: string, status = 400, code = "STATUS_CHECK_ERROR") {
 
 export async function POST(request: NextRequest) {
   try {
-    const parsed = bodySchema.safeParse(await request.json());
+    const parsed = statusSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return jsonError("Некорректный ID платежа или счета", 422, "INVALID_INPUT");
+      return jsonError("Некорректный ID платежа, счета или заказа", 422, "INVALID_INPUT");
     }
 
-    const { paymentId, invoiceId } = parsed.data;
-    if (!paymentId && !invoiceId) {
-      return jsonError("Необходимо указать paymentId или invoiceId", 400, "MISSING_INPUT");
+    const { paymentId, invoiceId, providerOrderId } = parsed.data;
+    if (!paymentId && !invoiceId && !providerOrderId) {
+      return jsonError("Необходимо указать paymentId, invoiceId или providerOrderId", 400, "MISSING_INPUT");
     }
 
     // 1. Authenticate CRM user
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest) {
     let paymentQuery = admin.from("payments").select("id, organization_id, invoice_id, provider_order_id, status, amount, currency");
     if (paymentId) {
       paymentQuery = paymentQuery.eq("id", paymentId);
+    } else if (providerOrderId) {
+      paymentQuery = paymentQuery.eq("provider_order_id", providerOrderId);
     } else {
       paymentQuery = paymentQuery.eq("invoice_id", invoiceId).eq("provider", "alfabank").order("created_at", { ascending: false }).limit(1);
     }
@@ -154,7 +157,7 @@ export async function POST(request: NextRequest) {
           invoice_id: payment.invoice_id,
           provider: "alfabank",
           event_type: "payment_paid",
-          payload: { statusResponse, source: "manual_check" },
+          payload: redactSensitivePaymentPayload({ statusResponse, source: "manual_check" }),
         });
       } else if (newStatus === "failed" || newStatus === "cancelled") {
         // Record failure event
@@ -164,7 +167,7 @@ export async function POST(request: NextRequest) {
           invoice_id: payment.invoice_id,
           provider: "alfabank",
           event_type: "payment_failed",
-          payload: { statusResponse, source: "manual_check" },
+          payload: redactSensitivePaymentPayload({ statusResponse, source: "manual_check" }),
         });
       }
     }

@@ -169,7 +169,7 @@ async function processCallback(request: NextRequest) {
       invoice_id: payment.invoice_id,
       provider: "alfabank",
       event_type: "payment_paid",
-      payload: { statusResponse },
+      payload: redactSensitivePaymentPayload({ statusResponse }),
     });
   } else if (newStatus === "failed" || newStatus === "cancelled") {
     // Log failure event
@@ -179,7 +179,7 @@ async function processCallback(request: NextRequest) {
       invoice_id: payment.invoice_id,
       provider: "alfabank",
       event_type: "payment_failed",
-      payload: { statusResponse },
+      payload: redactSensitivePaymentPayload({ statusResponse }),
     });
   }
 
