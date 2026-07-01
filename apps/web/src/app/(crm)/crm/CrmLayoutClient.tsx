@@ -19,7 +19,8 @@ import {
   Calendar,
   ClipboardList,
   FileText,
-  Globe
+  Globe,
+  Receipt
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -42,7 +43,8 @@ export default function CrmLayout({
     { name: "Заявки (Лиды)", path: "/crm/leads", icon: Inbox },
     { name: "Ученики", path: "/crm/students", icon: Users },
     { name: "Группы", path: "/crm/groups", icon: GraduationCap },
-    { name: "Оплаты", path: "/crm/payments", icon: CreditCard },
+    { name: "Счета (Invoices)", path: "/crm/invoices", icon: CreditCard },
+    { name: "Платежи (Payments)", path: "/crm/payments", icon: Receipt },
     { name: "Учебные материалы", path: "/crm/materials", icon: BookOpen },
     { name: "Занятия", path: "/crm/lessons", icon: Calendar },
     { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },

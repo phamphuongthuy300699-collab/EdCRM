@@ -67,7 +67,29 @@ export default function ParentLayout({
           </Link>
 
           {/* Navigation / Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <Link href="/parent" style={{
+              fontSize: "var(--font-small)",
+              color: pathname === "/parent" ? "var(--color-primary)" : "var(--color-text-muted)",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}>
+              <span>Главная</span>
+            </Link>
+
+            <Link href="/parent/payments" style={{
+              fontSize: "var(--font-small)",
+              color: pathname.startsWith("/parent/payments") ? "var(--color-primary)" : "var(--color-text-muted)",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}>
+              <span>Оплаты и счета</span>
+            </Link>
+
             <Link href="/" style={{
               fontSize: "var(--font-small)",
               color: "var(--color-text-muted)",
