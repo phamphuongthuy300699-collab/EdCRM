@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAlfaOrderStatus } from "@/lib/payments/alfabank/client";
-import { mapAlfaStatusToCrmStatus } from "@/lib/payments/alfabank/mapper";
+import { mapAlfaStatusToCrmStatus, redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       const nowStr = new Date().toISOString();
       const updateData: Record<string, any> = {
         status: newStatus,
-        raw_response: statusResponse,
+        raw_response: redactSensitivePaymentPayload(statusResponse),
       };
 
       if (newStatus === "paid") {

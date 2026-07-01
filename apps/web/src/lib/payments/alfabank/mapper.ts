@@ -60,3 +60,37 @@ export function mapAlfaStatusToCrmStatus(orderStatus: number | undefined): strin
   if (orderStatus === 6) return "failed";
   return "unknown";
 }
+
+export function redactSensitivePaymentPayload(payload: any): any {
+  if (!payload || typeof payload !== "object") return payload;
+  
+  // Create deep copy
+  const copy = JSON.parse(JSON.stringify(payload));
+  const sensitiveKeys = [
+    "password", 
+    "token", 
+    "secret", 
+    "api_password_secret", 
+    "apipassword", 
+    "username",
+    "api_login",
+    "terminal_id",
+    "merchant_id",
+    "sig",
+    "signature"
+  ];
+  
+  const recurse = (current: any) => {
+    for (const key in current) {
+      if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) {
+        current[key] = "[redacted]";
+      } else if (typeof current[key] === "object" && current[key] !== null) {
+        recurse(current[key]);
+      }
+    }
+  };
+  
+  recurse(copy);
+  return copy;
+}
+

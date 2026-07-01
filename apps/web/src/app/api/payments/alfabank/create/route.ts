@@ -4,6 +4,7 @@ import { createAlfaOrder } from "@/lib/payments/alfabank/client";
 import { alfaErrorMessage, AlfaBankError } from "@/lib/payments/alfabank/errors";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
@@ -216,8 +217,8 @@ export async function POST(request: NextRequest) {
           provider_order_id: result.providerOrderId,
           provider_payment_id: result.providerOrderId,
           payment_url: result.paymentUrl,
-          raw_request: { ...result.rawRequest, endpoint: result.endpoint },
-          raw_response: result.rawResponse,
+          raw_request: redactSensitivePaymentPayload({ ...result.rawRequest, endpoint: result.endpoint }),
+          raw_response: redactSensitivePaymentPayload(result.rawResponse),
           updated_at: new Date().toISOString(),
         })
         .eq("id", payment.id);

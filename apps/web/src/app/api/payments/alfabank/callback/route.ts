@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAlfaOrderStatus } from "@/lib/payments/alfabank/client";
-import { mapAlfaStatusToCrmStatus } from "@/lib/payments/alfabank/mapper";
+import { mapAlfaStatusToCrmStatus, redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { AlfaBankError } from "@/lib/payments/alfabank/errors";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
@@ -66,7 +66,7 @@ async function processCallback(request: NextRequest) {
     invoice_id: payment.invoice_id,
     provider: "alfabank",
     event_type: "callback_received",
-    payload: rawPayload,
+    payload: redactSensitivePaymentPayload(rawPayload),
   });
 
   // 6. Idempotency check: if payment is already completed or refunded, do not process again
@@ -131,7 +131,7 @@ async function processCallback(request: NextRequest) {
   const nowStr = new Date().toISOString();
   const updateData: Record<string, any> = {
     status: newStatus,
-    raw_response: statusResponse,
+    raw_response: redactSensitivePaymentPayload(statusResponse),
   };
 
   if (newStatus === "paid") {

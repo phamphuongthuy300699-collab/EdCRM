@@ -179,6 +179,11 @@ export default function PaymentsSettingsClient() {
           <h1>Настройки платежей</h1>
           <p>Настройки → Платежи → Альфа-Банк. Секретный пароль сохраняется только на сервере и не возвращается в интерфейс.</p>
         </div>
+        <Link href="/crm/settings/payments/diagnostics">
+          <Button type="button" variant="secondary-crm" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <span>Диагностика подключения</span>
+          </Button>
+        </Link>
         <CreditCard size={30} color="var(--color-primary)" />
       </div>
 

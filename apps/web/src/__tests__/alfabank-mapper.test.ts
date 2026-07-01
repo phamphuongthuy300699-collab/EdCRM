@@ -4,6 +4,7 @@ import {
   resolveRegisterEndpoint,
   sanitizeAlfaRequest,
   toMinorUnits,
+  redactSensitivePaymentPayload,
 } from "../lib/payments/alfabank/mapper";
 
 describe("alfabank mapper", () => {
@@ -35,5 +36,28 @@ describe("alfabank mapper", () => {
     expect(resolveRegisterEndpoint({ paymentStage: "one_step" })).toBe("register.do");
     expect(resolveRegisterEndpoint({ paymentStage: "two_step" })).toBe("registerPreAuth.do");
     expect(resolveRegisterEndpoint({ paymentStage: "two_step", registerEndpoint: "/custom/register.do" })).toBe("custom/register.do");
+  });
+
+  it("scrubs sensitive values from payment logs nested payloads", () => {
+    const payload = {
+      orderId: "123",
+      credentials: {
+        userName: "user-123",
+        password: "secret-password-123",
+        api_password_secret: "some-secret",
+      },
+      security: {
+        signature: "sig-val",
+        token: "token-val",
+      }
+    };
+
+    const redacted = redactSensitivePaymentPayload(payload);
+    expect(redacted.orderId).toBe("123");
+    expect(redacted.credentials.userName).toBe("[redacted]");
+    expect(redacted.credentials.password).toBe("[redacted]");
+    expect(redacted.credentials.api_password_secret).toBe("[redacted]");
+    expect(redacted.security.signature).toBe("[redacted]");
+    expect(redacted.security.token).toBe("[redacted]");
   });
 });
