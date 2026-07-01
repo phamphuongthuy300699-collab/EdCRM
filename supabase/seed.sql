@@ -17,7 +17,12 @@ values (
   'ул. Ленина, д. 10',
   '+7 (999) 123-45-67',
   true
-);
+)
+on conflict (id) do update set
+  name = excluded.name,
+  address = excluded.address,
+  phone = excluded.phone,
+  is_active = excluded.is_active;
 
 -- Seed rooms
 insert into public.rooms (id, organization_id, branch_id, name, capacity)
@@ -27,7 +32,11 @@ values (
   '120c1a93-8ef9-4eb5-8e7c-eb8ab57342fb',
   'Кабинет 101 (Лего-конструирование)',
   10
-);
+)
+on conflict (id) do update set
+  branch_id = excluded.branch_id,
+  name = excluded.name,
+  capacity = excluded.capacity;
 
 -- Seed courses
 insert into public.courses (id, organization_id, title, slug, short_description, min_age, max_age, duration_minutes, price_monthly, is_public, sort_order)
@@ -57,7 +66,6 @@ values
   4000.00,
   true,
   20
-)
 )
 on conflict (organization_id, slug) do nothing;
 

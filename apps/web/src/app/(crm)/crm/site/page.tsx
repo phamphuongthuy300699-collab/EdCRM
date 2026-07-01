@@ -440,29 +440,56 @@ export default function CrmSitePage() {
       <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
         {[
           { id: "home", label: "Главная", icon: Globe },
-          { id: "courses", label: "Курсы", icon: BookOpen },
-          { id: "schedule", label: "Расписание", icon: Calendar },
-          { id: "prices", label: "Цены", icon: DollarSign },
+          { id: "courses", label: "Курсы → настройки", icon: BookOpen, href: "/crm/settings?tab=courses" },
+          { id: "schedule", label: "Расписание → настройки", icon: Calendar, href: "/crm/settings?tab=groups" },
+          { id: "prices", label: "Цены → настройки", icon: DollarSign, href: "/crm/settings?tab=courses" },
           { id: "seo", label: "SEO", icon: Search },
         ].map(tab => {
           const Icon = tab.icon;
+          const directoryHref =
+            tab.id === "courses" || tab.id === "prices"
+              ? "/crm/settings?tab=courses"
+              : tab.id === "schedule"
+                ? "/crm/settings?tab=groups"
+                : "";
+          const tabStyle = {
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: "13px",
+            background: activeTab === tab.id ? "var(--color-primary-soft)" : "transparent",
+            color: activeTab === tab.id ? "var(--color-primary-dark)" : "var(--color-text-muted)"
+          } as React.CSSProperties;
+
+          if (directoryHref) {
+            return (
+              <a
+                key={tab.id}
+                data-testid={`site-tab-${tab.id}`}
+                href={directoryHref}
+                style={{ ...tabStyle, textDecoration: "none" }}
+              >
+                <Icon size={16} />
+                <span>{tab.label}</span>
+              </a>
+            );
+          }
+
           return (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id as any); setSuccessMsg(""); setErrorMsg(""); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: "13px",
-                background: activeTab === tab.id ? "var(--color-primary-soft)" : "transparent",
-                color: activeTab === tab.id ? "var(--color-primary-dark)" : "var(--color-text-muted)"
+              data-testid={`site-tab-${tab.id}`}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                setSuccessMsg("");
+                setErrorMsg("");
               }}
+              style={tabStyle}
             >
               <Icon size={16} />
               <span>{tab.label}</span>

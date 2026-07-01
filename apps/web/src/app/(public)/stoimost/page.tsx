@@ -33,9 +33,10 @@ export default async function StoimostPage() {
     ]
   };
 
-  let trialPrice = "0 ₽";
+  const trialPrice = "0 ₽";
   let monthlyPrice = "от 4 000 ₽";
-  let individualPrice = "от 1 500 ₽";
+  const individualPrice = "от 1 500 ₽";
+  let publicCourses: any[] = [];
 
   try {
     const supabase = createSupabaseAdminClient();
@@ -46,18 +47,30 @@ export default async function StoimostPage() {
       .single();
 
     if (org) {
-      const { data: pricesBlock } = await supabase
-        .from("site_content_blocks")
-        .select("content")
+      const { data: courses } = await (supabase.from("courses") as any)
+        .select("id, title, short_description, min_age, max_age, duration_minutes, price_monthly, sort_order")
         .eq("organization_id", org.id)
-        .eq("block_key", "home.prices")
-        .eq("status", "published")
-        .single();
-      
-      if (pricesBlock?.content) {
-        trialPrice = pricesBlock.content.trialPrice || trialPrice;
-        monthlyPrice = pricesBlock.content.monthlyPrice || monthlyPrice;
-        individualPrice = pricesBlock.content.individualPrice || individualPrice;
+        .eq("is_public", true)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (courses && courses.length > 0) {
+        publicCourses = courses;
+        const prices = courses.map((course: any) => Number(course.price_monthly || 0)).filter(Boolean);
+        if (prices.length > 0) {
+          monthlyPrice = `от ${Math.min(...prices).toLocaleString("ru-RU")} ₽`;
+        }
+      }
+
+      const { data: groups } = await (supabase.from("groups") as any)
+        .select("price_monthly")
+        .eq("organization_id", org.id)
+        .eq("status", "active")
+        .eq("show_on_site", true);
+
+      const groupPrices = (groups || []).map((group: any) => Number(group.price_monthly || 0)).filter(Boolean);
+      if (groupPrices.length > 0) {
+        monthlyPrice = `от ${Math.min(...groupPrices).toLocaleString("ru-RU")} ₽`;
       }
     }
   } catch (e) {
@@ -149,6 +162,24 @@ export default async function StoimostPage() {
               </div>
             </div>
           </div>
+
+          {publicCourses.length > 0 && (
+            <div>
+              <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "24px", textAlign: "center" }}>Цены по направлениям</h2>
+              <div style={{ display: "grid", gap: "12px" }}>
+                {publicCourses.map((course) => (
+                  <div key={course.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.7fr 0.7fr", gap: "16px", alignItems: "center", background: "white", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "18px 20px" }}>
+                    <div>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 800 }}>{course.title}</h3>
+                      <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "12px" }}>{course.short_description || "Описание направления уточняется"}</p>
+                    </div>
+                    <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{course.min_age || 6}-{course.max_age || 14} лет · {course.duration_minutes || 90} мин</span>
+                    <strong style={{ textAlign: "right" }}>{course.price_monthly ? `${Number(course.price_monthly).toLocaleString("ru-RU")} ₽ / мес` : "Цена уточняется"}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ background: "rgba(37, 99, 235, 0.04)", border: "1px dashed rgba(37, 99, 235, 0.3)", borderRadius: "16px", padding: "32px", marginTop: "24px" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "16px" }}>Что входит в стоимость:</h3>

@@ -48,6 +48,8 @@ interface LandingPageClientProps {
   initialSchedule?: any[];
   initialPrices?: any;
   initialBlocks?: any[];
+  initialTeachers?: any[];
+  initialBranches?: any[];
 }
 
 export default function LandingPageClient({
@@ -55,6 +57,8 @@ export default function LandingPageClient({
   initialSchedule,
   initialPrices,
   initialBlocks,
+  initialTeachers,
+  initialBranches,
 }: LandingPageClientProps) {
   const router = useRouter();
   
@@ -221,7 +225,7 @@ export default function LandingPageClient({
   const teachersBlock = getBlock('home.teachers');
   const teachersTitle = teachersBlock?.title || "Наши преподаватели";
   const teachersSubtitle = teachersBlock?.subtitle || "Практикующие наставники, которые умеют объяснять сложное детям простым языком";
-  const teachersListToRender = teachersBlock?.content?.items || [
+  const teacherFallbackList = teachersBlock?.content?.items || [
     {
       name: "Алексей Дмитриев",
       role: "Старший наставник LEGO & Arduino",
@@ -244,6 +248,15 @@ export default function LandingPageClient({
       alt: "Егор Смирнов — наставник Python/Arduino"
     }
   ];
+  const teachersListToRender = initialTeachers && initialTeachers.length > 0
+    ? initialTeachers.map((teacher: any) => ({
+        name: teacher.name,
+        role: teacher.role || "Наставник инженерной лаборатории",
+        text: teacher.text || "Помогает детям уверенно разбираться в инженерных задачах и доводить проекты до результата.",
+        imageUrl: teacher.imageUrl || "",
+        alt: teacher.alt || teacher.name,
+      }))
+    : teacherFallbackList;
 
   const portalPreviewBlock = getBlock('home.parent_student_portal_preview');
   const portalPreviewTitle = portalPreviewBlock?.title || "Родители видят прогресс ребенка в личном кабинете";
@@ -264,6 +277,9 @@ export default function LandingPageClient({
   const trialPrice = pricesBlock?.content?.trialPrice || "0 ₽";
   const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
   const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
+  const primaryBranch = initialBranches?.[0] || null;
+  const contactAddress = primaryBranch?.address || "г. Липецк, ул. Ленина, д. 10";
+  const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Понедельник — Суббота: 09:00 - 20:00";
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -1469,13 +1485,13 @@ export default function LandingPageClient({
                   style={{ marginTop: "4px", cursor: "pointer" }}
                 />
                 <label htmlFor="consent" style={{ fontSize: "11px", color: "var(--color-text-muted)", cursor: "pointer", lineHeight: 1.4 }}>
-                  Я согласен на обработку моих персональных данных и персональных данных ребенка в соответствии с{" "}
-                  <Link href="/privacy-policy" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
-                    Политикой конфиденциальности
+                  Нажимая кнопку, вы соглашаетесь с{" "}
+                  <Link href="/privacy" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
+                    политикой обработки персональных данных
                   </Link>{" "}
-                  и{" "}
+                  и подтверждаете{" "}
                   <Link href="/consent" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
-                    Согласием на обработку персональных данных
+                    согласие на обработку персональных данных
                   </Link>.
                 </label>
               </div>
@@ -1539,7 +1555,7 @@ export default function LandingPageClient({
                 gap: "6px"
               }}>
                 <MapPin size={16} style={{ color: "var(--color-primary)" }} />
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text)" }}>ул. Ленина, д. 10</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text)" }}>{contactAddress}</span>
               </div>
             </div>
 
@@ -1579,7 +1595,7 @@ export default function LandingPageClient({
               </div>
               <div>
                 <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Наш адрес</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>г. Липецк, ул. Ленина, д. 10</p>
+                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{contactAddress}</p>
               </div>
             </div>
 
@@ -1589,7 +1605,7 @@ export default function LandingPageClient({
               </div>
               <div>
                 <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Режим работы</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>Понедельник — Суббота: 09:00 - 20:00</p>
+                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{contactHours}</p>
               </div>
             </div>
 

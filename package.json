@@ -9,10 +9,12 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web",
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
     "test": "npm run test --workspace=apps/web",
-    "test:e2e": "npm run test:e2e --workspace=apps/web"
+    "test:e2e": "npm run test:e2e --workspace=apps/web",
+    "test:e2e:real": "npm run test:e2e:real --workspace=apps/web"
   },
   "dependencies": {
     "pg": "^8.22.0"

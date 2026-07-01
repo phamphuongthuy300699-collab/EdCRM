@@ -81,6 +81,7 @@ export default function ParentDashboard() {
   // Real DB Data
   const [guardian, setGuardian] = useState<any>(null);
   const [childrenList, setChildrenList] = useState<any[]>([]);
+  const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
 
   // Demo Fallback Data (Anna Petrova & Igor Petrov)
   const demoData = {
@@ -215,6 +216,11 @@ export default function ParentDashboard() {
     }
 
     loadParentSession();
+
+    fetch("/api/parent/payment-status")
+      .then((res) => res.json())
+      .then((data) => setOnlinePaymentEnabled(Boolean(data.onlinePaymentEnabled)))
+      .catch(() => setOnlinePaymentEnabled(false));
   }, []);
 
   const handleRequestPaymentLink = () => {
@@ -472,19 +478,19 @@ export default function ParentDashboard() {
                   </div>
 
                   <Button 
-                    onClick={(isDemoMode() && process.env.NODE_ENV !== "production") ? handleRequestPaymentLink : undefined}
-                    disabled={!(isDemoMode() && process.env.NODE_ENV !== "production")}
+                    onClick={onlinePaymentEnabled ? handleRequestPaymentLink : undefined}
+                    disabled={!onlinePaymentEnabled}
                     variant="primary-site" 
                     style={{ 
-                      background: (isDemoMode() && process.env.NODE_ENV !== "production") ? "var(--color-accent)" : "var(--color-text-muted)", 
-                      cursor: (isDemoMode() && process.env.NODE_ENV !== "production") ? "pointer" : "not-allowed",
+                      background: onlinePaymentEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
+                      cursor: onlinePaymentEnabled ? "pointer" : "not-allowed",
                       width: "100%", 
                       height: "40px", 
                       fontSize: "13px", 
                       marginTop: "8px" 
                     }}
                   >
-                    {(isDemoMode() && process.env.NODE_ENV !== "production") ? "Запросить ссылку на оплату" : "Оплата будет подключена после выдачи ключей"}
+                    {onlinePaymentEnabled ? "Запросить ссылку на оплату" : "Онлайн-оплата Альфабанк пока не настроена"}
                   </Button>
                 </div>
               </div>
@@ -655,19 +661,19 @@ export default function ParentDashboard() {
 
                             {inv.status !== "paid" && (
                               <Button 
-                                onClick={(isDemo && process.env.NODE_ENV !== "production") ? handleRequestPaymentLink : undefined}
-                                disabled={!(isDemo && process.env.NODE_ENV !== "production")}
+                                onClick={onlinePaymentEnabled ? handleRequestPaymentLink : undefined}
+                                disabled={!onlinePaymentEnabled}
                                 variant="primary-site" 
                                 style={{ 
-                                  background: (isDemo && process.env.NODE_ENV !== "production") ? "var(--color-accent)" : "var(--color-text-muted)", 
-                                  cursor: (isDemo && process.env.NODE_ENV !== "production") ? "pointer" : "not-allowed",
+                                  background: onlinePaymentEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
+                                  cursor: onlinePaymentEnabled ? "pointer" : "not-allowed",
                                   height: "36px", 
                                   fontSize: "12px", 
                                   width: "100%", 
                                   marginTop: "4px" 
                                 }}
                               >
-                                {(isDemo && process.env.NODE_ENV !== "production") ? "Запросить ссылку" : "Оплата будет подключена после выдачи ключей"}
+                                {onlinePaymentEnabled ? "Запросить ссылку" : "Онлайн-оплата Альфабанк пока не настроена"}
                               </Button>
                             )}
                           </div>

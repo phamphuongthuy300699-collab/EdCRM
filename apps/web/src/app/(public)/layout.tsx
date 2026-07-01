@@ -187,6 +187,12 @@ export default function PublicLayout({
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Документы</h4>
               <ul style={{ listStyle: "none", display: "grid", gap: "12px", fontSize: "var(--font-small)" }}>
+                <li><Link href="/contacts" style={{ color: "#E5E7EB" }}>Контакты</Link></li>
+                <li><Link href="/legal" style={{ color: "#E5E7EB" }}>Реквизиты</Link></li>
+                <li><Link href="/privacy" style={{ color: "#E5E7EB" }}>Политика обработки данных</Link></li>
+                <li><Link href="/offer" style={{ color: "#E5E7EB" }}>Публичная оферта</Link></li>
+                <li><Link href="/payment" style={{ color: "#E5E7EB" }}>Условия оплаты</Link></li>
+                <li><Link href="/refund" style={{ color: "#E5E7EB" }}>Условия возврата</Link></li>
                 <li><Link href="/privacy-policy" style={{ color: "#E5E7EB" }}>Конфиденциальность</Link></li>
                 <li><Link href="/consent" style={{ color: "#E5E7EB" }}>Согласие на ОПД</Link></li>
               </ul>

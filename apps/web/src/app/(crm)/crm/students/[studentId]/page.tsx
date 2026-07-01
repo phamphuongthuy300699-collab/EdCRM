@@ -25,7 +25,7 @@ interface Invoice {
   id: string;
   title: string;
   amount: number;
-  status: "paid" | "pending" | "overdue";
+  status: "draft" | "issued" | "partially_paid" | "paid" | "cancelled" | "overdue";
   due_date: string;
 }
 
@@ -99,7 +99,7 @@ export default function StudentDetailPage() {
       { id: "i2", title: "Абонемент на Май (8 занятий)", amount: 4500, status: "paid", due_date: "2026-05-15" }
     ],
     "3": [
-      { id: "i3", title: "Абонемент на Июнь (8 занятий)", amount: 4000, status: "pending", due_date: "2026-06-25" },
+      { id: "i3", title: "Абонемент на Июнь (8 занятий)", amount: 4000, status: "issued", due_date: "2026-06-25" },
       { id: "i4", title: "Абонемент на Май (8 занятий)", amount: 4000, status: "paid", due_date: "2026-05-25" }
     ],
     "4": [
@@ -313,8 +313,8 @@ export default function StudentDetailPage() {
           student_id: student.id,
           invoice_id: invoiceId,
           amount: targetInvoice.amount,
-          provider: "yookassa",
-          status: "succeeded",
+          provider: "manual",
+          status: "paid",
           paid_at: new Date().toISOString()
         });
 
@@ -473,7 +473,7 @@ export default function StudentDetailPage() {
           id: "i-mock-" + Date.now(),
           title: newInvoiceTitle,
           amount: newInvoiceAmount,
-          status: "pending",
+          status: "issued",
           due_date: newInvoiceDueDate
         };
         setInvoices([newMockInv, ...invoices]);
@@ -498,10 +498,11 @@ export default function StudentDetailPage() {
           guardian_id: student.guardianId || null,
           enrollment_id: activeEnrollment?.id || null,
           title: newInvoiceTitle,
+          description: newInvoiceTitle,
           amount: newInvoiceAmount,
           currency: "RUB",
           due_date: newInvoiceDueDate,
-          status: "pending",
+          status: "issued",
           issued_at: new Date().toISOString()
         })
         .select()
@@ -550,8 +551,12 @@ export default function StudentDetailPage() {
   const getInvoiceStatusBadge = (status: string) => {
     switch (status) {
       case "paid": return <span className="badge badge-green">Оплачено</span>;
-      case "pending": return <span className="badge badge-blue">Ожидает</span>;
+      case "pending":
+      case "issued":
+      case "draft": return <span className="badge badge-blue">Ожидает</span>;
+      case "partially_paid": return <span className="badge badge-amber">Частично</span>;
       case "overdue": return <span className="badge badge-red">Просрочен</span>;
+      case "cancelled": return <span className="badge badge-gray">Отменен</span>;
       default: return <span className="badge badge-gray">{status}</span>;
     }
   };
@@ -751,7 +756,7 @@ export default function StudentDetailPage() {
                           <span style={{ fontWeight: 800, fontSize: "14px" }}>{inv.amount} ₽</span>
                           {getInvoiceStatusBadge(inv.status)}
                         </div>
-                        {(inv.status === "pending" || inv.status === "overdue") && (
+                        {(inv.status === "issued" || inv.status === "draft" || inv.status === "partially_paid" || inv.status === "overdue") && (
                           <Button 
                             onClick={() => handlePayInvoice(inv.id)}
                             disabled={payingInvoiceId === inv.id}

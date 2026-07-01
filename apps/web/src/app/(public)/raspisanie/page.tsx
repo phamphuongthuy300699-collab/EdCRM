@@ -54,12 +54,16 @@ export default async function RaspisaniePage() {
           capacity,
           show_on_site,
           course:courses(title),
+          branch:branches(name, address, is_active, show_on_site),
+          room:rooms(name),
+          teacher:profiles(full_name),
           schedule_rules:group_schedule_rules(weekday, starts_at),
           enrollments(id, status)
         `)
         .eq("organization_id", org.id)
         .eq("show_on_site", true)
-        .eq("status", "active");
+        .eq("status", "active")
+        .order("sort_order", { ascending: true });
 
       if (groups && groups.length > 0) {
         const daysMap: Record<number, string> = {
@@ -69,7 +73,12 @@ export default async function RaspisaniePage() {
           1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
         };
 
-        scheduleToRender = groups.map(g => {
+        scheduleToRender = groups
+        .filter((g: any) => {
+          const branch = Array.isArray(g.branch) ? g.branch[0] : g.branch;
+          return !branch || (branch.is_active !== false && branch.show_on_site !== false);
+        })
+        .map(g => {
           const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
           const spots = g.capacity - activeEnrollments;
 
@@ -99,6 +108,10 @@ export default async function RaspisaniePage() {
             age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
             course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
             time: timeStr,
+            branch: (Array.isArray(g.branch) ? g.branch[0]?.name : (g.branch as any)?.name) || "",
+            address: (Array.isArray(g.branch) ? g.branch[0]?.address : (g.branch as any)?.address) || "",
+            room: (Array.isArray(g.room) ? g.room[0]?.name : (g.room as any)?.name) || "",
+            teacher: (Array.isArray(g.teacher) ? g.teacher[0]?.full_name : (g.teacher as any)?.full_name) || "",
             spotsText,
             badgeClass
           };
@@ -170,18 +183,22 @@ export default async function RaspisaniePage() {
               display: "grid",
               gap: "0"
             }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "14px", borderBottom: "1px solid var(--color-border)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "14px", borderBottom: "1px solid var(--color-border)", gap: "12px" }}>
                 <span>Возраст</span>
                 <span>Курс</span>
                 <span>Время занятий</span>
+                <span>Филиал</span>
+                <span>Преподаватель</span>
                 <span>Наличие мест</span>
               </div>
               
               {scheduleToRender.map((sched, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px" }}>
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px", gap: "12px" }}>
                   <span style={{ fontWeight: 700 }}>{sched.age}</span>
                   <span>{sched.course}</span>
                   <span>{sched.time}</span>
+                  <span>{sched.branch || sched.address || "Адрес уточняется"}{sched.room ? ` · ${sched.room}` : ""}</span>
+                  <span>{sched.teacher || "Наставник назначается"}</span>
                   <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
                 </div>
               ))}

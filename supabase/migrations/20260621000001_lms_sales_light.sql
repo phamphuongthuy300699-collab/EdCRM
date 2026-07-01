@@ -297,7 +297,49 @@ create policy "objections_all" on public.objections
   for all to authenticated using (public.has_org_role(organization_id, array['owner','admin','manager']::public.app_role[]));
 
 
+/*
+-- Demo data moved to supabase/seed.sql.
+-- Keep migrations structural: do not execute demo inserts here.
 -- 9. Seed Demo Data directly in Migration
+-- Ensure baseline organization/course exist on a clean database.
+insert into public.organizations (id, name, slug, city, timezone)
+values (
+  'a3848a60-a292-491a-85eb-7f2824cf4e77',
+  'Р РѕР±РѕС‚РѕС‚РµС…РЅРёРєР° Р›РёРїРµС†Рє',
+  'robotics-lipetsk',
+  'Р›РёРїРµС†Рє',
+  'Europe/Moscow'
+)
+on conflict (slug) do nothing;
+
+insert into public.courses (
+  id,
+  organization_id,
+  title,
+  slug,
+  short_description,
+  min_age,
+  max_age,
+  duration_minutes,
+  price_monthly,
+  is_public,
+  sort_order
+)
+values (
+  '4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a',
+  'a3848a60-a292-491a-85eb-7f2824cf4e77',
+  'LEGO Start',
+  'robotics-lego',
+  'РљСѓСЂСЃ РєРѕРЅСЃС‚СЂСѓРёСЂРѕРІР°РЅРёСЏ Рё РїСЂРѕРіСЂР°РјРјРёСЂРѕРІР°РЅРёСЏ СЂРѕР±РѕС‚РѕРІ РґР»СЏ РґРµС‚РµР№ РЅР° Р±Р°Р·Рµ Lego Education.',
+  6,
+  10,
+  90,
+  4500.00,
+  true,
+  10
+)
+on conflict (organization_id, slug) do nothing;
+
 -- Organization is 'a3848a60-a292-491a-85eb-7f2824cf4e77', Course is '4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a'
 -- Update title of seeded course to Lego Start
 update public.courses
@@ -412,3 +454,4 @@ values
   ('f4444444-4444-4444-4444-444444444444', 'a3848a60-a292-491a-85eb-7f2824cf4e77', 'Ребенок уже ходит в другой кружок', 'Конкуренты', '"Отлично, что ребенок активный! А куда вы ходите? Робототехника и программирование развивают системное алгоритмическое мышление, которое поможет ему и в спорте, и в языках. К тому же наши занятия проходят по выходным и отлично сочетаются с другими секциями. Приходите просто на пробный урок — это ни к чему не обязывает, но ребенок попробует новое направление."', '{"конкуренты", "спорт", "время"}'),
   ('f5555555-5555-5555-5555-555555555555', 'a3848a60-a292-491a-85eb-7f2824cf4e77', 'Неудобное время', 'Расписание', '"Понимаю вас, график у всех плотный. У нас есть несколько вариантов групп: утренние в 10:00, дневные в 13:00 и вечерние в 16:30. Также мы сейчас формируем новую группу на будний день в 18:30. Какое время вам было бы комфортно в идеале? Давайте мы запишем вас в лист ожидания на это время."', '{"время", "расписание", "график"}')
 on conflict do nothing;
+*/

@@ -53,6 +53,10 @@ export default async function Page() {
   let initialCourses: any[] = [];
   let initialSchedule: any[] = [];
   let initialBlocks: any[] = [];
+  let initialTeachers: any[] = [];
+  let initialBranches: any[] = [];
+  let orgPhone = "+7-999-123-45-67";
+  let orgAddress = "ул. Ленина, д. 10";
 
   try {
     const supabase = createSupabaseAdminClient();
@@ -77,8 +81,44 @@ export default async function Page() {
         .select("*")
         .eq("organization_id", org.id)
         .eq("is_public", true)
+        .eq("is_active", true)
         .order("sort_order", { ascending: true });
       if (courses) initialCourses = courses;
+
+      const { data: branches } = await (supabase.from("branches") as any)
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .eq("show_on_site", true)
+        .order("sort_order", { ascending: true });
+      if (branches) {
+        initialBranches = branches;
+        if (branches[0]?.phone) orgPhone = branches[0].phone;
+        if (branches[0]?.address) orgAddress = branches[0].address;
+      }
+
+      const { data: teachers } = await (supabase.from("org_memberships") as any)
+        .select(`
+          role,
+          is_active,
+          profiles(id, full_name, avatar_url, specialty, public_bio, show_on_site, sort_order)
+        `)
+        .eq("organization_id", org.id)
+        .eq("role", "teacher")
+        .eq("is_active", true);
+      if (teachers) {
+        initialTeachers = teachers
+          .map((item: any) => Array.isArray(item.profiles) ? item.profiles[0] : item.profiles)
+          .filter((profile: any) => profile?.show_on_site)
+          .sort((a: any, b: any) => (a.sort_order || 100) - (b.sort_order || 100))
+          .map((profile: any) => ({
+            name: profile.full_name,
+            role: profile.specialty || "Наставник инженерной лаборатории",
+            text: profile.public_bio,
+            imageUrl: profile.avatar_url,
+            alt: profile.full_name,
+          }));
+      }
 
       // 3. Fetch groups & schedule rules
       const { data: groups } = await supabase
@@ -91,12 +131,16 @@ export default async function Page() {
           capacity,
           show_on_site,
           course:courses(title),
+          branch:branches(name, address),
+          room:rooms(name),
+          teacher:profiles(full_name),
           schedule_rules:group_schedule_rules(weekday, starts_at),
           enrollments(id, status)
         `)
         .eq("organization_id", org.id)
         .eq("show_on_site", true)
-        .eq("status", "active");
+        .eq("status", "active")
+        .order("sort_order", { ascending: true });
 
       if (groups) {
         const daysMap: Record<number, string> = {
@@ -124,6 +168,10 @@ export default async function Page() {
             age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
             course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
             time: timeStr,
+            branch: (Array.isArray(g.branch) ? g.branch[0]?.name : (g.branch as any)?.name) || "",
+            address: (Array.isArray(g.branch) ? g.branch[0]?.address : (g.branch as any)?.address) || "",
+            room: (Array.isArray(g.room) ? g.room[0]?.name : (g.room as any)?.name) || "",
+            teacher: (Array.isArray(g.teacher) ? g.teacher[0]?.full_name : (g.teacher as any)?.full_name) || "",
             spots: spots
           };
         });
@@ -142,10 +190,10 @@ export default async function Page() {
     "logo": "https://robotics-lipetsk.ru/favicon.ico",
     "image": "https://robotics-lipetsk.ru/images/classroom_lipetsk.png",
     "description": "Школа инженерного мышления и программирования для детей 6–14 лет в Липецке. Сборка роботов, разработка игр, Scratch, Python, Arduino в мини-группах.",
-    "telephone": "+7-999-123-45-67",
+    "telephone": orgPhone,
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "ул. Ленина, д. 10",
+      "streetAddress": orgAddress,
       "addressLocality": "Липецк",
       "postalCode": "398000",
       "addressCountry": "RU"
@@ -198,6 +246,8 @@ export default async function Page() {
         initialCourses={initialCourses}
         initialSchedule={initialSchedule}
         initialBlocks={initialBlocks}
+        initialTeachers={initialTeachers}
+        initialBranches={initialBranches}
       />
     </>
   );

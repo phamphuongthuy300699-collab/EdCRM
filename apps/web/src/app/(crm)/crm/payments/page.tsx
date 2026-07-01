@@ -185,8 +185,8 @@ export default function CrmPaymentsPage() {
           student_id: inv.student_id,
           invoice_id: id,
           amount: parseFloat(inv.amount),
-          provider: "cash",
-          status: "succeeded",
+          provider: "manual",
+          status: "paid",
           paid_at: new Date().toISOString()
         });
 
@@ -274,6 +274,7 @@ export default function CrmPaymentsPage() {
         guardian_id: primaryGuardianLink?.guardian_id || null,
         enrollment_id: activeEnrollment?.id || null,
         title: newTitle,
+        description: newTitle,
         amount: parseFloat(newAmount),
         currency: "RUB",
         status: "issued" as const,
