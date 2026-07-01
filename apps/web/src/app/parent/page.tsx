@@ -234,7 +234,7 @@ export default function ParentDashboard() {
     try {
       setPaymentError("");
       setPayingInvoiceId(invoiceId);
-      const response = await fetch("/api/payments/alfa/create", {
+      const response = await fetch("/api/payments/alfabank/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ invoiceId }),

@@ -132,7 +132,10 @@ export async function POST(request: Request) {
     if (!access.ok) return access.response;
 
     const input = parsed.data;
-    const organizationId = input.organizationId || access.organizationId;
+    if (input.organizationId && input.organizationId !== access.organizationId) {
+      return NextResponse.json({ ok: false, error: "Недостаточно прав для данной организации" }, { status: 403 });
+    }
+    const organizationId = access.organizationId;
     const admin = createSupabaseAdminClient();
 
     const { data: current, error: currentError } = await (admin.from("payment_provider_settings") as any)

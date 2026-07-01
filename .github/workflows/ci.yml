@@ -26,5 +26,8 @@ jobs:
       - name: Lint web app
         run: npm run lint
 
+      - name: Run unit tests
+        run: npm --workspace apps/web run test
+
       - name: Build web app
         run: npm --workspace apps/web run build
