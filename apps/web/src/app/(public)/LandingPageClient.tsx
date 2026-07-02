@@ -50,6 +50,7 @@ interface LandingPageClientProps {
   initialBlocks?: any[];
   initialTeachers?: any[];
   initialBranches?: any[];
+  orgDetails?: any;
 }
 
 export default function LandingPageClient({
@@ -59,6 +60,7 @@ export default function LandingPageClient({
   initialBlocks,
   initialTeachers,
   initialBranches,
+  orgDetails,
 }: LandingPageClientProps) {
   const router = useRouter();
   
@@ -223,29 +225,37 @@ export default function LandingPageClient({
   const heroSecondaryCtaText = heroBlock?.content?.secondaryCtaText || "Посмотреть проекты";
 
   const teachersBlock = getBlock('home.teachers');
+  const showTeachers = teachersBlock?.content?.showBlock !== false;
   const teachersTitle = teachersBlock?.title || "Наши преподаватели";
   const teachersSubtitle = teachersBlock?.subtitle || "Практикующие наставники, которые умеют объяснять сложное детям простым языком";
-  const teacherFallbackList = teachersBlock?.content?.items || [
+  const teacherFallbackList = [
     {
-      name: "Алексей Дмитриев",
-      role: "Старший наставник LEGO & Arduino",
-      text: "Помогает детям не бояться ошибок и доводить инженерные проекты до рабочего результата.",
-      imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
-      alt: "Алексей Дмитриев — преподаватель робототехники"
+      name: "Загрядская Дарья",
+      role: "LEGO Education, DUPLO, WeDo 2.0, EV3, Scratch",
+      text: "Дарья ведёт занятия по робототехнике для дошкольников и школьников. Помогает детям освоить конструирование, первые алгоритмы и программирование.",
+      imageUrl: "",
+      alt: "Загрядская Дарья"
     },
     {
-      name: "Мария Соколова",
-      role: "Преподаватель Scratch и основ программирования",
-      text: "Учит мыслить алгоритмами через игры, мультфильмы и первые интерактивные проекты.",
-      imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
-      alt: "Мария Соколова — преподаватель программирования"
+      name: "Шамрай Алена",
+      role: "WeDo 2.0, EV3, SPIKE Prime, Scratch",
+      text: "Алена работает со школьниками старшего возраста и помогает им переходить от простого конструирования к более осознанной инженерной логике.",
+      imageUrl: "",
+      alt: "Шамрай Алена"
     },
     {
-      name: "Егор Смирнов",
-      role: "Python / Arduino наставник",
-      text: "Объясняет Python, электронику и датчики через практические задачи и мини-проекты.",
-      imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
-      alt: "Егор Смирнов — наставник Python/Arduino"
+      name: "Троянова Дарья",
+      role: "LEGO Education, DUPLO, WeDo 2.0, Scratch",
+      text: "Дарья ведёт занятия для дошкольников и школьников младшего возраста. Основной акцент — развитие логики, внимания и интереса к творчеству.",
+      imageUrl: "",
+      alt: "Троянова Дарья"
+    },
+    {
+      name: "Федоренко Сергей",
+      role: "Программирование, алгоритмика, цифровые проекты",
+      text: "Сергей ведёт направление программирования для детей. На занятиях ребята развивают алгоритмическое мышление и учатся создавать цифровые проекты.",
+      imageUrl: "",
+      alt: "Федоренко Сергей"
     }
   ];
   const teachersListToRender = initialTeachers && initialTeachers.length > 0
@@ -1246,47 +1256,70 @@ export default function LandingPageClient({
       </section>
 
       {/* TEACHERS SECTION */}
-      <section id="teachers" style={{ padding: "100px 0" }}>
-        <div className="container">
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
-            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              {teachersTitle}
-            </h2>
-            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              {teachersSubtitle}
-            </p>
-          </div>
+      {showTeachers && (
+        <section id="teachers" style={{ padding: "100px 0" }}>
+          <div className="container">
+            <div style={{ textAlign: "center", marginBottom: "64px" }}>
+              <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+                {teachersTitle}
+              </h2>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+                {teachersSubtitle}
+              </p>
+            </div>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "32px"
-          }}>
-            {teachersListToRender.map((teacher: any, idx: number) => (
-              <div key={idx} className="card-site" style={{ textAlign: "center" }}>
-                <div style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  margin: "0 auto 20px auto",
-                  border: "3px solid var(--color-primary-soft)",
-                  boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
-                  position: "relative"
-                }}>
-                  <img src={teacher.imageUrl} alt={teacher.alt || teacher.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
-                </div>
-                <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>{teacher.name}</h4>
-                <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>{teacher.role}</p>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-                  «{teacher.text}»
-                </p>
-              </div>
-            ))}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "32px"
+            }}>
+              {teachersListToRender.map((teacher: any, idx: number) => {
+                const initials = teacher.name 
+                  ? teacher.name.split(" ").map((n: string) => n[0]).join("") 
+                  : "Р";
+                return (
+                  <div key={idx} className="card-site" style={{ textAlign: "center" }}>
+                    <div style={{
+                      width: "120px",
+                      height: "120px",
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      margin: "0 auto 20px auto",
+                      border: "3px solid var(--color-primary-soft)",
+                      boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                      position: "relative"
+                    }}>
+                      {teacher.imageUrl ? (
+                        <img src={teacher.imageUrl} alt={teacher.alt || teacher.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{
+                          width: "100%",
+                          height: "100%",
+                          background: "var(--color-primary-soft)",
+                          color: "var(--color-primary-dark)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: "1.8rem"
+                        }}>
+                          {initials}
+                        </div>
+                      )}
+                      <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>{teacher.name}</h4>
+                    <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>{teacher.role}</p>
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
+                      «{teacher.text}»
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 11. FAQ */}
       <section id="faq" style={{ padding: "100px 0", background: "var(--color-bg)" }}>
@@ -1618,9 +1651,8 @@ export default function LandingPageClient({
               lineHeight: 1.5
             }}>
               <div style={{ fontWeight: 700, marginBottom: "4px" }}>Юридическая информация:</div>
-              <div>ИП Куратор Липецк Роботикс</div>
-              <div>ОГРНИП: 326482100099999 · ИНН: 482609999999</div>
-              <div>Лицензия на образовательную деятельность № 48-Л01-9999</div>
+              <div>{orgDetails?.full_legal_name || orgDetails?.short_legal_name || "Юлдашев Рустам Хакимович (ИП)"}</div>
+              <div>ИНН: {orgDetails?.inn || "482426310695"}{orgDetails?.ogrn ? ` · ОГРНИП: ${orgDetails.ogrn}` : ""}</div>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@robotics-crm/ui";
 import { 
   Globe, 
@@ -8,39 +8,48 @@ import {
   Calendar, 
   DollarSign, 
   Search, 
+  Users, 
+  MapPin, 
+  Tag, 
+  FileText, 
+  Image as ImageIcon, 
   Plus, 
-  Trash, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
   Save, 
-  Edit,
-  PlusCircle,
-  XCircle,
-  HelpCircle,
-  Eye,
-  EyeOff
+  CheckCircle2, 
+  X,
+  Upload,
+  ArrowRight,
+  ShieldCheck,
+  Building
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { getMediaUrl } from "@/shared/utils/media";
+
+type TabId = "home" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
 export default function CrmSitePage() {
-  const [activeTab, setActiveTab] = useState<"home" | "courses" | "schedule" | "prices" | "seo">("home");
+  const [activeTab, setActiveTab] = useState<TabId>("home");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [orgId, setOrgId] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [orgId, setOrgId] = useState("");
 
   const supabase = createSupabaseBrowserClient();
+  const demo = isDemoMode();
 
-  // Site Blocks States
+  // Tab 1: Home/Hero & Portal Preview
+  const [heroBadge, setHeroBadge] = useState("");
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
-  const [heroBadge, setHeroBadge] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroBullets, setHeroBullets] = useState<string[]>([]);
-  
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [teachersTitle, setTeachersTitle] = useState("");
-  const [teachersSubtitle, setTeachersSubtitle] = useState("");
+  const [newBullet, setNewBullet] = useState("");
 
   const [portalTitle, setPortalTitle] = useState("");
   const [portalSubtitle, setPortalSubtitle] = useState("");
@@ -54,87 +63,99 @@ export default function CrmSitePage() {
   const [portalBalance, setPortalBalance] = useState("");
   const [portalTeacherNote, setPortalTeacherNote] = useState("");
 
-  // Prices Block State
-  const [priceTrial, setPriceTrial] = useState("");
-  const [priceMonthly, setPriceMonthly] = useState("");
-  const [priceIndividual, setPriceIndividual] = useState("");
+  // Tab 2: Teachers
+  const [teachersTitle, setTeachersTitle] = useState("");
+  const [teachersSubtitle, setTeachersSubtitle] = useState("");
+  const [teachersShowBlock, setTeachersShowBlock] = useState(true);
+  const [teachersList, setTeachersList] = useState<any[]>([]);
 
-  // SEO Block State
+  // Tab 3: Branches & Organization Contacts
+  const [orgPhone, setOrgPhone] = useState("");
+  const [orgEmail, setOrgEmail] = useState("");
+  const [orgShortLegal, setOrgShortLegal] = useState("");
+  const [orgFullLegal, setOrgFullLegal] = useState("");
+  const [orgInn, setOrgInn] = useState("");
+  const [orgOgrn, setOrgOgrn] = useState("");
+  const [orgLegalAddress, setOrgLegalAddress] = useState("");
+  const [orgBankName, setOrgBankName] = useState("");
+  const [orgBankInn, setOrgBankInn] = useState("");
+  const [orgBik, setOrgBik] = useState("");
+  const [orgAccount, setOrgAccount] = useState("");
+  const [orgCorrAccount, setOrgCorrAccount] = useState("");
+  const [orgBankAddress, setOrgBankAddress] = useState("");
+  
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [editingBranch, setEditingBranch] = useState<any | null>(null);
+
+  // Tab 4: Prices & Tariffs
+  const [tariffs, setTariffs] = useState<any[]>([]);
+  const [editingTariff, setEditingTariff] = useState<any | null>(null);
+
+  // Tab 5: Schedule Visibility
+  const [groups, setGroups] = useState<any[]>([]);
+
+  // Tab 6: Legal Pages
+  const [selectedDocKey, setSelectedDocKey] = useState<string>("legal.page.legal");
+  const [docTitle, setDocTitle] = useState("");
+  const [docSubtitle, setDocSubtitle] = useState("");
+  const [docMetaTitle, setDocMetaTitle] = useState("");
+  const [docMetaDesc, setDocMetaDesc] = useState("");
+  const [docBody, setDocBody] = useState("");
+  const [docShowInFooter, setDocShowInFooter] = useState(true);
+
+  // Tab 7: Footer
+  const [footerShowLegalName, setFooterShowLegalName] = useState(true);
+  const [footerShowInn, setFooterShowInn] = useState(true);
+  const [footerShowBankRequisites, setFooterShowBankRequisites] = useState(false);
+  const [footerShowBranchAddresses, setFooterShowBranchAddresses] = useState(true);
+  const [footerShowLegalAddress, setFooterShowLegalAddress] = useState(false);
+  const [footerCopyrightText, setFooterCopyrightText] = useState("");
+  const [footerVk, setFooterVk] = useState("");
+  const [footerTelegram, setFooterTelegram] = useState("");
+  const [footerWhatsapp, setFooterWhatsapp] = useState("");
+
+  // Tab 8: Media Manager
+  const [activeMediaFolder, setActiveMediaFolder] = useState("branding");
+  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // General SEO Tab (merged into SEO section)
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoH1, setSeoH1] = useState("");
 
-  // DB entities
-  const [courses, setCourses] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
-
-  // Selected Course/Group for edit modals
-  const [editingCourse, setEditingCourse] = useState<any | null>(null);
-
-  // Load Data
+  // Load All Site Data
   const loadData = async () => {
     try {
       setLoading(true);
       setErrorMsg("");
 
-      const demo = isDemoMode();
-
-      if (demo) {
-        setHeroTitle("Бесплатное пробное занятие 90 минут: ребенок соберет и запрограммирует первого робота");
-        setHeroSubtitle("Курсы робототехники и программирования для детей 6–14 лет в Липецке. Практика на реальном оборудовании в мини-группах.");
-        setHeroBadge("Школа робототехники в Липецке");
-        setHeroCtaText("Записаться на пробный урок");
-        setHeroBullets(["Без предоплаты", "Оборудование включено", "Мини-группы до 8 детей", "Подберем группу по возрасту"]);
-
-        setTeachersTitle("Наши преподаватели");
-        setTeachersSubtitle("Практикующие наставники, которые умеют объяснять сложное детям простым языком");
-        setTeachers([
-          { name: "Алексей Дмитриев", role: "Старший наставник LEGO & Arduino", text: "Помогает детям не бояться ошибок и доводить инженерные проекты до рабочего результата.", imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200", alt: "Алексей Дмитриев — преподаватель робототехники" },
-          { name: "Мария Соколова", role: "Преподаватель Scratch и основ программирования", text: "Учит мыслить алгоритмами через игры, мультфильмы и первые интерактивные проекты.", imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200", alt: "Мария Соколова — преподаватель программирования" }
-        ]);
-
-        setPortalTitle("Родители видят прогресс ребенка в личном кабинете");
-        setPortalSubtitle("Расписание, посещаемость, баланс, материалы урока и отчеты наставника — в одном месте.");
-        setPortalStudentName("Миша Иванов");
-        setPortalAge("8 лет");
-        setPortalCourse("Робототехника LEGO");
-        setPortalNextLesson("Суббота, 12:00");
-        setPortalCabinet("Кабинет 3");
-        setPortalAttendance("7 из 8");
-        setPortalProject("Робот RoboSort-3000");
-        setPortalBalance("Осталось 2 занятия");
-        setPortalTeacherNote("Миша отлично справился с логикой ветвления и доработал алгоритм захвата кубиков.");
-
-        setPriceTrial("0 ₽");
-        setPriceMonthly("от 4 000 ₽");
-        setPriceIndividual("от 1 500 ₽");
-
-        setSeoTitle("Робототехника и программирование для детей в Липецке | Школа Robotics");
-        setSeoDescription("Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.");
-        setSeoH1("Бесплатное пробное занятие 90 минут: ребенок соберет и запрограммирует первого робота");
-
-        setCourses([
-          { id: "c1", title: "Робототехника (Lego Education)", short_description: "Изучение механики и программирования", min_age: 6, max_age: 9, price_monthly: 4500, is_public: true, sort_order: 1 },
-          { id: "c2", title: "Программирование Scratch", short_description: "Создание игр и анимации", min_age: 7, max_age: 11, price_monthly: 4000, is_public: true, sort_order: 2 }
-        ]);
-
-        setGroups([
-          { id: "g1", title: "LEGO Start 1", show_on_site: true, capacity: 8, course: { title: "Робототехника (Lego Education)" }, schedule_rules: [{ weekday: 2, starts_at: "17:00:00" }, { weekday: 4, starts_at: "17:00:00" }] }
-        ]);
-
-        return;
-      }
-
+      // 1. Get default organization
       const { data: org, error: orgError } = await (supabase
         .from("organizations") as any)
-        .select("id")
+        .select("*")
         .eq("slug", "robotics-lipetsk")
         .single();
 
       if (orgError || !org) throw new Error("Организация не найдена");
       setOrgId(org.id);
 
-      // 1. Fetch site blocks
+      setOrgPhone(org.phone || "");
+      setOrgEmail(org.email || "");
+      setOrgShortLegal(org.short_legal_name || "");
+      setOrgFullLegal(org.full_legal_name || "");
+      setOrgInn(org.inn || "");
+      setOrgOgrn(org.ogrn || "");
+      setOrgLegalAddress(org.legal_address || "");
+      setOrgBankName(org.bank_name || "");
+      setOrgBankInn(org.bank_inn || "");
+      setOrgBik(org.bik || "");
+      setOrgAccount(org.account_number || "");
+      setOrgCorrAccount(org.correspondent_account || "");
+      setOrgBankAddress(org.bank_address || "");
+
+      // 2. Fetch site content blocks
       const { data: blocks } = await (supabase
         .from("site_content_blocks") as any)
         .select("*")
@@ -148,12 +169,6 @@ export default function CrmSitePage() {
         setHeroBadge(hero?.content?.badge || "");
         setHeroCtaText(hero?.content?.ctaText || "");
         setHeroBullets(hero?.content?.bullets || []);
-
-        // Teachers
-        const tBlock = blocks.find((b: any) => b.block_key === "home.teachers");
-        setTeachersTitle(tBlock?.title || "");
-        setTeachersSubtitle(tBlock?.subtitle || "");
-        setTeachers(tBlock?.content?.items || []);
 
         // Portal Preview
         const pBlock = blocks.find((b: any) => b.block_key === "home.parent_student_portal_preview");
@@ -169,36 +184,73 @@ export default function CrmSitePage() {
         setPortalBalance(pBlock?.content?.balance || "");
         setPortalTeacherNote(pBlock?.content?.teacherNote || "");
 
-        // Prices
-        const prBlock = blocks.find((b: any) => b.block_key === "home.prices");
-        setPriceTrial(prBlock?.content?.trialPrice || "");
-        setPriceMonthly(prBlock?.content?.monthlyPrice || "");
-        setPriceIndividual(prBlock?.content?.individualPrice || "");
+        // Teachers Block
+        const tBlock = blocks.find((b: any) => b.block_key === "home.teachers");
+        setTeachersTitle(tBlock?.title || "Наши преподаватели");
+        setTeachersSubtitle(tBlock?.subtitle || "Практикующие наставники");
+        setTeachersShowBlock(tBlock?.content?.showBlock !== false);
 
         // SEO
         const seoBlock = blocks.find((b: any) => b.block_key === "home.seo");
         setSeoTitle(seoBlock?.title || "");
         setSeoDescription(seoBlock?.subtitle || "");
         setSeoH1(seoBlock?.content?.h1 || "");
+
+        // Footer block
+        const fBlock = blocks.find((b: any) => b.block_key === "site.footer");
+        setFooterShowLegalName(fBlock?.content?.showLegalName !== false);
+        setFooterShowInn(fBlock?.content?.showInn !== false);
+        setFooterShowBankRequisites(Boolean(fBlock?.content?.showBankRequisites));
+        setFooterShowBranchAddresses(fBlock?.content?.showBranchAddresses !== false);
+        setFooterShowLegalAddress(Boolean(fBlock?.content?.showLegalAddress));
+        setFooterCopyrightText(fBlock?.content?.copyrightText || "");
+        setFooterVk(fBlock?.content?.socials?.vk || "");
+        setFooterTelegram(fBlock?.content?.socials?.telegram || "");
+        setFooterWhatsapp(fBlock?.content?.socials?.whatsapp || "");
       }
 
-      // 2. Fetch courses
-      const { data: coursesData } = await (supabase
-        .from("courses") as any)
+      // 3. Fetch Teachers (profiles + memberships)
+      const { data: teachersData } = await (supabase.from("org_memberships") as any)
+        .select(`
+          user_id,
+          role,
+          is_active,
+          profiles(id, full_name, email, phone, specialty, public_bio, show_on_site, sort_order, avatar_url, show_public_contacts)
+        `)
+        .eq("organization_id", org.id)
+        .eq("role", "teacher");
+
+      if (teachersData) {
+        const list = teachersData
+          .map((m: any) => Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
+          .filter(Boolean)
+          .sort((a: any, b: any) => (a.sort_order || 100) - (b.sort_order || 100));
+        setTeachersList(list);
+      }
+
+      // 4. Fetch Branches
+      const { data: branches } = await (supabase.from("branches") as any)
         .select("*")
         .eq("organization_id", org.id)
         .order("sort_order", { ascending: true });
-      if (coursesData) setCourses(coursesData);
+      if (branches) setBranchesList(branches);
 
-      // 3. Fetch groups & rules
-      const { data: groupsData } = await (supabase
-        .from("groups") as any)
+      // 5. Fetch Tariffs
+      const { data: tariffsData } = await (supabase.from("course_tariffs") as any)
+        .select("*")
+        .eq("organization_id", org.id)
+        .order("sort_order", { ascending: true });
+      if (tariffsData) setTariffs(tariffsData);
+
+      // 6. Fetch Groups
+      const { data: groupsData } = await (supabase.from("groups") as any)
         .select(`
           *,
           course:courses(title),
           schedule_rules:group_schedule_rules(weekday, starts_at)
         `)
-        .eq("organization_id", org.id);
+        .eq("organization_id", org.id)
+        .order("sort_order", { ascending: true });
       if (groupsData) setGroups(groupsData);
 
     } catch (err: any) {
@@ -213,18 +265,60 @@ export default function CrmSitePage() {
     loadData();
   }, []);
 
-  // Save Block Helper
+  // Fetch media files list when active folder or media tab is selected
+  const loadMediaFiles = async () => {
+    try {
+      const res = await fetch(`/api/crm/media?folder=${activeMediaFolder}`);
+      const data = await res.json();
+      if (res.ok) {
+        setMediaFiles(data.files || []);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      console.error("Media load error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "media") {
+      loadMediaFiles();
+    }
+  }, [activeTab, activeMediaFolder]);
+
+  // Load active legal page details
+  useEffect(() => {
+    if (activeTab === "legal") {
+      setLoading(true);
+      const docKey = selectedDocKey;
+      (supabase
+        .from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("block_key", docKey)
+        .maybeSingle()
+        .then(({ data }: any) => {
+          setDocTitle(data?.title || "");
+          setDocSubtitle(data?.subtitle || "");
+          setDocMetaTitle(data?.content?.meta_title || "");
+          setDocMetaDesc(data?.content?.meta_description || "");
+          setDocBody(data?.content?.body || "");
+          setDocShowInFooter(data?.content?.show_in_footer !== false);
+          setLoading(false);
+        });
+    }
+  }, [activeTab, selectedDocKey, orgId]);
+
+  // General Block Saving Helper
   const saveBlock = async (key: string, title: string, subtitle: string, content: any) => {
-    if (isDemoMode()) {
-      console.log(`Demo Mode: Saving block ${key}:`, { title, subtitle, content });
+    if (demo) {
+      console.log(`Demo mode block save: ${key}`, { title, subtitle, content });
       return;
     }
-
-    const { error } = await (supabase
-      .from("site_content_blocks") as any)
+    const { error } = await (supabase.from("site_content_blocks") as any)
       .upsert({
         organization_id: orgId,
-        page_slug: "/",
+        page_slug: key.startsWith("legal.page") ? `/${key.split(".").pop()}` : "/",
         block_key: key,
         title,
         subtitle,
@@ -233,32 +327,21 @@ export default function CrmSitePage() {
       }, {
         onConflict: "organization_id,page_slug,block_key"
       });
-
     if (error) throw error;
   };
 
-  // Save Home Tab
+  // Tab 1: Save Home/Hero
   const handleSaveHome = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
     setSaving(true);
-    setErrorMsg("");
     setSuccessMsg("");
-
+    setErrorMsg("");
     try {
-      // Save Hero
       await saveBlock("home.hero", heroTitle, heroSubtitle, {
         badge: heroBadge,
         ctaText: heroCtaText,
         bullets: heroBullets
       });
-
-      // Save Teachers
-      await saveBlock("home.teachers", teachersTitle, teachersSubtitle, {
-        items: teachers
-      });
-
-      // Save Portal Preview
       await saveBlock("home.parent_student_portal_preview", portalTitle, portalSubtitle, {
         studentName: portalStudentName,
         age: portalAge,
@@ -270,666 +353,449 @@ export default function CrmSitePage() {
         balance: portalBalance,
         teacherNote: portalTeacherNote
       });
-
-      setSuccessMsg("Изменения блоков главной страницы успешно сохранены!");
+      await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1 });
+      setSuccessMsg("Изменения на Главной сохранены!");
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Не удалось сохранить изменения");
+      setErrorMsg(err.message || "Не удалось сохранить");
     } finally {
       setSaving(false);
     }
   };
 
-  // Save Prices
-  const handleSavePrices = async (e: React.FormEvent) => {
+  // Tab 2: Save Teachers settings
+  const handleSaveTeachersSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
     setSaving(true);
-    setErrorMsg("");
     setSuccessMsg("");
-
     try {
-      await saveBlock("home.prices", "Стоимость обучения", "Прозрачные тарифы без скрытых переплат и комиссий", {
-        trialPrice: priceTrial,
-        monthlyPrice: priceMonthly,
-        individualPrice: priceIndividual
+      await saveBlock("home.teachers", teachersTitle, teachersSubtitle, {
+        showBlock: teachersShowBlock
       });
-      setSuccessMsg("Цены успешно сохранены!");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Не удалось сохранить цены");
+      setSuccessMsg("Настройки наставников сохранены!");
+    } catch (e: any) {
+      setErrorMsg(e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Save SEO
-  const handleSaveSEO = async (e: React.FormEvent) => {
+  // Toggle teacher public visibility & contact details
+  const handleToggleTeacherField = async (teacher: any, field: "show_on_site" | "show_public_contacts") => {
+    const nextVal = !teacher[field];
+    try {
+      const { error } = await (supabase.from("profiles") as any)
+        .update({ [field]: nextVal })
+        .eq("id", teacher.id);
+      if (error) throw error;
+      setTeachersList(teachersList.map(t => t.id === teacher.id ? { ...t, [field]: nextVal } : t));
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // Tab 3: Save Org general info
+  const handleSaveOrgInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
     setSaving(true);
-    setErrorMsg("");
     setSuccessMsg("");
-
     try {
-      await saveBlock("home.seo", seoTitle, seoDescription, {
-        h1: seoH1
-      });
-      setSuccessMsg("SEO настройки успешно сохранены!");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Не удалось сохранить настройки SEO");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Save Course Detail Editing
-  const handleSaveCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCourse) return;
-    setSaving(true);
-    setErrorMsg("");
-
-    try {
-      if (isDemoMode()) {
-        setCourses(courses.map(c => c.id === editingCourse.id ? editingCourse : c));
-        setEditingCourse(null);
-        return;
-      }
-
-      const { error } = await (supabase
-        .from("courses") as any)
+      const { error } = await (supabase.from("organizations") as any)
         .update({
-          title: editingCourse.title,
-          short_description: editingCourse.short_description,
-          min_age: editingCourse.min_age ? parseInt(editingCourse.min_age, 10) : null,
-          max_age: editingCourse.max_age ? parseInt(editingCourse.max_age, 10) : null,
-          price_monthly: editingCourse.price_monthly ? parseFloat(editingCourse.price_monthly) : null,
-          is_public: editingCourse.is_public,
-          sort_order: editingCourse.sort_order ? parseInt(editingCourse.sort_order, 10) : 100
+          phone: orgPhone,
+          email: orgEmail,
+          short_legal_name: orgShortLegal,
+          full_legal_name: orgFullLegal,
+          inn: orgInn,
+          ogrn: orgOgrn || null,
+          legal_address: orgLegalAddress,
+          bank_name: orgBankName,
+          bank_inn: orgBankInn,
+          bik: orgBik,
+          account_number: orgAccount,
+          correspondent_account: orgCorrAccount,
+          bank_address: orgBankAddress
         })
-        .eq("id", editingCourse.id);
+        .eq("id", orgId);
 
       if (error) throw error;
-
-      setCourses(courses.map(c => c.id === editingCourse.id ? editingCourse : c));
-      setEditingCourse(null);
-      setSuccessMsg(`Курс «${editingCourse.title}» успешно обновлен!`);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Не удалось обновить курс");
+      setSuccessMsg("Контакты и реквизиты успешно сохранены!");
+    } catch (e: any) {
+      setErrorMsg(e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Toggle Group show_on_site
-  const handleToggleGroupShow = async (group: any) => {
+  // Edit/Save Branch Details
+  const handleSaveBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    setSaving(true);
+    try {
+      const { error } = await (supabase.from("branches") as any)
+        .update({
+          name: editingBranch.name,
+          address: editingBranch.address,
+          phone: editingBranch.phone,
+          email: editingBranch.email,
+          work_hours: editingBranch.work_hours,
+          show_on_site: editingBranch.show_on_site,
+          sort_order: parseInt(editingBranch.sort_order || 100, 10)
+        })
+        .eq("id", editingBranch.id);
+
+      if (error) throw error;
+      setBranchesList(branchesList.map(b => b.id === editingBranch.id ? editingBranch : b));
+      setEditingBranch(null);
+      setSuccessMsg("Филиал успешно сохранен!");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Tab 4: CRUD Tariffs
+  const handleSaveTariff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTariff) return;
+    setSaving(true);
+    try {
+      const tariffData = {
+        organization_id: orgId,
+        title: editingTariff.title,
+        audience: editingTariff.audience || "school",
+        format: editingTariff.format,
+        price: parseFloat(editingTariff.price || 0),
+        is_one_time: Boolean(editingTariff.is_one_time),
+        sort_order: parseInt(editingTariff.sort_order || 100, 10),
+        show_on_site: editingTariff.show_on_site
+      };
+
+      if (editingTariff.id) {
+        // Update
+        const { error } = await (supabase.from("course_tariffs") as any)
+          .update(tariffData)
+          .eq("id", editingTariff.id);
+        if (error) throw error;
+      } else {
+        // Insert
+        const { data, error } = await (supabase.from("course_tariffs") as any)
+          .insert(tariffData)
+          .select()
+          .single();
+        if (error) throw error;
+        editingTariff.id = data.id;
+      }
+      loadData();
+      setEditingTariff(null);
+      setSuccessMsg("Тариф сохранен!");
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTariff = async (id: string) => {
+    if (!confirm("Вы действительно хотите удалить этот тариф?")) return;
+    try {
+      const { error } = await (supabase.from("course_tariffs") as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      setTariffs(tariffs.filter(t => t.id !== id));
+      setSuccessMsg("Тариф удален!");
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
+
+  // Tab 5: Schedule visibility toggle
+  const handleToggleGroupShowOnSite = async (group: any) => {
     const nextVal = !group.show_on_site;
     try {
-      if (isDemoMode()) {
-        setGroups(groups.map(g => g.id === group.id ? { ...g, show_on_site: nextVal } : g));
-        return;
-      }
-
-      const { error } = await (supabase
-        .from("groups") as any)
+      const { error } = await (supabase.from("groups") as any)
         .update({ show_on_site: nextVal })
         .eq("id", group.id);
-
       if (error) throw error;
-
       setGroups(groups.map(g => g.id === group.id ? { ...g, show_on_site: nextVal } : g));
-      setSuccessMsg(`Отображение группы «${group.title}» изменено!`);
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Не удалось переключить отображение группы");
+    } catch (e: any) {
+      alert(e.message);
     }
   };
 
-  // Update Group Capacity
-  const handleUpdateGroupCapacity = async (group: any, nextCap: string) => {
-    const capNum = parseInt(nextCap, 10);
-    if (isNaN(capNum)) return;
+  // Tab 6: Save Legal Page content
+  const handleSaveLegalDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccessMsg("");
     try {
-      if (isDemoMode()) {
-        setGroups(groups.map(g => g.id === group.id ? { ...g, capacity: capNum } : g));
-        return;
-      }
-
-      const { error } = await (supabase
-        .from("groups") as any)
-        .update({ capacity: capNum })
-        .eq("id", group.id);
-
-      if (error) throw error;
-
-      setGroups(groups.map(g => g.id === group.id ? { ...g, capacity: capNum } : g));
+      await saveBlock(selectedDocKey, docTitle, docSubtitle, {
+        meta_title: docMetaTitle,
+        meta_description: docMetaDesc,
+        body: docBody,
+        show_in_footer: docShowInFooter
+      });
+      setSuccessMsg("Юридический документ сохранен!");
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Не удалось обновить вместимость группы");
+      setErrorMsg(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Tab 7: Save Footer
+  const handleSaveFooter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccessMsg("");
+    try {
+      await saveBlock("site.footer", "Футер сайта", "Параметры отображения нижней части страниц", {
+        showLegalName: footerShowLegalName,
+        showInn: footerShowInn,
+        showBankRequisites: footerShowBankRequisites,
+        showBranchAddresses: footerShowBranchAddresses,
+        showLegalAddress: footerShowLegalAddress,
+        copyrightText: footerCopyrightText,
+        socials: {
+          vk: footerVk,
+          telegram: footerTelegram,
+          whatsapp: footerWhatsapp
+        }
+      });
+      setSuccessMsg("Настройки футера сохранены!");
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Tab 8: Upload file
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingFile(true);
+    try {
+      const file = files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", activeMediaFolder);
+
+      const res = await fetch("/api/crm/media", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setSuccessMsg(`Файл ${file.name} успешно загружен!`);
+      loadMediaFiles();
+    } catch (err: any) {
+      alert(err.message || "Не удалось загрузить файл");
+    } finally {
+      setUploadingFile(false);
     }
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      {/* Title */}
-      <div>
-        <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px" }}>
-          Управление сайтом
-        </h1>
-        <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-          Простой конструктор контента публичного лендинга и SEO-настроек.
-        </p>
+      <style>{`
+        .card-crm { background: #fff; border: 1px solid var(--color-border); border-radius: 12px; padding: 24px; display: flex; flexDirection: column; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-size: 13px; fontWeight: 700; color: var(--color-text); }
+        .form-input { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 13px; width: 100%; box-sizing: border-box; }
+        .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .badge-blue { background: var(--color-primary-soft); color: var(--color-primary-dark); }
+        .badge-red { background: #FEF2F2; color: #991B1B; }
+        .badge-green { background: #DCFCE7; color: #15803D; }
+        .badge-gray { background: #F3F4F6; color: #4B5563; }
+        .site-tab-nav { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 12px; }
+        .table-crm { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .table-crm th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--color-border); font-weight: 700; }
+        .table-crm td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+      `}</style>
+
+      <div style={{ display: "flex", alignContent: "center", justifyContent: "space-between", gap: "16px" }}>
+        <div>
+          <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", margin: "0 0 4px" }}>Управление сайтом</h1>
+          <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", margin: 0 }}>Настройка внешнего вида, медиафайлов, тарифов, контактов и правовой информации школы Робокс.</p>
+        </div>
       </div>
 
-      {/* Messages */}
       {successMsg && (
-        <div style={{ background: "#F0FDF4", border: "1px solid #DCFCE7", color: "#166534", padding: "12px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 600 }}>
+        <div style={{ background: "#F0FDF4", border: "1px solid #DCFCE7", color: "#166534", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 650 }}>
           ✓ {successMsg}
         </div>
       )}
+
       {errorMsg && (
-        <div style={{ background: "#FEF2F2", border: "1px solid #FEE2E2", color: "#991B1B", padding: "12px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 600 }}>
+        <div style={{ background: "#FEF2F2", border: "1px solid #FEE2E2", color: "#991B1B", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 650 }}>
           ⚠️ {errorMsg}
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
+      <div className="site-tab-nav">
         {[
-          { id: "home", label: "Главная", icon: Globe },
-          { id: "courses", label: "Курсы → настройки", icon: BookOpen, href: "/crm/settings?tab=courses" },
-          { id: "schedule", label: "Расписание → настройки", icon: Calendar, href: "/crm/settings?tab=groups" },
-          { id: "prices", label: "Цены → настройки", icon: DollarSign, href: "/crm/settings?tab=courses" },
-          { id: "seo", label: "SEO", icon: Search },
+          { id: "home", label: "Главная страница", icon: Globe },
+          { id: "teachers", label: "Преподаватели", icon: Users },
+          { id: "branches", label: "Контакты & Филиалы", icon: MapPin },
+          { id: "prices", label: "Цены & Тарифы", icon: DollarSign },
+          { id: "schedule", label: "Расписание", icon: Calendar },
+          { id: "legal", label: "Юридические страницы", icon: FileText },
+          { id: "footer", label: "Футер", icon: Building },
+          { id: "media", label: "Медиа-менеджер", icon: ImageIcon }
         ].map(tab => {
           const Icon = tab.icon;
-          const directoryHref =
-            tab.id === "courses" || tab.id === "prices"
-              ? "/crm/settings?tab=courses"
-              : tab.id === "schedule"
-                ? "/crm/settings?tab=groups"
-                : "";
-          const tabStyle = {
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: 700,
-            fontSize: "13px",
-            background: activeTab === tab.id ? "var(--color-primary-soft)" : "transparent",
-            color: activeTab === tab.id ? "var(--color-primary-dark)" : "var(--color-text-muted)"
-          } as React.CSSProperties;
-
-          if (directoryHref) {
-            return (
-              <a
-                key={tab.id}
-                data-testid={`site-tab-${tab.id}`}
-                href={directoryHref}
-                style={{ ...tabStyle, textDecoration: "none" }}
-              >
-                <Icon size={16} />
-                <span>{tab.label}</span>
-              </a>
-            );
-          }
-
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              data-testid={`site-tab-${tab.id}`}
               onClick={() => {
-                setActiveTab(tab.id as any);
+                setActiveTab(tab.id as TabId);
                 setSuccessMsg("");
                 setErrorMsg("");
               }}
-              style={tabStyle}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "12px",
+                background: isActive ? "var(--color-primary-soft)" : "transparent",
+                color: isActive ? "var(--color-primary-dark)" : "var(--color-text-muted)"
+              }}
             >
-              <Icon size={16} />
-              <span>{tab.label}</span>
+              <Icon size={14} />
+              {tab.label}
             </button>
           );
         })}
       </div>
 
       {loading ? (
-        <div style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Загрузка редактора контента...</div>
+        <div style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Загрузка...</div>
       ) : (
-        <div>
+        <div style={{ display: "grid", gap: "24px" }}>
+          
           {/* TAB 1: HOME */}
           {activeTab === "home" && (
-            <form onSubmit={handleSaveHome} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-              
-              {/* HERO BLOCK */}
-              <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Блок «Hero» (Первый экран)</h3>
+            <form onSubmit={handleSaveHome} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Блок Hero (Первый экран)</h3>
                 
                 <div className="form-group">
-                  <label className="form-label">Бейдж сверху</label>
-                  <input type="text" className="form-input" value={heroBadge} onChange={e => setHeroBadge(e.target.value)} placeholder="Например: Школа робототехники в Липецке" />
+                  <label className="form-label">Бейдж над заголовком</label>
+                  <input type="text" className="form-input" value={heroBadge} onChange={e => setHeroBadge(e.target.value)} />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Главный заголовок (H1)</label>
+                  <label className="form-label">Заголовок H1</label>
                   <input type="text" className="form-input" value={heroTitle} onChange={e => setHeroTitle(e.target.value)} required />
                 </div>
-
                 <div className="form-group">
                   <label className="form-label">Подзаголовок</label>
-                  <textarea className="form-input" style={{ height: "70px", padding: "8px" }} value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} required />
+                  <textarea className="form-input" style={{ height: "60px" }} value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Текст кнопки CTA</label>
+                  <label className="form-label">Текст кнопки призыва к действию (CTA)</label>
                   <input type="text" className="form-input" value={heroCtaText} onChange={e => setHeroCtaText(e.target.value)} required />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Преимущества (список через запятую)</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={heroBullets.join(", ")} 
-                    onChange={e => setHeroBullets(e.target.value.split(",").map(b => b.trim()).filter(Boolean))} 
-                  />
-                </div>
-              </div>
-
-              {/* TEACHERS BLOCK */}
-              <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Блок «Наши преподаватели»</h3>
-                
-                <div className="form-group">
-                  <label className="form-label">Заголовок блока</label>
-                  <input type="text" className="form-input" value={teachersTitle} onChange={e => setTeachersTitle(e.target.value)} required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Подзаголовок блока</label>
-                  <input type="text" className="form-input" value={teachersSubtitle} onChange={e => setTeachersSubtitle(e.target.value)} required />
-                </div>
-
-                {/* Repeatable Teachers Cards */}
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)" }}>Список преподавателей:</span>
-                    <Button 
-                      type="button" 
-                      onClick={() => setTeachers([...teachers, { name: "", role: "", text: "", imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200", alt: "" }])}
-                      variant="secondary-crm"
-                      style={{ padding: "4px 8px", fontSize: "11px", height: "auto" }}
-                    >
-                      <PlusCircle size={12} /> Добавить преподавателя
-                    </Button>
+                  <label className="form-label">Преимущества (список)</label>
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                    <input type="text" className="form-input" value={newBullet} onChange={e => setNewBullet(e.target.value)} placeholder="Добавить преимущество..." />
+                    <Button type="button" variant="secondary-crm" onClick={() => {
+                      if (newBullet.trim()) {
+                        setHeroBullets([...heroBullets, newBullet.trim()]);
+                        setNewBullet("");
+                      }
+                    }}>Добавить</Button>
                   </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    {teachers.map((teacher, idx) => (
-                      <div key={idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "16px", background: "var(--color-bg)", position: "relative" }}>
-                        <button 
-                          type="button" 
-                          onClick={() => setTeachers(teachers.filter((_, i) => i !== idx))} 
-                          style={{ position: "absolute", top: "12px", right: "12px", background: "none", border: "none", color: "#EF4444", cursor: "pointer" }}
-                        >
-                          <Trash size={14} />
-                        </button>
-                        
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            style={{ height: "32px", fontSize: "12px" }}
-                            placeholder="Имя преподавателя" 
-                            value={teacher.name} 
-                            onChange={e => {
-                              const updated = [...teachers];
-                              updated[idx].name = e.target.value;
-                              setTeachers(updated);
-                            }}
-                            required
-                          />
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            style={{ height: "32px", fontSize: "12px" }}
-                            placeholder="Роль / Предмет" 
-                            value={teacher.role} 
-                            onChange={e => {
-                              const updated = [...teachers];
-                              updated[idx].role = e.target.value;
-                              setTeachers(updated);
-                            }}
-                            required
-                          />
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            style={{ height: "32px", fontSize: "12px" }}
-                            placeholder="Ссылка на фото" 
-                            value={teacher.imageUrl} 
-                            onChange={e => {
-                              const updated = [...teachers];
-                              updated[idx].imageUrl = e.target.value;
-                              setTeachers(updated);
-                            }}
-                            required
-                          />
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            style={{ height: "32px", fontSize: "12px" }}
-                            placeholder="Alt текст изображения" 
-                            value={teacher.alt} 
-                            onChange={e => {
-                              const updated = [...teachers];
-                              updated[idx].alt = e.target.value;
-                              setTeachers(updated);
-                            }}
-                            required
-                          />
-                          <textarea 
-                            className="form-input" 
-                            style={{ height: "50px", fontSize: "12px", padding: "6px" }}
-                            placeholder="Цитата / Описание" 
-                            value={teacher.text} 
-                            onChange={e => {
-                              const updated = [...teachers];
-                              updated[idx].text = e.target.value;
-                              setTeachers(updated);
-                            }}
-                            required
-                          />
-                        </div>
+                  <div style={{ display: "grid", gap: "6px" }}>
+                    {heroBullets.map((b, idx) => (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F9FAFB", padding: "6px 12px", borderRadius: "6px", fontSize: "12px" }}>
+                        <span>{b}</span>
+                        <button type="button" onClick={() => setHeroBullets(heroBullets.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "#EF4444", cursor: "pointer" }}>✕</button>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* PORTAL PREVIEW BLOCK */}
-              <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Блок «Личный кабинет (Preview)»</h3>
-                
-                <div className="form-group">
-                  <label className="form-label">Заголовок блока</label>
-                  <input type="text" className="form-input" value={portalTitle} onChange={e => setPortalTitle(e.target.value)} required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Подзаголовок блока</label>
-                  <input type="text" className="form-input" value={portalSubtitle} onChange={e => setPortalSubtitle(e.target.value)} required />
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Блок «Личный кабинет»</h3>
+                <div className="form-grid-2">
                   <div className="form-group">
-                    <label className="form-label">Имя ученика</label>
+                    <label className="form-label">Заголовок блока</label>
+                    <input type="text" className="form-input" value={portalTitle} onChange={e => setPortalTitle(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Подзаголовок</label>
+                    <input type="text" className="form-input" value={portalSubtitle} onChange={e => setPortalSubtitle(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">Имя ученика (демо)</label>
                     <input type="text" className="form-input" value={portalStudentName} onChange={e => setPortalStudentName(e.target.value)} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Возраст ученика</label>
+                    <label className="form-label">Возраст (демо)</label>
                     <input type="text" className="form-input" value={portalAge} onChange={e => setPortalAge(e.target.value)} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Курс</label>
+                    <label className="form-label">Курс (демо)</label>
                     <input type="text" className="form-input" value={portalCourse} onChange={e => setPortalCourse(e.target.value)} required />
                   </div>
+                </div>
+                <div className="form-grid-3">
                   <div className="form-group">
-                    <label className="form-label">Следующее занятие</label>
+                    <label className="form-label">Следующий урок (демо)</label>
                     <input type="text" className="form-input" value={portalNextLesson} onChange={e => setPortalNextLesson(e.target.value)} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Кабинет</label>
+                    <label className="form-label">Кабинет (демо)</label>
                     <input type="text" className="form-input" value={portalCabinet} onChange={e => setPortalCabinet(e.target.value)} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Посещаемость</label>
+                    <label className="form-label">Посещаемость (демо)</label>
                     <input type="text" className="form-input" value={portalAttendance} onChange={e => setPortalAttendance(e.target.value)} required />
                   </div>
+                </div>
+                <div className="form-grid-3">
                   <div className="form-group">
-                    <label className="form-label">Текущий проект</label>
+                    <label className="form-label">Проект (демо)</label>
                     <input type="text" className="form-input" value={portalProject} onChange={e => setPortalProject(e.target.value)} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Баланс абонемента</label>
+                    <label className="form-label">Баланс (демо)</label>
                     <input type="text" className="form-input" value={portalBalance} onChange={e => setPortalBalance(e.target.value)} required />
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Отчет наставника</label>
-                  <textarea className="form-input" style={{ height: "60px", padding: "8px" }} value={portalTeacherNote} onChange={e => setPortalTeacherNote(e.target.value)} required />
-                </div>
-              </div>
-
-              {/* SAVE BUTTON */}
-              <div>
-                <Button type="submit" variant="primary-crm" disabled={saving}>
-                  {saving ? "Сохранение..." : "Сохранить все изменения блоков"}
-                </Button>
-              </div>
-
-            </form>
-          )}
-
-          {/* TAB 2: COURSES */}
-          {activeTab === "courses" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-text)" }}>Курсы в системе ({courses.length})</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                {courses.map(course => (
-                  <div key={course.id} className="card-crm" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "16px" }}>
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                        <h4 style={{ fontWeight: 700, fontSize: "15px" }}>{course.title}</h4>
-                        <span className={`badge ${course.is_public ? "badge-blue" : "badge-red"}`}>
-                          {course.is_public ? "Публичный" : "Скрыт"}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "8px" }}>
-                        {course.short_description || "Нет описания"}
-                      </p>
-                      <div style={{ fontSize: "12px", display: "flex", gap: "12px" }}>
-                        <span>Возраст: {course.min_age}–{course.max_age} лет</span>
-                        <span style={{ fontWeight: 700 }}>Цена: {course.price_monthly ? `${course.price_monthly} ₽` : "Не указана"}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: "12px" }}>
-                      <Button onClick={() => setEditingCourse(course)} variant="secondary-crm" style={{ display: "flex", alignItems: "center", gap: "6px", height: "32px", fontSize: "12px" }}>
-                        <Edit size={12} /> Редактировать курс
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Edit Course Modal */}
-              {editingCourse && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                  <div style={{ background: "white", padding: "32px", borderRadius: "16px", border: "1px solid var(--color-border)", width: "500px", display: "flex", flexDirection: "column", gap: "20px", boxShadow: "0 20px 40px rgba(0,0,0,0.15)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
-                      <h3 style={{ fontWeight: 700, fontSize: "16px" }}>Редактировать курс: {editingCourse.title}</h3>
-                      <button onClick={() => setEditingCourse(null)} style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", fontSize: "16px" }}>✕</button>
-                    </div>
-
-                    <form onSubmit={handleSaveCourse} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      <div className="form-group">
-                        <label className="form-label">Название курса</label>
-                        <input type="text" className="form-input" value={editingCourse.title} onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })} required />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Краткое описание (для сайта)</label>
-                        <textarea className="form-input" style={{ height: "60px", padding: "8px" }} value={editingCourse.short_description || ""} onChange={e => setEditingCourse({ ...editingCourse, short_description: e.target.value })} required />
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                        <div className="form-group">
-                          <label className="form-label">Мин. возраст (лет)</label>
-                          <input type="number" className="form-input" value={editingCourse.min_age || ""} onChange={e => setEditingCourse({ ...editingCourse, min_age: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Макс. возраст (лет)</label>
-                          <input type="number" className="form-input" value={editingCourse.max_age || ""} onChange={e => setEditingCourse({ ...editingCourse, max_age: e.target.value })} />
-                        </div>
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                        <div className="form-group">
-                          <label className="form-label">Цена в месяц (₽)</label>
-                          <input type="number" className="form-input" value={editingCourse.price_monthly || ""} onChange={e => setEditingCourse({ ...editingCourse, price_monthly: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Порядок сортировки</label>
-                          <input type="number" className="form-input" value={editingCourse.sort_order || 100} onChange={e => setEditingCourse({ ...editingCourse, sort_order: e.target.value })} />
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "8px" }}>
-                        <input type="checkbox" id="is_public" checked={editingCourse.is_public} onChange={e => setEditingCourse({ ...editingCourse, is_public: e.target.checked })} style={{ cursor: "pointer" }} />
-                        <label htmlFor="is_public" style={{ fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Показывать курс на публичном сайте</label>
-                      </div>
-
-                      <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "8px" }}>
-                        <Button type="button" onClick={() => setEditingCourse(null)} variant="secondary-crm" style={{ height: "38px" }}>Отмена</Button>
-                        <Button type="submit" variant="primary-crm" disabled={saving}>{saving ? "Сохранение..." : "Сохранить"}</Button>
-                      </div>
-                    </form>
+                  <div className="form-group">
+                    <label className="form-label">Отзыв преподавателя (демо)</label>
+                    <input type="text" className="form-input" value={portalTeacherNote} onChange={e => setPortalTeacherNote(e.target.value)} required />
                   </div>
                 </div>
-              )}
-
-            </div>
-          )}
-
-          {/* TAB 3: SCHEDULE */}
-          {activeTab === "schedule" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-text)" }}>Группы и расписание ({groups.length})</span>
-
-              <div style={{ background: "white", border: "1px solid var(--color-border)", borderRadius: "12px", overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr", padding: "16px 24px", background: "var(--color-bg)", fontWeight: 700, fontSize: "12px", borderBottom: "1px solid var(--color-border)" }}>
-                  <span>Группа</span>
-                  <span>Направление</span>
-                  <span>Время</span>
-                  <span style={{ textAlign: "center" }}>Вместимость</span>
-                  <span style={{ textAlign: "right" }}>Показ на сайте</span>
-                </div>
-
-                {groups.map(group => {
-                  const daysMap: Record<number, string> = {
-                    1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
-                  };
-                  const rules = group.schedule_rules || [];
-                  const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
-                  const days = sortedRules.map((r: any) => daysMap[r.weekday] || "").join("/");
-                  const start = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
-                  const timeLabel = rules.length > 0 ? `${days} в ${start}` : "Не задано";
-
-                  return (
-                    <div key={group.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1.5fr 1fr 1fr 1fr", padding: "16px 24px", borderBottom: "1px solid var(--color-border)", alignItems: "center", fontSize: "13px" }}>
-                      <span style={{ fontWeight: 700 }}>{group.title}</span>
-                      <span>{group.course?.title || "Не привязан"}</span>
-                      <span>{timeLabel}</span>
-                      <div style={{ display: "flex", justifySelf: "center", alignItems: "center", gap: "6px" }}>
-                        <input 
-                          type="number" 
-                          value={group.capacity} 
-                          onChange={e => handleUpdateGroupCapacity(group, e.target.value)} 
-                          style={{ width: "50px", height: "28px", border: "1px solid var(--color-border)", borderRadius: "6px", textAlign: "center", fontSize: "12px" }}
-                        />
-                        <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>чел.</span>
-                      </div>
-                      <div style={{ display: "flex", justifySelf: "end" }}>
-                        <button
-                          onClick={() => handleToggleGroupShow(group)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: group.show_on_site ? "var(--color-primary-dark)" : "var(--color-text-muted)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            fontWeight: 700,
-                            fontSize: "12px"
-                          }}
-                        >
-                          {group.show_on_site ? (
-                            <>
-                              <Eye size={14} style={{ color: "#22C55E" }} />
-                              <span style={{ color: "#22C55E" }}>Показывается</span>
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff size={14} style={{ color: "#EF4444" }} />
-                              <span style={{ color: "#EF4444" }}>Скрыта</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: PRICES */}
-          {activeTab === "prices" && (
-            <form onSubmit={handleSavePrices} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Редактор цен и общих тарифов</h3>
-                
-                <div className="form-group">
-                  <label className="form-label">Пробное занятие</label>
-                  <input type="text" className="form-input" value={priceTrial} onChange={e => setPriceTrial(e.target.value)} placeholder="Например: 0 ₽" required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Месячный абонемент</label>
-                  <input type="text" className="form-input" value={priceMonthly} onChange={e => setPriceMonthly(e.target.value)} placeholder="Например: от 4 000 ₽" required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Индивидуальное занятие</label>
-                  <input type="text" className="form-input" value={priceIndividual} onChange={e => setPriceIndividual(e.target.value)} placeholder="Например: от 1 500 ₽" required />
-                </div>
               </div>
 
-              <div>
-                <Button type="submit" variant="primary-crm" disabled={saving}>
-                  {saving ? "Сохранение..." : "Сохранить цены"}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {/* TAB 5: SEO */}
-          {activeTab === "seo" && (
-            <form onSubmit={handleSaveSEO} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>SEO настройки главной страницы</h3>
-                
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>SEO параметры главной</h3>
                 <div className="form-group">
-                  <label className="form-label">Meta Title (Заголовок во вкладке браузера)</label>
+                  <label className="form-label">Meta Title (Заголовок вкладки)</label>
                   <input type="text" className="form-input" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Meta Description (Сниппет в выдаче Яндекса/Google)</label>
-                  <textarea className="form-input" style={{ height: "80px", padding: "8px" }} value={seoDescription} onChange={e => setSeoDescription(e.target.value)} required />
+                  <label className="form-label">Meta Description</label>
+                  <input type="text" className="form-input" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} required />
                 </div>
-
                 <div className="form-group">
                   <label className="form-label">Заголовок H1 на сайте</label>
                   <input type="text" className="form-input" value={seoH1} onChange={e => setSeoH1(e.target.value)} required />
@@ -938,11 +804,652 @@ export default function CrmSitePage() {
 
               <div>
                 <Button type="submit" variant="primary-crm" disabled={saving}>
-                  {saving ? "Сохранение..." : "Сохранить SEO настройки"}
+                  <Save size={16} /> Сохранить главную страницу
                 </Button>
               </div>
             </form>
           )}
+
+          {/* TAB 2: TEACHERS */}
+          {activeTab === "teachers" && (
+            <div style={{ display: "grid", gap: "24px" }}>
+              <form onSubmit={handleSaveTeachersSettings} className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Настройки отображения блока на главной</h3>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <input type="checkbox" id="teachersShowBlock" checked={teachersShowBlock} onChange={e => setTeachersShowBlock(e.target.checked)} style={{ cursor: "pointer" }} />
+                  <label htmlFor="teachersShowBlock" style={{ fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Показывать блок «Наши преподаватели» на главной</label>
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Заголовок блока</label>
+                    <input type="text" className="form-input" value={teachersTitle} onChange={e => setTeachersTitle(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Подзаголовок блока</label>
+                    <input type="text" className="form-input" value={teachersSubtitle} onChange={e => setTeachersSubtitle(e.target.value)} required />
+                  </div>
+                </div>
+                <div>
+                  <Button type="submit" variant="primary-crm" disabled={saving}>Сохранить настройки блока</Button>
+                </div>
+              </form>
+
+              <div className="card-crm">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>
+                  <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Преподаватели из CRM</h3>
+                  <a href="/crm/settings?tab=staff" style={{ fontSize: "12px", color: "var(--color-primary)", fontWeight: 700 }}>Перейти в управление сотрудниками →</a>
+                </div>
+
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table-crm">
+                    <thead>
+                      <tr>
+                        <th>Имя</th>
+                        <th>Специализация</th>
+                        <th style={{ textAlign: "center" }}>Показывать контакты</th>
+                        <th style={{ textAlign: "right" }}>Статус на сайте</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teachersList.map(teacher => (
+                        <tr key={teacher.id}>
+                          <td style={{ fontWeight: 700 }}>{teacher.full_name}</td>
+                          <td style={{ fontSize: "12px", color: "var(--color-text-muted)", maxWidth: "250px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{teacher.specialty || "—"}</td>
+                          <td style={{ textAlign: "center" }}>
+                            <button type="button" onClick={() => handleToggleTeacherField(teacher, "show_public_contacts")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: teacher.show_public_contacts ? "#22C55E" : "var(--color-text-muted)" }}>
+                              {teacher.show_public_contacts ? "Публичные" : "Скрыты"}
+                            </button>
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              onClick={() => handleToggleTeacherField(teacher, "show_on_site")}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontWeight: 700,
+                                fontSize: "12px",
+                                color: teacher.show_on_site ? "#22C55E" : "#EF4444"
+                              }}
+                            >
+                              {teacher.show_on_site ? (
+                                <><Eye size={14} /> На сайте</>
+                              ) : (
+                                <><EyeOff size={14} /> Скрыт</>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: BRANCHES & CONTACTS */}
+          {activeTab === "branches" && (
+            <div style={{ display: "grid", gap: "24px" }}>
+              <form onSubmit={handleSaveOrgInfo} className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Контакты организации и банковские реквизиты</h3>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Телефон организации (основной)</label>
+                    <input type="text" className="form-input" value={orgPhone} onChange={e => setOrgPhone(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email организации (основной)</label>
+                    <input type="email" className="form-input" value={orgEmail} onChange={e => setOrgEmail(e.target.value)} required />
+                  </div>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Сокращенное юридическое наименование</label>
+                    <input type="text" className="form-input" value={orgShortLegal} onChange={e => setOrgShortLegal(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Полное юридическое наименование</label>
+                    <input type="text" className="form-input" value={orgFullLegal} onChange={e => setOrgFullLegal(e.target.value)} required />
+                  </div>
+                </div>
+
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">ИНН организации</label>
+                    <input type="text" className="form-input" value={orgInn} onChange={e => setOrgInn(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">ОГРН/ОГРНИП (не выдумывать)</label>
+                    <input type="text" className="form-input" value={orgOgrn} onChange={e => setOrgOgrn(e.target.value)} placeholder="Пусто / не указано" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Юридический адрес</label>
+                    <input type="text" className="form-input" value={orgLegalAddress} onChange={e => setOrgLegalAddress(e.target.value)} required />
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "8px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 700, margin: "0 0 12px 0" }}>Банковские данные (получатель)</h4>
+                  <div className="form-grid-3">
+                    <div className="form-group">
+                      <label className="form-label">Название банка</label>
+                      <input type="text" className="form-input" value={orgBankName} onChange={e => setOrgBankName(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">ИНН банка</label>
+                      <input type="text" className="form-input" value={orgBankInn} onChange={e => setOrgBankInn(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">БИК</label>
+                      <input type="text" className="form-input" value={orgBik} onChange={e => setOrgBik(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="form-grid-3" style={{ marginTop: "12px" }}>
+                    <div className="form-group">
+                      <label className="form-label">Расчетный счет</label>
+                      <input type="text" className="form-input" value={orgAccount} onChange={e => setOrgAccount(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Корреспондентский счет</label>
+                      <input type="text" className="form-input" value={orgCorrAccount} onChange={e => setOrgCorrAccount(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Адрес банка</label>
+                      <input type="text" className="form-input" value={orgBankAddress} onChange={e => setOrgBankAddress(e.target.value)} required />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Button type="submit" variant="primary-crm" disabled={saving}>
+                    <Save size={16} /> Сохранить реквизиты
+                  </Button>
+                </div>
+              </form>
+
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Адреса образовательной деятельности (Филиалы на сайте)</h3>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table-crm">
+                    <thead>
+                      <tr>
+                        <th>Название</th>
+                        <th>Адрес проведения занятий</th>
+                        <th>Режим работы</th>
+                        <th style={{ textAlign: "center" }}>Порядок</th>
+                        <th style={{ textAlign: "right" }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {branchesList.map(b => (
+                        <tr key={b.id}>
+                          <td style={{ fontWeight: 700 }}>{b.name}</td>
+                          <td>{b.address}</td>
+                          <td style={{ fontSize: "12px" }}>{b.work_hours || "—"}</td>
+                          <td style={{ textAlign: "center" }}>{b.sort_order}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <Button variant="secondary-crm" onClick={() => setEditingBranch(b)} style={{ height: "30px", fontSize: "11px", display: "inline-flex", gap: "4px" }}>
+                              <Edit size={12} /> Изменить
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Edit Branch Modal */}
+              {editingBranch && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                  <form onSubmit={handleSaveBranch} style={{ background: "white", padding: "28px", borderRadius: "16px", width: "480px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <h3 style={{ fontWeight: 700, fontSize: "16px", margin: 0 }}>Редактировать филиал: {editingBranch.name}</h3>
+                    <div className="form-group">
+                      <label className="form-label">Название</label>
+                      <input type="text" className="form-input" value={editingBranch.name} onChange={e => setEditingBranch({ ...editingBranch, name: e.target.value })} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Адрес проведения занятий</label>
+                      <input type="text" className="form-input" value={editingBranch.address} onChange={e => setEditingBranch({ ...editingBranch, address: e.target.value })} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Режим работы</label>
+                      <input type="text" className="form-input" value={editingBranch.work_hours || ""} onChange={e => setEditingBranch({ ...editingBranch, work_hours: e.target.value })} required />
+                    </div>
+                    <div className="form-grid-2">
+                      <div className="form-group">
+                        <label className="form-label">Порядок сортировки</label>
+                        <input type="number" className="form-input" value={editingBranch.sort_order} onChange={e => setEditingBranch({ ...editingBranch, sort_order: e.target.value })} required />
+                      </div>
+                      <div className="form-group" style={{ justifyContent: "center" }}>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "16px" }}>
+                          <input type="checkbox" id="branch_show" checked={editingBranch.show_on_site} onChange={e => setEditingBranch({ ...editingBranch, show_on_site: e.target.checked })} />
+                          <label htmlFor="branch_show" style={{ fontSize: "12px", fontWeight: 700 }}>Показывать на сайте</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: "14px" }}>
+                      <Button variant="secondary-crm" type="button" onClick={() => setEditingBranch(null)}>Отмена</Button>
+                      <Button variant="primary-crm" type="submit" disabled={saving}>Сохранить</Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: PRICES & TARIFFS */}
+          {activeTab === "prices" && (
+            <div style={{ display: "grid", gap: "24px" }}>
+              <div className="card-crm">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>
+                  <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Публичные тарифы Робокс</h3>
+                  <Button variant="primary-crm" onClick={() => setEditingTariff({ title: "", audience: "school", format: "", price: 0, is_one_time: false, sort_order: 100, show_on_site: true })}>
+                    <Plus size={14} /> Создать тариф
+                  </Button>
+                </div>
+
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table-crm">
+                    <thead>
+                      <tr>
+                        <th>Название тарифа</th>
+                        <th>Аудитория</th>
+                        <th>Описание / Формат</th>
+                        <th style={{ textAlign: "right" }}>Цена</th>
+                        <th style={{ textAlign: "center" }}>Разовый</th>
+                        <th style={{ textAlign: "center" }}>На сайте</th>
+                        <th style={{ textAlign: "right" }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tariffs.map(t => (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 700 }}>{t.title}</td>
+                          <td>
+                            {t.audience === "school" ? "Школьники" : t.audience === "preschool" ? "Дошкольники" : "Общий"}
+                          </td>
+                          <td style={{ fontSize: "12px", color: "var(--color-text-muted)", maxWidth: "200px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{t.format || "—"}</td>
+                          <td style={{ textAlign: "right", fontWeight: 800, color: "var(--color-primary)" }}>{Number(t.price).toLocaleString("ru-RU")} ₽</td>
+                          <td style={{ textAlign: "center" }}>{t.is_one_time ? "Да" : "Нет"}</td>
+                          <td style={{ textAlign: "center" }}>{t.show_on_site ? "✓" : "—"}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <div style={{ display: "inline-flex", gap: "6px" }}>
+                              <Button variant="secondary-crm" onClick={() => setEditingTariff({ ...t, price: t.price.toString() })} style={{ height: "30px", fontSize: "11px" }}>
+                                <Edit size={12} />
+                              </Button>
+                              <Button variant="secondary-crm" onClick={() => handleDeleteTariff(t.id)} style={{ height: "30px", fontSize: "11px", color: "#EF4444" }}>
+                                <Trash2 size={12} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {tariffs.length === 0 && (
+                        <tr><td colSpan={7} style={{ textAlign: "center", padding: "20px", color: "var(--color-text-muted)" }}>Тарифы отсутствуют.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Edit Tariff Modal */}
+              {editingTariff && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                  <form onSubmit={handleSaveTariff} style={{ background: "white", padding: "28px", borderRadius: "16px", width: "480px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <h3 style={{ fontWeight: 700, fontSize: "16px", margin: 0 }}>{editingTariff.id ? "Редактировать тариф" : "Создать тариф"}</h3>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Название тарифа *</label>
+                      <input type="text" className="form-input" value={editingTariff.title} onChange={e => setEditingTariff({ ...editingTariff, title: e.target.value })} required />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Аудитория</label>
+                      <select className="form-input" value={editingTariff.audience} onChange={e => setEditingTariff({ ...editingTariff, audience: e.target.value })}>
+                        <option value="school">Школьники (8-14 лет)</option>
+                        <option value="preschool">Дошкольники (5-7 лет)</option>
+                        <option value="general">Общий тариф</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Описание / Формат занятий</label>
+                      <input type="text" className="form-input" value={editingTariff.format || ""} onChange={e => setEditingTariff({ ...editingTariff, format: e.target.value })} placeholder="Например: В мини-группе 2 раза в неделю по 90 минут" />
+                    </div>
+
+                    <div className="form-grid-2">
+                      <div className="form-group">
+                        <label className="form-label">Стоимость (₽) *</label>
+                        <input type="number" className="form-input" value={editingTariff.price} onChange={e => setEditingTariff({ ...editingTariff, price: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Порядок сортировки</label>
+                        <input type="number" className="form-input" value={editingTariff.sort_order} onChange={e => setEditingTariff({ ...editingTariff, sort_order: e.target.value })} required />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <input type="checkbox" id="t_one_time" checked={editingTariff.is_one_time} onChange={e => setEditingTariff({ ...editingTariff, is_one_time: e.target.checked })} />
+                        <label htmlFor="t_one_time" style={{ fontSize: "12px", fontWeight: 700 }}>Разовый платеж</label>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <input type="checkbox" id="t_show" checked={editingTariff.show_on_site} onChange={e => setEditingTariff({ ...editingTariff, show_on_site: e.target.checked })} />
+                        <label htmlFor="t_show" style={{ fontSize: "12px", fontWeight: 700 }}>Показывать на сайте</label>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: "14px" }}>
+                      <Button variant="secondary-crm" type="button" onClick={() => setEditingTariff(null)}>Отмена</Button>
+                      <Button variant="primary-crm" type="submit" disabled={saving}>Сохранить</Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: SCHEDULE */}
+          {activeTab === "schedule" && (
+            <div className="card-crm">
+              <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Группы и расписание на сайте</h3>
+              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Управляйте видимостью групп на публичном расписании сайта.</p>
+              
+              <div style={{ overflowX: "auto" }}>
+                <table className="table-crm">
+                  <thead>
+                    <tr>
+                      <th>Группа</th>
+                      <th>Направление</th>
+                      <th>Филиал</th>
+                      <th>Время</th>
+                      <th style={{ textAlign: "right" }}>Статус на сайте</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groups.map(g => {
+                      const daysMap: Record<number, string> = { 1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс" };
+                      const rules = g.schedule_rules || [];
+                      const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
+                      const days = sortedRules.map((r: any) => daysMap[r.weekday] || "").join("/");
+                      const start = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
+                      const timeLabel = rules.length > 0 ? `${days} в ${start}` : "Уточняется";
+                      
+                      return (
+                        <tr key={g.id}>
+                          <td style={{ fontWeight: 700 }}>{g.title}</td>
+                          <td>{g.course?.title || "—"}</td>
+                          <td>{g.branch?.name || "—"}</td>
+                          <td>{timeLabel}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGroupShowOnSite(g)}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontWeight: 700,
+                                fontSize: "12px",
+                                color: g.show_on_site ? "#22C55E" : "var(--color-text-muted)"
+                              }}
+                            >
+                              {g.show_on_site ? (
+                                <><Eye size={14} /> На сайте</>
+                              ) : (
+                                <><EyeOff size={14} /> Скрыта</>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: LEGAL PAGES */}
+          {activeTab === "legal" && (
+            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {[
+                  { key: "legal.page.legal", label: "Юр. информация" },
+                  { key: "legal.page.privacy", label: "Персональные данные" },
+                  { key: "legal.page.offer", label: "Публичная оферта" },
+                  { key: "legal.page.payment", label: "Условия оплаты" },
+                  { key: "legal.page.refund", label: "Условия возврата" }
+                ].map(doc => (
+                  <button
+                    key={doc.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDocKey(doc.key);
+                      setSuccessMsg("");
+                      setErrorMsg("");
+                    }}
+                    style={{
+                      border: "none",
+                      background: selectedDocKey === doc.key ? "var(--color-primary-soft)" : "none",
+                      color: selectedDocKey === doc.key ? "var(--color-primary-dark)" : "var(--color-text-muted)",
+                      padding: "10px 12px",
+                      borderRadius: "6px",
+                      textAlign: "left",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: "12px"
+                    }}
+                  >
+                    {doc.label}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSaveLegalDoc} className="card-crm" style={{ gap: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0, textTransform: "capitalize" }}>
+                  Редактировать страницу: {selectedDocKey.split(".").pop()}
+                </h3>
+
+                <div className="form-group">
+                  <label className="form-label">Заголовок H1 страницы</label>
+                  <input type="text" className="form-input" value={docTitle} onChange={e => setDocTitle(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Короткое описание / Лид-параграф</label>
+                  <input type="text" className="form-input" value={docSubtitle} onChange={e => setDocSubtitle(e.target.value)} required />
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Meta Title (SEO)</label>
+                    <input type="text" className="form-input" value={docMetaTitle} onChange={e => setDocMetaTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Meta Description (SEO)</label>
+                    <input type="text" className="form-input" value={docMetaDesc} onChange={e => setDocMetaDesc(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Текст страницы (поддерживает двойной перенос для новых параграфов)</label>
+                  <textarea className="form-input" style={{ height: "240px", fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }} value={docBody} onChange={e => setDocBody(e.target.value)} required />
+                </div>
+
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="docShowInFooter" checked={docShowInFooter} onChange={e => setDocShowInFooter(e.target.checked)} />
+                  <label htmlFor="docShowInFooter" style={{ fontSize: "12px", fontWeight: 700 }}>Показывать ссылку на страницу в футере</label>
+                </div>
+
+                <div>
+                  <Button type="submit" variant="primary-crm" disabled={saving}>
+                    <Save size={16} /> Сохранить документ
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 7: FOOTER */}
+          {activeTab === "footer" && (
+            <form onSubmit={handleSaveFooter} className="card-crm" style={{ gap: "20px" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Настройки футера</h3>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="f_legalName" checked={footerShowLegalName} onChange={e => setFooterShowLegalName(e.target.checked)} />
+                  <label htmlFor="f_legalName" style={{ fontSize: "13px", fontWeight: 600 }}>Показывать полное юридическое название (Юлдашев Рустам Хакимович (ИП))</label>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="f_inn" checked={footerShowInn} onChange={e => setFooterShowInn(e.target.checked)} />
+                  <label htmlFor="f_inn" style={{ fontSize: "13px", fontWeight: 600 }}>Показывать ИНН</label>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="f_requisites" checked={footerShowBankRequisites} onChange={e => setFooterShowBankRequisites(e.target.checked)} />
+                  <label htmlFor="f_requisites" style={{ fontSize: "13px", fontWeight: 600 }}>Показывать банковские реквизиты (р/с, банк, БИК)</label>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="f_branches" checked={footerShowBranchAddresses} onChange={e => setFooterShowBranchAddresses(e.target.checked)} />
+                  <label htmlFor="f_branches" style={{ fontSize: "13px", fontWeight: 600 }}>Показывать адреса филиалов образовательной деятельности</label>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input type="checkbox" id="f_legalAddress" checked={footerShowLegalAddress} onChange={e => setFooterShowLegalAddress(e.target.checked)} />
+                  <label htmlFor="f_legalAddress" style={{ fontSize: "13px", fontWeight: 600 }}>Показывать юридический адрес (ул. Артемова, 5а, 126)</label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Текст копирайта (поддерживает плейсхолдер {'{year}'} для авто-подстановки года)</label>
+                <input type="text" className="form-input" value={footerCopyrightText} onChange={e => setFooterCopyrightText(e.target.value)} placeholder="Например: © {year} Робокс Липецк. Все права защищены." required />
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
+                <h4 style={{ fontSize: "13px", fontWeight: 700, margin: "0 0 12px 0" }}>Ссылки на социальные сети</h4>
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">ВКонтакте (VK)</label>
+                    <input type="text" className="form-input" value={footerVk} onChange={e => setFooterVk(e.target.value)} placeholder="Ссылка на сообщество" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Telegram</label>
+                    <input type="text" className="form-input" value={footerTelegram} onChange={e => setFooterTelegram(e.target.value)} placeholder="Ссылка на канал/аккаунт" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">WhatsApp</label>
+                    <input type="text" className="form-input" value={footerWhatsapp} onChange={e => setFooterWhatsapp(e.target.value)} placeholder="Ссылка на чат" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Button type="submit" variant="primary-crm" disabled={saving}>
+                  <Save size={16} /> Сохранить настройки футера
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 8: MEDIA MANAGER */}
+          {activeTab === "media" && (
+            <div className="card-crm" style={{ gap: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Медиа-менеджер</h3>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input type="file" ref={fileInputRef} onChange={handleUploadFile} style={{ display: "none" }} />
+                  <Button variant="primary-crm" disabled={uploadingFile} onClick={() => fileInputRef.current?.click()}>
+                    <Upload size={14} /> {uploadingFile ? "Загрузка..." : "Загрузить файл"}
+                  </Button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                {[
+                  { id: "branding", label: "Брендинг & лого" },
+                  { id: "teachers", label: "Фото преподавателей" },
+                  { id: "pricing", label: "Тарифы" },
+                  { id: "schedule", label: "Сетка расписания" },
+                  { id: "legal", label: "Документы" },
+                  { id: "misc", label: "Разное" }
+                ].map(folder => (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => setActiveMediaFolder(folder.id)}
+                    style={{
+                      border: "none",
+                      background: activeMediaFolder === folder.id ? "var(--color-primary-soft)" : "#F3F4F6",
+                      color: activeMediaFolder === folder.id ? "var(--color-primary-dark)" : "var(--color-text-muted)",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: "11px"
+                    }}
+                  >
+                    {folder.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px", minHeight: "200px", background: "#F9FAFB", padding: "16px", borderRadius: "8px", border: "1px dashed var(--color-border)" }}>
+                {mediaFiles.map((file, idx) => (
+                  <div key={idx} style={{ background: "white", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "8px", display: "flex", flexDirection: "column", gap: "8px", justifyContent: "space-between" }}>
+                    <div style={{ height: "100px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {file.name.endsWith(".svg") || file.name.endsWith(".png") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") ? (
+                        <img src={file.url} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      ) : (
+                        <FileText size={32} style={{ color: "var(--color-text-muted)" }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={file.name}>
+                        {file.name}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
+                        {(file.size / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(file.path);
+                        alert(`Путь скопирован: ${file.path}`);
+                      }}
+                      style={{
+                        background: "var(--color-primary-soft)",
+                        color: "var(--color-primary-dark)",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "4px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        textAlign: "center"
+                      }}
+                    >
+                      Копировать путь
+                    </button>
+                  </div>
+                ))}
+
+                {mediaFiles.length === 0 && (
+                  <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)" }}>
+                    <ImageIcon size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                    <span style={{ fontSize: "12px" }}>В этой папке нет файлов. Загрузите первый!</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

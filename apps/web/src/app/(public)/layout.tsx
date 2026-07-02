@@ -2,16 +2,90 @@ import React from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { Button } from "@robotics-crm/ui";
-import { Phone, Menu } from "lucide-react";
+import { Phone } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const ymId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
+  let phone = "+7 994 777-48-48";
+  let email = "robokslip48@mail.ru";
+  let shortLegalName = "ИП Юлдашев Рустам Хакимович";
+  let fullLegalName = "Юлдашев Рустам Хакимович (ИП)";
+  let inn = "482426310695";
+  let legalAddress = "398057, Россия, Липецкая область, Липецк, ул. Артемова, 5а, 126";
+  let bankName = 'АО "АЛЬФА-БАНК"';
+  let account = "40802810102930009628";
+  let bik = "044525593";
+  let corrAccount = "30101810200000000593";
+  
+  let showLegalName = true;
+  let showInn = true;
+  let showBankRequisites = false;
+  let showBranchAddresses = true;
+  let showLegalAddress = false;
+  let copyrightText = "© {year} Робокс Липецк. Все права защищены.";
+  let socials = { vk: "", telegram: "", whatsapp: "" };
+  let branches: any[] = [];
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id, phone, email, short_legal_name, full_legal_name, inn, legal_address, bank_name, account_number, bik, correspondent_account")
+      .eq("slug", "robotics-lipetsk")
+      .single();
+
+    if (org) {
+      if (org.phone) phone = org.phone;
+      if (org.email) email = org.email;
+      if (org.short_legal_name) shortLegalName = org.short_legal_name;
+      if (org.full_legal_name) fullLegalName = org.full_legal_name;
+      if (org.inn) inn = org.inn;
+      if (org.legal_address) legalAddress = org.legal_address;
+      if (org.bank_name) bankName = org.bank_name;
+      if (org.account_number) account = org.account_number;
+      if (org.bik) bik = org.bik;
+      if (org.correspondent_account) corrAccount = org.correspondent_account;
+
+      // Load footer settings
+      const { data: footerBlock } = await (supabase.from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("block_key", "site.footer")
+        .maybeSingle();
+
+      if (footerBlock?.content) {
+        const c = footerBlock.content;
+        if (c.showLegalName !== undefined) showLegalName = c.showLegalName;
+        if (c.showInn !== undefined) showInn = c.showInn;
+        if (c.showBankRequisites !== undefined) showBankRequisites = c.showBankRequisites;
+        if (c.showBranchAddresses !== undefined) showBranchAddresses = c.showBranchAddresses;
+        if (c.showLegalAddress !== undefined) showLegalAddress = c.showLegalAddress;
+        if (c.copyrightText) copyrightText = c.copyrightText;
+        if (c.socials) socials = { ...socials, ...c.socials };
+      }
+
+      // Load branches
+      const { data: branchesData } = await (supabase.from("branches") as any)
+        .select("name, address")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .eq("show_on_site", true)
+        .order("sort_order", { ascending: true });
+      if (branchesData) {
+        branches = branchesData;
+      }
+    }
+  } catch (e) {
+    console.error("Error loading layout data:", e);
+  }
 
   const ymScript = ymId ? `
     (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -34,6 +108,8 @@ export default function PublicLayout({
     gtag('js', new Date());
     gtag('config', '${gaId}');
   ` : "";
+
+  const resolvedCopyright = copyrightText.replace("{year}", new Date().getFullYear().toString());
 
   return (
     <>
@@ -102,7 +178,7 @@ export default function PublicLayout({
 
           {/* Actions */}
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <a href="tel:+79947774848" style={{
+            <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
@@ -112,7 +188,7 @@ export default function PublicLayout({
               transition: "color 0.2s"
             }}>
               <Phone size={16} style={{ color: "var(--color-primary)" }} />
-              <span>+7 (994) 777-48-48</span>
+              <span>{phone}</span>
             </a>
             <a href="#lead-form">
               <Button variant="primary-site" style={{ height: "42px", fontSize: "var(--font-small)" }}>
@@ -156,6 +232,21 @@ export default function PublicLayout({
               <p style={{ color: "#9CA3AF", fontSize: "var(--font-small)", maxWidth: "250px" }}>
                 Современная школа инженерного мышления и робототехники для детей 6–14 лет в Липецке.
               </p>
+              
+              {/* Social links */}
+              {(socials.vk || socials.telegram || socials.whatsapp) && (
+                <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+                  {socials.vk && (
+                    <a href={socials.vk} target="_blank" rel="noopener noreferrer" style={{ color: "#9CA3AF", fontSize: "12px", textDecoration: "underline" }}>ВКонтакте</a>
+                  )}
+                  {socials.telegram && (
+                    <a href={socials.telegram} target="_blank" rel="noopener noreferrer" style={{ color: "#9CA3AF", fontSize: "12px", textDecoration: "underline" }}>Telegram</a>
+                  )}
+                  {socials.whatsapp && (
+                    <a href={socials.whatsapp} target="_blank" rel="noopener noreferrer" style={{ color: "#9CA3AF", fontSize: "12px", textDecoration: "underline" }}>WhatsApp</a>
+                  )}
+                </div>
+              )}
             </div>
             
             <div>
@@ -185,14 +276,47 @@ export default function PublicLayout({
 
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Контакты</h4>
-              <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "8px" }}>
-                г. Липецк, ул. Артемова, д. 5а, оф. 126
-              </p>
-              <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "8px" }}>
-                +7 (994) 777-48-48
+              {showLegalName && (
+                <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "4px", fontWeight: 700 }}>
+                  {shortLegalName || fullLegalName}
+                </p>
+              )}
+              {showInn && (
+                <p style={{ color: "#9CA3AF", fontSize: "var(--font-xs)", marginBottom: "12px" }}>
+                  ИНН: {inn}
+                </p>
+              )}
+              
+              {showBranchAddresses && branches.length > 0 && (
+                <div style={{ marginBottom: "12px" }}>
+                  <span style={{ fontSize: "var(--font-xs)", color: "#9CA3AF", display: "block", marginBottom: "4px", textTransform: "uppercase" }}>Филиалы:</span>
+                  {branches.map((b, idx) => (
+                    <p key={idx} style={{ color: "#E5E7EB", fontSize: "var(--font-small)", margin: "0 0 4px 0" }}>
+                      {b.address}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {showLegalAddress && (
+                <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "12px", fontStyle: "italic" }}>
+                  Юр. адрес: {legalAddress}
+                </p>
+              )}
+
+              {showBankRequisites && (
+                <div style={{ color: "#9CA3AF", fontSize: "var(--font-xs)", marginBottom: "12px", borderTop: "1px solid #374151", paddingTop: "8px" }}>
+                  <p style={{ margin: "0 0 2px 0" }}>Банк: {bankName}</p>
+                  <p style={{ margin: "0 0 2px 0" }}>Р/с: {account}</p>
+                  <p style={{ margin: "0" }}>БИК: {bik}</p>
+                </div>
+              )}
+
+              <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "8px", fontWeight: 700 }}>
+                {phone}
               </p>
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)" }}>
-                robokslip48@mail.ru
+                {email}
               </p>
             </div>
           </div>
@@ -206,7 +330,7 @@ export default function PublicLayout({
             fontSize: "var(--font-xs)",
             color: "#9CA3AF"
           }}>
-            <span>© {new Date().getFullYear()} Робокс Липецк. Все права защищены.</span>
+            <span>{resolvedCopyright}</span>
             <Link href="/login" style={{ color: "#6B7280", textDecoration: "underline" }} className="hover-link-primary">
               Вход для сотрудников
             </Link>

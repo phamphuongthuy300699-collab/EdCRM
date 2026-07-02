@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { InfoGrid, LegalPageShell, LegalSection, PlaceholderNotice } from "../LegalPageShell";
-import { getPublicLegalData } from "../legal-data";
+import { InfoGrid, LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
+import { getPublicLegalData, getDynamicPageBlock } from "../legal-data";
 
 export const revalidate = 300;
 
@@ -11,11 +11,18 @@ export const metadata: Metadata = {
 
 export default async function LegalPage() {
   const data = await getPublicLegalData();
+  const pageBlock = await getDynamicPageBlock(
+    "legal.page.legal",
+    "Юридическая информация",
+    "Раздел с реквизитами организации, фактическим адресом, контактами и банковскими данными для проведения оплат и проверок интернет-эквайринга.",
+    `### Юридические основания
+Все платежные операции проводятся в соответствии с Правилами платежных систем и действующим законодательством Российской Федерации. Договор-оферта заключается в электронном виде и имеет полную юридическую силу.`
+  );
 
   return (
     <LegalPageShell
-      title="Юридическая информация"
-      lead="Раздел с реквизитами организации, фактическим адресом, контактами и банковскими данными для проведения оплат и проверок интернет-эквайринга."
+      title={pageBlock.title}
+      lead={pageBlock.subtitle}
     >
       <InfoGrid
         items={[
@@ -30,11 +37,7 @@ export default async function LegalPage() {
           { label: "Банковские реквизиты", value: data.bankDetails },
         ]}
       />
-      <LegalSection title="Юридические основания">
-        <p>
-          Все платежные операции проводятся в соответствии с Правилами платежных систем и действующим законодательством Российской Федерации. Договор-оферта заключается в электронном виде и имеет полную юридическую силу.
-        </p>
-      </LegalSection>
+      <DynamicLegalSections bodyText={pageBlock.body} />
     </LegalPageShell>
   );
 }

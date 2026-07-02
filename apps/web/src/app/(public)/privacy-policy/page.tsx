@@ -1,16 +1,21 @@
 import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
+import { getPublicLegalData } from "../legal-data";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Политика конфиденциальности | Школа Robotics Липецк",
-  description: "Политика конфиденциальности и обработки персональных данных в школе робототехники и программирования Robotics Липецк.",
+  title: "Политика конфиденциальности | Робокс Липецк",
+  description: "Политика конфиденциальности и обработки персональных данных в школе робототехники и программирования Робокс Липецк.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/privacy-policy",
   },
 };
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  const data = await getPublicLegalData();
+
   return (
     <div className="container" style={{ padding: "80px 20px", maxWidth: "800px", fontFamily: "var(--font-inter), sans-serif", lineHeight: 1.7 }}>
       <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "var(--color-primary)", fontWeight: 600, marginBottom: "32px", fontSize: "14px" }}>
@@ -28,7 +33,7 @@ export default function PrivacyPolicyPage() {
       <section style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "12px" }}>1. Общие положения</h2>
         <p>
-          Настоящая политика конфиденциальности определяет порядок обработки персональных данных пользователей на сайте школы Robotics Липецк (https://robotics-lipetsk.ru). Мы уделяем приоритетное внимание безопасности и защите ваших персональных данных.
+          Настоящая политика конфиденциальности определяет порядок обработки персональных данных пользователей на сайте школы {data.schoolName} (https://robotics-lipetsk.ru). Мы уделяем приоритетное внимание безопасности и защите ваших персональных данных.
         </p>
       </section>
 
@@ -68,7 +73,7 @@ export default function PrivacyPolicyPage() {
       <section style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "12px" }}>5. Права пользователей</h2>
         <p>
-          Вы имеете право запросить сведения о хранящихся у нас ваших персональных данных, изменить их или отозвать свое согласие на обработку, направив обращение на адрес электронной почты: <strong>info@robotics-lipetsk.ru</strong>.
+          Вы имеете право запросить сведения о хранящихся у нас ваших персональных данных, изменить их или отозвать свое согласие на обработку, направив обращение на адрес электронной почты: <strong>{data.email}</strong>.
         </p>
       </section>
     </div>

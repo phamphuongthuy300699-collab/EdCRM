@@ -70,3 +70,42 @@ export function PlaceholderNotice({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+export function DynamicLegalSections({ bodyText }: { bodyText: string }) {
+  if (!bodyText) return null;
+  const lines = bodyText.split("\n").map(l => l.trim());
+  const sections: Array<{ title: string; paragraphs: string[] }> = [];
+  let currentSection = { title: "", paragraphs: [] as string[] };
+
+  for (const line of lines) {
+    if (!line) continue;
+    const isHeading = line.startsWith("###") || /^\d+\.\s+\S+/.test(line);
+    
+    if (isHeading) {
+      if (currentSection.title || currentSection.paragraphs.length > 0) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        title: line.replace(/^###\s*/, ""),
+        paragraphs: []
+      };
+    } else {
+      currentSection.paragraphs.push(line);
+    }
+  }
+  if (currentSection.title || currentSection.paragraphs.length > 0) {
+    sections.push(currentSection);
+  }
+
+  return (
+    <>
+      {sections.map((sec, idx) => (
+        <LegalSection key={idx} title={sec.title || "Информация"}>
+          {sec.paragraphs.map((p, pIdx) => (
+            <p key={pIdx} style={{ marginBottom: "12px" }}>{p}</p>
+          ))}
+        </LegalSection>
+      ))}
+    </>
+  );
+}

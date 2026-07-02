@@ -1,16 +1,21 @@
 import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
+import { getPublicLegalData } from "../legal-data";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Согласие на обработку персональных данных | Школа Robotics Липецк",
-  description: "Согласие на обработку персональных данных для родителей и учащихся школы Robotics Липецк.",
+  title: "Согласие на обработку персональных данных | Робокс Липецк",
+  description: "Согласие на обработку персональных данных для родителей и учащихся школы Робокс Липецк.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/consent",
   },
 };
 
-export default function ConsentPage() {
+export default async function ConsentPage() {
+  const data = await getPublicLegalData();
+
   return (
     <div className="container" style={{ padding: "80px 20px", maxWidth: "800px", fontFamily: "var(--font-inter), sans-serif", lineHeight: 1.7 }}>
       <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "var(--color-primary)", fontWeight: 600, marginBottom: "32px", fontSize: "14px" }}>
@@ -27,7 +32,7 @@ export default function ConsentPage() {
 
       <div style={{ display: "grid", gap: "20px" }}>
         <p>
-          Отправляя заявку на сайте https://robotics-lipetsk.ru (далее — Сайт), я, в соответствии с Федеральным законом РФ № 152-ФЗ «О персональных данных», свободно, своей волей и в своем интересе выражаю безусловное согласие на обработку моих персональных данных и персональных данных моего несовершеннолетнего ребенка (подопечного) школой Robotics Липецк (далее — Оператор).
+          Отправляя заявку на сайте https://robotics-lipetsk.ru (далее — Сайт), я, в соответствии с Федеральным законом РФ № 152-ФЗ «О персональных данных», свободно, своей волей и в своем интересе выражаю безусловное согласие на обработку моих персональных данных и персональных данных моего несовершеннолетнего ребенка (подопечного) школой {data.schoolName} (далее — Оператор).
         </p>
 
         <p>
@@ -43,7 +48,7 @@ export default function ConsentPage() {
         </p>
 
         <p>
-          Настоящее согласие вступает в силу с момента отправки веб-формы на Сайте и действует в течение всего срока оказания услуг или до его письменного отзыва. Отзыв согласия может быть направлен в свободной форме на адрес электронной почты <strong>info@robotics-lipetsk.ru</strong>.
+          Настоящее согласие вступает в силу с момента отправки веб-формы на Сайте и действует в течение всего срока оказания услуг или до его письменного отзыва. Отзыв согласия может быть направлен в свободной форме на адрес электронной почты <strong>{data.email}</strong>.
         </p>
       </div>
     </div>

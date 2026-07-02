@@ -58,13 +58,17 @@ export default async function Page() {
   let orgPhone = "+7-994-777-48-48";
   let orgAddress = "ул. Артемова, д. 5а, оф. 126";
 
+  let org: any = null;
+
   try {
     const supabase = createSupabaseAdminClient();
-    const { data: org } = await supabase
+    const { data: orgData } = await supabase
       .from("organizations")
-      .select("id")
+      .select("*")
       .eq("slug", "robotics-lipetsk")
       .single();
+    
+    org = orgData;
 
     if (org) {
       // 1. Fetch site content blocks
@@ -248,6 +252,7 @@ export default async function Page() {
         initialBlocks={initialBlocks}
         initialTeachers={initialTeachers}
         initialBranches={initialBranches}
+        orgDetails={org}
       />
     </>
   );
