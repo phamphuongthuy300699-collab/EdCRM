@@ -93,29 +93,40 @@ export default function ParentLoginPage() {
         }}>
           {/* Logo / Title */}
           <div style={{ textAlign: "center", marginBottom: "32px" }}>
+            <img 
+              src="/api/crm/media?path=branding/roboks-logo.svg" 
+              alt="Робокс" 
+              style={{ width: "48px", height: "48px", objectFit: "contain", margin: "0 auto 16px auto" }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const fallback = e.currentTarget.nextSibling as HTMLDivElement;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
             <div style={{
               width: "48px",
               height: "48px",
               borderRadius: "12px",
-              background: "var(--color-accent)",
-              display: "flex",
+              background: "var(--roboks-gradient)",
+              display: "none",
               alignItems: "center",
               justifyContent: "center",
               color: "white",
-              fontWeight: 800,
+              fontWeight: 900,
               fontSize: "1.5rem",
               fontFamily: "var(--font-geologica)",
               margin: "0 auto 16px auto"
             }}>
-              P
+              Р
             </div>
             <h1 style={{
               fontFamily: "var(--font-geologica)",
-              fontSize: "1.45rem",
+              fontSize: "1.5rem",
               color: "var(--color-text)",
-              marginBottom: "8px"
+              marginBottom: "8px",
+              fontWeight: 800
             }}>
-              Кабинет родителя
+              Робокс Родителям
             </h1>
             <p style={{
               fontSize: "var(--font-small)",

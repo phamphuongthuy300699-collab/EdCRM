@@ -1,18 +1,32 @@
 :root {
-  --color-bg: #F7F9FC;
-  --color-surface: #FFFFFF;
-  --color-surface-soft: #EEF4FF;
+  /* Roboks Design Tokens */
+  --roboks-cyan: #8ED0DD;
+  --roboks-purple: #463E8E;
+  --roboks-pink: #DA3C8C;
+  --roboks-dark: #2B2A29;
+  
+  --roboks-bg: #F7FBFD;
+  --roboks-card: #FFFFFF;
+  --roboks-border: #E3EEF3;
+  --roboks-muted: #6B7280;
+  
+  --roboks-gradient: linear-gradient(135deg, #8ED0DD 0%, #463E8E 50%, #DA3C8C 100%);
 
-  --color-text: #111827;
-  --color-text-muted: #667085;
+  /* Remapped standard variables */
+  --color-bg: var(--roboks-bg);
+  --color-surface: var(--roboks-card);
+  --color-surface-soft: rgba(142, 208, 221, 0.12);
 
-  --color-primary: #2563EB;
-  --color-primary-dark: #1D4ED8;
-  --color-primary-soft: #DBEAFE;
+  --color-text: var(--roboks-dark);
+  --color-text-muted: var(--roboks-muted);
 
-  --color-accent: #F97316;
-  --color-accent-dark: #EA580C;
-  --color-accent-soft: #FFEDD5;
+  --color-primary: var(--roboks-purple);
+  --color-primary-dark: #2F286E;
+  --color-primary-soft: rgba(70, 62, 142, 0.08);
+
+  --color-accent: var(--roboks-pink);
+  --color-accent-dark: #C22B75;
+  --color-accent-soft: rgba(218, 60, 140, 0.08);
 
   --color-success: #16A34A;
   --color-success-soft: #DCFCE7;
@@ -24,7 +38,7 @@
   --color-danger: #DC2626;
   --color-danger-soft: #FEE2E2;
 
-  --color-border: #E5E7EB;
+  --color-border: var(--roboks-border);
 
   /* Font Sizes */
   --font-h1: 3rem;       /* 48px */
@@ -38,7 +52,7 @@
   /* Shape consistency */
   --radius-button: 12px;
   --radius-input: 12px;
-  --radius-card-site: 20px;
+  --radius-card-site: 28px;
   --radius-card-crm: 14px;
 }
 

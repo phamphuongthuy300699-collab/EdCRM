@@ -55,6 +55,7 @@ export default async function Page() {
   let initialBlocks: any[] = [];
   let initialTeachers: any[] = [];
   let initialBranches: any[] = [];
+  let initialTariffs: any[] = [];
   let orgPhone = "+7-994-777-48-48";
   let orgAddress = "ул. Артемова, д. 5а, оф. 126";
 
@@ -180,6 +181,15 @@ export default async function Page() {
           };
         });
       }
+
+      // Fetch dynamic course tariffs
+      const { data: tariffsData } = await supabase
+        .from("course_tariffs")
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("show_on_site", true)
+        .order("sort_order", { ascending: true });
+      if (tariffsData) initialTariffs = tariffsData;
     }
   } catch (e) {
     console.error("Error loading server side landing page data:", e);
@@ -253,6 +263,7 @@ export default async function Page() {
         initialTeachers={initialTeachers}
         initialBranches={initialBranches}
         orgDetails={org}
+        initialTariffs={initialTariffs}
       />
     </>
   );

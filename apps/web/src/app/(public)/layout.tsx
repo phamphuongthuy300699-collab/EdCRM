@@ -5,6 +5,7 @@ import { Button } from "@robotics-crm/ui";
 import { Phone } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import Header from "./Header";
 
 export default async function PublicLayout({
   children,
@@ -34,6 +35,11 @@ export default async function PublicLayout({
   let socials = { vk: "", telegram: "", whatsapp: "" };
   let branches: any[] = [];
 
+  let brandName = "Робокс";
+  let brandLogo = "branding/roboks-logo.svg";
+  let logoAlt = "Робокс — школа робототехники и программирования в Липецке";
+  let logoDisplay = "full";
+
   try {
     const supabase = createSupabaseAdminClient();
     const { data: org } = await supabase
@@ -55,14 +61,14 @@ export default async function PublicLayout({
       if (org.correspondent_account) corrAccount = org.correspondent_account;
 
       // Load footer settings
-      const { data: footerBlock } = await (supabase.from("site_content_blocks") as any)
+      const { data: fBlock } = await (supabase.from("site_content_blocks") as any)
         .select("*")
         .eq("organization_id", org.id)
         .eq("block_key", "site.footer")
         .maybeSingle();
 
-      if (footerBlock?.content) {
-        const c = footerBlock.content;
+      if (fBlock?.content) {
+        const c = fBlock.content;
         if (c.showLegalName !== undefined) showLegalName = c.showLegalName;
         if (c.showInn !== undefined) showInn = c.showInn;
         if (c.showBankRequisites !== undefined) showBankRequisites = c.showBankRequisites;
@@ -70,6 +76,21 @@ export default async function PublicLayout({
         if (c.showLegalAddress !== undefined) showLegalAddress = c.showLegalAddress;
         if (c.copyrightText) copyrightText = c.copyrightText;
         if (c.socials) socials = { ...socials, ...c.socials };
+      }
+
+      // Load branding settings
+      const { data: brandingBlock } = await (supabase.from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("block_key", "site.branding")
+        .maybeSingle();
+
+      if (brandingBlock?.content) {
+        const c = brandingBlock.content;
+        if (brandingBlock.title) brandName = brandingBlock.title;
+        if (c.logo) brandLogo = c.logo;
+        if (c.logoAlt) logoAlt = c.logoAlt;
+        if (c.logoDisplay) logoDisplay = c.logoDisplay;
       }
 
       // Load branches
@@ -124,80 +145,13 @@ export default async function PublicLayout({
       )}
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {/* Header */}
-      <header style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        background: "rgba(255, 255, 255, 0.8)",
-        backdropFilter: "blur(8px)",
-        borderBottom: "1px solid var(--color-border)",
-        height: "72px",
-        display: "flex",
-        alignItems: "center"
-      }}>
-        <div className="container" style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}>
-          {/* Logo */}
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-            <img 
-              src={getMediaUrl("branding/roboks-logo.svg")} 
-              alt="Робокс" 
-              style={{ height: "42px", width: "auto" }}
-            />
-            <span style={{
-              fontWeight: 800,
-              fontSize: "1.35rem",
-              fontFamily: "var(--font-geologica)",
-              color: "var(--color-text)",
-              letterSpacing: "-0.02em"
-            }}>
-              Робокс<span style={{ color: "var(--color-primary)" }}>.</span>
-            </span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "32px",
-            fontFamily: "var(--font-inter)",
-            fontWeight: 600,
-            fontSize: "var(--font-small)",
-            color: "var(--color-text-muted)"
-          }}>
-            <a href="#courses" style={{ transition: "color 0.2s" }} className="nav-link">Курсы</a>
-            <a href="#schedule" style={{ transition: "color 0.2s" }} className="nav-link">Группы</a>
-            <a href="#prices" style={{ transition: "color 0.2s" }} className="nav-link">Стоимость</a>
-            <a href="#teachers" style={{ transition: "color 0.2s" }} className="nav-link">Преподаватели</a>
-            <a href="#faq" style={{ transition: "color 0.2s" }} className="nav-link">Вопросы</a>
-            <a href="#contacts" style={{ transition: "color 0.2s" }} className="nav-link">Контакты</a>
-          </nav>
-
-          {/* Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontWeight: 600,
-              fontSize: "var(--font-small)",
-              color: "var(--color-text)",
-              transition: "color 0.2s"
-            }}>
-              <Phone size={16} style={{ color: "var(--color-primary)" }} />
-              <span>{phone}</span>
-            </a>
-            <a href="#lead-form">
-              <Button variant="primary-site" style={{ height: "42px", fontSize: "var(--font-small)" }}>
-                Записаться
-              </Button>
-            </a>
-          </div>
-        </div>
-      </header>
+      <Header
+        brandName={brandName}
+        brandLogo={brandLogo}
+        logoAlt={logoAlt}
+        logoDisplay={logoDisplay}
+        phone={phone}
+      />
 
       {/* Main Content */}
       <main style={{ flex: 1, background: "#FFFFFF" }}>
@@ -221,12 +175,12 @@ export default async function PublicLayout({
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                 <img 
-                  src={getMediaUrl("branding/roboks-logo.svg")} 
-                  alt="Робокс" 
+                  src={getMediaUrl(brandLogo)} 
+                  alt={logoAlt || brandName} 
                   style={{ height: "32px", width: "auto" }}
                 />
                 <span style={{ fontWeight: 800, fontFamily: "var(--font-geologica)", fontSize: "1.2rem" }}>
-                  Робокс
+                  {brandName}
                 </span>
               </div>
               <p style={{ color: "#9CA3AF", fontSize: "var(--font-small)", maxWidth: "250px" }}>

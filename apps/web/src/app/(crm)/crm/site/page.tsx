@@ -24,13 +24,14 @@ import {
   Upload,
   ArrowRight,
   ShieldCheck,
-  Building
+  Building,
+  Sparkles
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
 
-type TabId = "home" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
+type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
 export default function CrmSitePage() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
@@ -42,6 +43,16 @@ export default function CrmSitePage() {
 
   const supabase = createSupabaseBrowserClient();
   const demo = isDemoMode();
+
+  // Tab: Branding
+  const [brandName, setBrandName] = useState("Робокс");
+  const [brandLogo, setBrandLogo] = useState("branding/roboks-logo.svg");
+  const [brandFavicon, setBrandFavicon] = useState("branding/favicon.ico");
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState("#8ED0DD");
+  const [brandAccentColor, setBrandAccentColor] = useState("#DA3C8C");
+  const [brandGradient, setBrandGradient] = useState("linear-gradient(135deg, #8ED0DD 0%, #463E8E 50%, #DA3C8C 100%)");
+  const [brandLogoDisplay, setBrandLogoDisplay] = useState("full"); // full, compact, sign
+  const [brandLogoAlt, setBrandLogoAlt] = useState("Робокс — школа робототехники и программирования в Липецке");
 
   // Tab 1: Home/Hero & Portal Preview
   const [heroBadge, setHeroBadge] = useState("");
@@ -198,15 +209,30 @@ export default function CrmSitePage() {
 
         // Footer block
         const fBlock = blocks.find((b: any) => b.block_key === "site.footer");
-        setFooterShowLegalName(fBlock?.content?.showLegalName !== false);
-        setFooterShowInn(fBlock?.content?.showInn !== false);
-        setFooterShowBankRequisites(Boolean(fBlock?.content?.showBankRequisites));
-        setFooterShowBranchAddresses(fBlock?.content?.showBranchAddresses !== false);
-        setFooterShowLegalAddress(Boolean(fBlock?.content?.showLegalAddress));
-        setFooterCopyrightText(fBlock?.content?.copyrightText || "");
-        setFooterVk(fBlock?.content?.socials?.vk || "");
-        setFooterTelegram(fBlock?.content?.socials?.telegram || "");
-        setFooterWhatsapp(fBlock?.content?.socials?.whatsapp || "");
+        if (fBlock) {
+          setFooterShowLegalName(fBlock?.content?.showLegalName !== false);
+          setFooterShowInn(fBlock?.content?.showInn !== false);
+          setFooterShowBankRequisites(Boolean(fBlock?.content?.showBankRequisites));
+          setFooterShowBranchAddresses(fBlock?.content?.showBranchAddresses !== false);
+          setFooterShowLegalAddress(Boolean(fBlock?.content?.showLegalAddress));
+          setFooterCopyrightText(fBlock?.content?.copyrightText || "");
+          setFooterVk(fBlock?.content?.socials?.vk || "");
+          setFooterTelegram(fBlock?.content?.socials?.telegram || "");
+          setFooterWhatsapp(fBlock?.content?.socials?.whatsapp || "");
+        }
+
+        // Branding block
+        const brand = blocks.find((b: any) => b.block_key === "site.branding");
+        if (brand) {
+          setBrandName(brand.title || "Робокс");
+          setBrandLogo(brand.content?.logo || "branding/roboks-logo.svg");
+          setBrandFavicon(brand.content?.favicon || "branding/favicon.ico");
+          setBrandPrimaryColor(brand.content?.primaryColor || "#8ED0DD");
+          setBrandAccentColor(brand.content?.accentColor || "#DA3C8C");
+          setBrandGradient(brand.content?.gradient || "linear-gradient(135deg, #8ED0DD 0%, #463E8E 50%, #DA3C8C 100%)");
+          setBrandLogoDisplay(brand.content?.logoDisplay || "full");
+          setBrandLogoAlt(brand.content?.logoAlt || "Робокс — школа робототехники и программирования в Липецке");
+        }
       }
 
       // 3. Fetch Teachers (profiles + memberships)
@@ -374,6 +400,65 @@ export default function CrmSitePage() {
       setSuccessMsg("Настройки наставников сохранены!");
     } catch (e: any) {
       setErrorMsg(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Tab: Branding settings save
+  const handleSaveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccessMsg("");
+    try {
+      await saveBlock("site.branding", brandName, "Настройки брендинга", {
+        logo: brandLogo,
+        favicon: brandFavicon,
+        primaryColor: brandPrimaryColor,
+        accentColor: brandAccentColor,
+        gradient: brandGradient,
+        logoDisplay: brandLogoDisplay,
+        logoAlt: brandLogoAlt
+      });
+      setSuccessMsg("Настройки брендинга успешно сохранены!");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Не удалось сохранить настройки");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Quick upload for Logo / Favicon
+  const handleQuickUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "logo" | "favicon") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSaving(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "branding");
+
+      const res = await fetch("/api/crm/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Не удалось загрузить файл");
+      }
+
+      const data = await res.json();
+      if (target === "logo") {
+        setBrandLogo(data.path);
+      } else {
+        setBrandFavicon(data.path);
+      }
+      setSuccessMsg("Файл успешно загружен и установлен!");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Ошибка при загрузке файла");
     } finally {
       setSaving(false);
     }
@@ -641,6 +726,7 @@ export default function CrmSitePage() {
       <div className="site-tab-nav">
         {[
           { id: "home", label: "Главная страница", icon: Globe },
+          { id: "branding", label: "Брендинг", icon: Sparkles },
           { id: "teachers", label: "Преподаватели", icon: Users },
           { id: "branches", label: "Контакты & Филиалы", icon: MapPin },
           { id: "prices", label: "Цены & Тарифы", icon: DollarSign },
@@ -805,6 +891,94 @@ export default function CrmSitePage() {
               <div>
                 <Button type="submit" variant="primary-crm" disabled={saving}>
                   <Save size={16} /> Сохранить главную страницу
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB: BRANDING */}
+          {activeTab === "branding" && (
+            <form onSubmit={handleSaveBranding} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Настройки бренда Робокс</h3>
+                
+                <div className="form-group">
+                  <label className="form-label">Название бренда</label>
+                  <input type="text" className="form-input" value={brandName} onChange={e => setBrandName(e.target.value)} required />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Логотип (путь в хранилище)</label>
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <input type="text" className="form-input" value={brandLogo} onChange={e => setBrandLogo(e.target.value)} required />
+                    <div style={{ width: "80px", height: "40px", border: "1px solid var(--color-border)", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflow: "hidden" }}>
+                      <img src={getMediaUrl(brandLogo)} alt="Preview Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "6px" }}>
+                    <input type="file" id="logo-quick-uploader" accept=".svg,.png,.jpg,.jpeg" style={{ display: "none" }} onChange={(e) => handleQuickUpload(e, "logo")} />
+                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => document.getElementById("logo-quick-uploader")?.click()}>
+                      Загрузить новый логотип
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Favicon / Иконка (путь в хранилище)</label>
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <input type="text" className="form-input" value={brandFavicon} onChange={e => setBrandFavicon(e.target.value)} required />
+                    <div style={{ width: "40px", height: "40px", border: "1px solid var(--color-border)", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflow: "hidden" }}>
+                      <img src={getMediaUrl(brandFavicon)} alt="Preview Favicon" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "6px" }}>
+                    <input type="file" id="favicon-quick-uploader" accept=".ico,.png,.svg" style={{ display: "none" }} onChange={(e) => handleQuickUpload(e, "favicon")} />
+                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => document.getElementById("favicon-quick-uploader")?.click()}>
+                      Загрузить новую иконку
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">Основной цвет</label>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <input type="color" value={brandPrimaryColor} onChange={e => setBrandPrimaryColor(e.target.value)} style={{ border: "none", width: "36px", height: "36px", cursor: "pointer", padding: 0 }} />
+                      <input type="text" className="form-input" value={brandPrimaryColor} onChange={e => setBrandPrimaryColor(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Акцентный цвет</label>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <input type="color" value={brandAccentColor} onChange={e => setBrandAccentColor(e.target.value)} style={{ border: "none", width: "36px", height: "36px", cursor: "pointer", padding: 0 }} />
+                      <input type="text" className="form-input" value={brandAccentColor} onChange={e => setBrandAccentColor(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Вариант отображения</label>
+                    <select className="form-input" value={brandLogoDisplay} onChange={e => setBrandLogoDisplay(e.target.value)}>
+                      <option value="full">Полный логотип</option>
+                      <option value="compact">Компактный</option>
+                      <option value="sign">Только знак</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Градиент бренда</label>
+                  <input type="text" className="form-input" value={brandGradient} onChange={e => setBrandGradient(e.target.value)} required />
+                  <div style={{ height: "16px", borderRadius: "4px", background: brandGradient, marginTop: "8px", border: "1px solid var(--color-border)" }} />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Alt-текст логотипа</label>
+                  <input type="text" className="form-input" value={brandLogoAlt} onChange={e => setBrandLogoAlt(e.target.value)} required />
+                </div>
+              </div>
+
+              <div>
+                <Button type="submit" variant="primary-crm" disabled={saving}>
+                  <Save size={16} /> Сохранить настройки бренда
                 </Button>
               </div>
             </form>

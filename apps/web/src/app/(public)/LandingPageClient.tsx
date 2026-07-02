@@ -51,6 +51,7 @@ interface LandingPageClientProps {
   initialTeachers?: any[];
   initialBranches?: any[];
   orgDetails?: any;
+  initialTariffs?: any[];
 }
 
 export default function LandingPageClient({
@@ -61,6 +62,7 @@ export default function LandingPageClient({
   initialTeachers,
   initialBranches,
   orgDetails,
+  initialTariffs,
 }: LandingPageClientProps) {
   const router = useRouter();
   
@@ -81,6 +83,11 @@ export default function LandingPageClient({
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Schedule Filter State
+  const [filterAge, setFilterAge] = useState<string>("all");
+  const [filterCourse, setFilterCourse] = useState<string>("all");
+  const [filterBranch, setFilterBranch] = useState<string>("all");
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -309,47 +316,99 @@ export default function LandingPageClient({
       })
     : coursesList;
 
-  // Dynamic Schedule Mapping
-  const scheduleToRender = (initialSchedule && initialSchedule.length > 0)
-    ? initialSchedule.map((item: any) => {
-        let spotsText = "Осталось несколько мест";
-        let badgeClass = "badge-green";
-        const spots = item.spots ?? 0;
-        if (spots <= 0) {
-          spotsText = "Группа заполнена";
-          badgeClass = "badge-red";
-        } else if (spots === 1 || spots === 2) {
-          spotsText = `Осталось ${spots} места`;
-          badgeClass = "badge-amber";
-        } else {
-          spotsText = `Осталось ${spots} мест`;
-          badgeClass = "badge-green";
-        }
-        return {
-          age: item.age,
-          course: item.course,
-          time: item.time,
-          spotsText,
-          badgeClass,
-        };
-      })
+  // Dynamic Schedule Mapping & Filters
+  const rawSchedule = (initialSchedule && initialSchedule.length > 0)
+    ? initialSchedule
     : [
-        { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
-        { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
-        { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
-        { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
+        { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spots: 2, branch: "Артемова", teacher: "Михаил Юрьевич" },
+        { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spots: 3, branch: "Победы", teacher: "Дмитрий Яковлев" },
+        { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spots: 0, branch: "Артемова", teacher: "Михаил Юрьевич" },
+        { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spots: 4, branch: "Победы", teacher: "Михаил Юрьевич" }
       ];
+
+  const uniqueCourses = Array.from(new Set(rawSchedule.map((s: any) => s.course).filter(Boolean)));
+  const uniqueBranches = Array.from(new Set(rawSchedule.map((s: any) => s.branch).filter(Boolean)));
+
+  const scheduleToRender = rawSchedule.filter((item: any) => {
+    // Age filter
+    if (filterAge !== "all") {
+      const match = item.age.match(/(\d+)\s*[–-]\s*(\d+)/);
+      if (match) {
+        const min = parseInt(match[1]);
+        const max = parseInt(match[2]);
+        if (filterAge === "preschool" && min > 7) return false;
+        if (filterAge === "junior" && (max < 8 || min > 10)) return false;
+        if (filterAge === "senior" && max < 11) return false;
+      }
+    }
+    // Course filter
+    if (filterCourse !== "all" && item.course !== filterCourse) return false;
+    // Branch filter
+    if (filterBranch !== "all" && item.branch !== filterBranch) return false;
+
+    return true;
+  }).map((item: any) => {
+    let spotsText = "Осталось несколько мест";
+    let badgeClass = "badge-green";
+    const spots = item.spots ?? 0;
+    if (spots <= 0) {
+      spotsText = "Группа заполнена";
+      badgeClass = "badge-red";
+    } else if (spots === 1 || spots === 2) {
+      spotsText = `Мест: ${spots} (мало)`;
+      badgeClass = "badge-amber";
+    } else {
+      spotsText = `Мест: ${spots}`;
+      badgeClass = "badge-green";
+    }
+    return {
+      age: item.age,
+      course: item.course,
+      time: item.time,
+      branch: item.branch || "",
+      teacher: item.teacher || "",
+      spotsText,
+      badgeClass,
+    };
+  });
 
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
       
       {/* 1. HERO SECTION */}
       <section className="bg-grid-blueprint" style={{
-        padding: "80px 0 120px 0",
+        padding: "100px 0 130px 0",
         borderBottom: "1px solid var(--color-border)",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
+        background: "var(--roboks-bg)"
       }}>
+        {/* Soft gradient blur spots */}
+        <div style={{
+          position: "absolute",
+          top: "10%",
+          left: "5%",
+          width: "350px",
+          height: "350px",
+          borderRadius: "50%",
+          background: "var(--roboks-cyan)",
+          opacity: 0.16,
+          filter: "blur(90px)",
+          pointerEvents: "none"
+        }} />
+        <div style={{
+          position: "absolute",
+          bottom: "10%",
+          right: "5%",
+          width: "400px",
+          height: "400px",
+          borderRadius: "50%",
+          background: "var(--roboks-pink)",
+          opacity: 0.14,
+          filter: "blur(110px)",
+          pointerEvents: "none"
+        }} />
+
         <div style={{
           position: "absolute",
           top: "-150px",
@@ -357,69 +416,79 @@ export default function LandingPageClient({
           width: "500px",
           height: "500px",
           borderRadius: "50%",
-          border: "1.5px dashed rgba(37,99,235,0.06)",
+          border: "1.5px dashed rgba(70, 62, 142, 0.08)",
           pointerEvents: "none"
         }} />
 
         <div className="container" style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1.1fr",
+          gridTemplateColumns: "1.1fr 0.9fr",
           alignItems: "center",
           gap: "64px",
           position: "relative",
-          zIndex: 10
+          zIndex: 10,
+          padding: "0 20px"
         }}>
           {/* Hero Left Content */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "var(--color-primary-soft)",
-              color: "var(--color-primary-dark)",
-              padding: "6px 12px",
-              borderRadius: "20px",
-              width: "fit-content",
-              fontWeight: 800,
-              fontSize: "var(--font-xs)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em"
-            }}>
-              {heroBadge}
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              <span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>🤖 Дошкольники и школьники</span>
+              <span className="badge badge-purple" style={{ background: "rgba(70, 62, 142, 0.08)", color: "var(--roboks-purple)", fontWeight: 800 }}>📍 2 адреса в Липецке</span>
+              <span className="badge badge-green" style={{ background: "#DCFCE7", color: "#15803D", fontWeight: 800 }}>👥 Мини-группы</span>
+              <span className="badge badge-red" style={{ background: "rgba(218, 60, 140, 0.08)", color: "var(--roboks-pink)", fontWeight: 800 }}>⚡️ 100% Практика</span>
             </div>
 
             <h1 style={{
-              fontSize: "var(--font-h1)",
+              fontSize: "clamp(2.2rem, 5.5vw, 3.4rem)",
               color: "var(--color-text)",
-              lineHeight: 1.15,
+              lineHeight: 1.12,
               fontFamily: "var(--font-geologica)",
-              maxWidth: "600px"
+              maxWidth: "640px",
+              fontWeight: 900,
+              letterSpacing: "-0.03em"
             }}>
-              {heroTitle}
+              Робототехника и программирование для детей в Липецке
             </h1>
 
             <p style={{
               fontSize: "var(--font-body-lg)",
               color: "var(--color-text-muted)",
-              maxWidth: "500px",
-              lineHeight: 1.6
+              maxWidth: "540px",
+              lineHeight: 1.65,
+              fontWeight: 500
             }}>
-              {heroSubtitle}
+              Занятия для дошкольников и школьников: LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch и первые цифровые проекты.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
-              <div style={{ display: "flex", gap: "16px" }}>
-                <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                  <Button variant="primary-site" style={{ background: "var(--color-accent)", height: "52px", padding: "0 28px" }}>
-                    {heroCtaText}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+                <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+                  <Button variant="primary-site" style={{ 
+                    background: "var(--roboks-gradient)", 
+                    height: "54px", 
+                    padding: "0 32px",
+                    fontWeight: 800,
+                    border: "none",
+                    borderRadius: "14px",
+                    boxShadow: "0 10px 25px rgba(218, 60, 140, 0.15)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}>
+                    Записаться на пробное занятие
                     <ArrowRight size={18} />
                   </Button>
-                </Link>
-                <Link href="/#projects">
-                  <Button variant="secondary-site" style={{ height: "52px", padding: "0 28px" }}>
-                    {heroSecondaryCtaText}
+                </a>
+                <a href="#schedule">
+                  <Button variant="secondary-site" style={{ 
+                    height: "54px", 
+                    padding: "0 32px",
+                    fontWeight: 750,
+                    borderRadius: "14px"
+                  }}>
+                    Посмотреть расписание
                   </Button>
-                </Link>
+                </a>
               </div>
               
               {/* Bullet points under Hero CTA */}
@@ -427,14 +496,15 @@ export default function LandingPageClient({
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: "12px 24px",
-                maxWidth: "500px",
-                background: "rgba(255, 255, 255, 0.7)",
-                padding: "16px",
-                borderRadius: "12px",
+                maxWidth: "540px",
+                background: "rgba(255, 255, 255, 0.75)",
+                backdropFilter: "blur(4px)",
+                padding: "18px",
+                borderRadius: "16px",
                 border: "1px solid var(--color-border)"
               }}>
                 {heroBullets.map((bullet: string, idx: number) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: 650 }}>
                     <Check size={16} style={{ color: "var(--color-success)" }} />
                     <span>{bullet}</span>
                   </div>
@@ -1154,7 +1224,7 @@ export default function LandingPageClient({
 
       {/* 9. SCHEDULE */}
       <section id="schedule" style={{ padding: "100px 0" }}>
-        <div className="container">
+        <div className="container" style={{ padding: "0 20px" }}>
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
               Расписание учебных групп в Липецке
@@ -1164,93 +1234,176 @@ export default function LandingPageClient({
             </p>
           </div>
 
+          {/* Filters Bar */}
           <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+            marginBottom: "32px",
             background: "white",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-card-site)",
-            overflow: "hidden",
-            boxShadow: "0 12px 32px rgba(15, 23, 42, 0.03)"
+            padding: "20px 24px",
+            borderRadius: "16px",
+            border: "1px solid var(--color-border)"
           }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "var(--font-small)", borderBottom: "1px solid var(--color-border)" }}>
-              <span>Возраст</span>
-              <span>Курс</span>
-              <span>Время занятий</span>
-              <span>Наличие мест</span>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Возраст ребенка</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterAge} onChange={e => setFilterAge(e.target.value)}>
+                <option value="all">Все возрасты</option>
+                <option value="preschool">Дошкольники (5–7 лет)</option>
+                <option value="junior">Младшая школа (8–10 лет)</option>
+                <option value="senior">Средняя/старшая школа (11–15 лет)</option>
+              </select>
             </div>
-            
-            {scheduleToRender.map((sched: any, idx: number) => (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center" }}>
-                <span style={{ fontWeight: 700 }}>{sched.age}</span>
-                <span>{sched.course}</span>
-                <span>{sched.time}</span>
-                <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Направление</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
+                <option value="all">Все направления</option>
+                {uniqueCourses.map((c: any) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Адрес / Филиал</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
+                <option value="all">Все филиалы</option>
+                {uniqueBranches.map((b: any) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Schedule list container */}
+          <div style={{ display: "grid", gap: "16px" }}>
+            {scheduleToRender.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px", color: "var(--color-text-muted)", background: "white", borderRadius: "var(--radius-card-site)", border: "1px solid var(--color-border)" }}>
+                Нет подходящих групп. Попробуйте сбросить фильтры или оставьте заявку, мы подберем группу индивидуально!
               </div>
-            ))}
+            ) : (
+              scheduleToRender.map((sched: any, idx: number) => (
+                <div key={idx} className="card-site" style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "24px 32px",
+                  gap: "24px",
+                  flexWrap: "wrap",
+                  background: "white"
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "12px", color: "var(--roboks-pink)", fontWeight: 800 }}>Возраст: {sched.age}</span>
+                    <h4 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "var(--color-text)" }}>{sched.course}</h4>
+                  </div>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Расписание</span>
+                    <span style={{ fontWeight: 650, fontSize: "14px" }}>{sched.time}</span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Филиал & Преподаватель</span>
+                    <span style={{ fontSize: "13.5px", fontWeight: 600 }}>{sched.branch || "Школа Робокс"} {sched.teacher ? `• ${sched.teacher}` : ""}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "0 0 auto", flexWrap: "wrap" }}>
+                    <span className={`badge ${sched.badgeClass}`} style={{ fontWeight: 800, padding: "8px 14px", borderRadius: "20px" }}>{sched.spotsText}</span>
+                    <a href="#lead-form">
+                      <Button variant="secondary-site" style={{ height: "40px", fontSize: "12px", borderRadius: "10px", padding: "0 16px" }}>Записаться</Button>
+                    </a>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
       {/* 10. PRICES SECTION */}
       <section id="prices" style={{ padding: "100px 0", background: "var(--color-bg)" }}>
-        <div className="container">
+        <div className="container" style={{ padding: "0 20px" }}>
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
               Стоимость занятий
             </h2>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+              Выбирайте удобный формат посещения занятий в нашей школе
+            </p>
           </div>
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "32px"
           }}>
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px" }}>
-              <div>
-                <span className="badge badge-blue" style={{ marginBottom: "16px" }}>Знакомство</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Пробное занятие</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  Ознакомительное занятие 90 минут. Ребенок соберет первого робота.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {trialPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="secondary-site" style={{ width: "100%" }}>Записаться бесплатно</Button>
-              </Link>
-            </div>
+            {(() => {
+              const tariffsList = (initialTariffs && initialTariffs.length > 0)
+                ? initialTariffs
+                : [
+                    { id: "trial", title: "Пробный урок", price: 0, format: "Ознакомительное занятие 90 минут. Ребенок соберет первого робота.", is_one_time: true, audience: "Дошкольники" },
+                    { id: "monthly", title: "Месячный абонемент", price: 4000, format: "4 занятия по 90 минут. Все учебные материалы и LEGO включены.", is_one_time: false, audience: "Школьники" },
+                    { id: "indiv", title: "Индивидуальный урок", price: 1500, format: "Персональный урок с наставником. Индивидуальный разбор сложных проектов.", is_one_time: false, audience: "Индивидуально" }
+                  ];
 
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px", border: "2px solid var(--color-primary)" }}>
-              <div>
-                <span className="badge badge-green" style={{ marginBottom: "16px" }}>Популярно</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Месячный абонемент</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  4 занятия по 90 минут. Все учебные материалы и LEGO включены.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {monthlyPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="primary-site" style={{ width: "100%" }}>Купить абонемент</Button>
-              </Link>
-            </div>
+              return tariffsList.map((t: any) => {
+                const isTrial = Number(t.price) === 0 || t.title.toLowerCase().includes("пробн") || t.audience?.toLowerCase().includes("дошкол");
+                const isMonthly = t.title.toLowerCase().includes("абонемент") || t.audience?.toLowerCase().includes("школ");
+                
+                let cardStyle: React.CSSProperties = {
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "28px",
+                  position: "relative"
+                };
 
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px" }}>
-              <div>
-                <span className="badge badge-purple" style={{ marginBottom: "16px" }}>Углубленный</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Индивидуальный</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  Персональный урок с наставником. Индивидуальный разбор сложных проектов.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {individualPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="secondary-site" style={{ width: "100%" }}>Заказать разбор</Button>
-              </Link>
-            </div>
+                let badgeClass = "badge-gray";
+                let badgeText = "Разовый";
+                
+                if (isTrial) {
+                  cardStyle.border = "2.5px solid var(--roboks-cyan)";
+                  cardStyle.background = "rgba(142, 208, 221, 0.04)";
+                  badgeClass = "badge-blue";
+                  badgeText = "Знакомство";
+                } else if (isMonthly) {
+                  cardStyle.border = "2.5px solid var(--roboks-purple)";
+                  cardStyle.boxShadow = "0 16px 40px rgba(70, 62, 142, 0.08)";
+                  badgeClass = "badge-purple";
+                  badgeText = "Популярно";
+                } else {
+                  cardStyle.border = "1px solid var(--color-border)";
+                  badgeClass = "badge-gray";
+                  badgeText = "Персональный";
+                }
+
+                return (
+                  <div key={t.id} className="card-site" style={cardStyle}>
+                    <div>
+                      <span className={`badge ${badgeClass}`} style={{ marginBottom: "16px", fontWeight: 800 }}>{badgeText}</span>
+                      <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px", fontFamily: "var(--font-geologica)" }}>{t.title}</h3>
+                      <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px", lineHeight: 1.5 }}>
+                        {t.format || t.audience}
+                      </p>
+                      <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+                        {Number(t.price) === 0 ? "Бесплатно" : `${Number(t.price).toLocaleString("ru-RU")} ₽`}
+                        {!t.is_one_time && Number(t.price) > 0 && <span style={{ fontSize: "14px", fontWeight: 650, color: "var(--color-text-muted)" }}> / мес</span>}
+                      </div>
+                    </div>
+                    <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+                      <Button 
+                        variant={isMonthly ? "primary-site" : "secondary-site"} 
+                        style={{ 
+                          width: "100%", 
+                          background: isMonthly ? "var(--roboks-gradient)" : undefined,
+                          border: isMonthly ? "none" : undefined,
+                          color: isMonthly ? "white" : undefined,
+                          fontWeight: 750
+                        }}
+                      >
+                        {isTrial ? "Записаться бесплатно" : isMonthly ? "Купить абонемент" : "Записаться"}
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       </section>
@@ -1270,12 +1423,12 @@ export default function LandingPageClient({
 
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: "32px"
             }}>
               {teachersListToRender.map((teacher: any, idx: number) => {
                 const initials = teacher.name 
-                  ? teacher.name.split(" ").map((n: string) => n[0]).join("") 
+                  ? teacher.name.split(" ").filter(Boolean).map((n: string) => n[0]).join("") 
                   : "Р";
                 return (
                   <div key={idx} className="card-site" style={{ textAlign: "center" }}>
@@ -1286,7 +1439,7 @@ export default function LandingPageClient({
                       overflow: "hidden",
                       margin: "0 auto 20px auto",
                       border: "3px solid var(--color-primary-soft)",
-                      boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+                      boxShadow: "0 8px 24px rgba(70, 62, 142, 0.1)",
                       position: "relative"
                     }}>
                       {teacher.imageUrl ? (
@@ -1295,22 +1448,23 @@ export default function LandingPageClient({
                         <div style={{
                           width: "100%",
                           height: "100%",
-                          background: "var(--color-primary-soft)",
-                          color: "var(--color-primary-dark)",
+                          background: "var(--roboks-gradient)",
+                          color: "white",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontWeight: 700,
-                          fontSize: "1.8rem"
+                          fontWeight: 900,
+                          fontSize: "2rem",
+                          fontFamily: "var(--font-geologica)"
                         }}>
                           {initials}
                         </div>
                       )}
                       <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
                     </div>
-                    <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>{teacher.name}</h4>
-                    <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>{teacher.role}</p>
-                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
+                    <h4 style={{ fontSize: "1.25rem", marginBottom: "4px", fontFamily: "var(--font-geologica)", fontWeight: 800 }}>{teacher.name}</h4>
+                    <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--roboks-pink)", fontWeight: 800, marginBottom: "16px" }}>{teacher.role}</p>
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
                       «{teacher.text}»
                     </p>
                   </div>
