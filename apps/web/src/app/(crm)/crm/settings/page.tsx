@@ -15,10 +15,12 @@ import {
   EyeOff,
   KeyRound,
   Link as LinkIcon,
+  Percent,
   Plus,
   Save,
   Settings,
   ShieldCheck,
+  Tag,
   UserPlus,
   Users,
   X,
@@ -26,7 +28,7 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 
-type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "system";
+type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
 type StaffRole = "owner" | "admin" | "manager" | "teacher" | "accountant";
 
@@ -250,6 +252,12 @@ export default function CrmSettingsPage() {
   });
   const [paymentSecretsConfigured, setPaymentSecretsConfigured] = useState(false);
 
+  const [discountTypes, setDiscountTypes] = useState<any[]>([]);
+  const [discountAssignments, setDiscountAssignments] = useState<any[]>([]);
+  const [discountAssignmentDraft, setDiscountAssignmentDraft] = useState<any | null>(null);
+  const [guardians, setGuardians] = useState<any[]>([]);
+  const [discountStudents, setDiscountStudents] = useState<any[]>([]);
+
   const [branchDraft, setBranchDraft] = useState<any | null>(null);
   const [roomDraft, setRoomDraft] = useState<any | null>(null);
   const [courseDraft, setCourseDraft] = useState<any | null>(null);
@@ -407,6 +415,37 @@ export default function CrmSettingsPage() {
         setPaymentSettings(paymentRes.settings || paymentSettings);
         setPaymentSecretsConfigured(Boolean(paymentRes.passwordConfigured));
       }
+
+      // Load discount data
+      const [dtRes, daRes, guardiansRes, studentsRes] = await Promise.all([
+        (supabase.from("discount_types") as any)
+          .select("*")
+          .eq("organization_id", orgData.id)
+          .order("title"),
+        (supabase.from("discount_assignments") as any)
+          .select(`
+            *,
+            discount_type:discount_types(id, title, percent, code, kind, is_one_time),
+            approver:profiles!discount_assignments_approved_by_fkey(full_name),
+            guardian:guardians(full_name),
+            student:students(full_name)
+          `)
+          .eq("organization_id", orgData.id)
+          .order("created_at", { ascending: false }),
+        (supabase.from("guardians") as any)
+          .select("id, full_name, phone, email")
+          .eq("organization_id", orgData.id)
+          .order("full_name"),
+        (supabase.from("students") as any)
+          .select("id, full_name")
+          .eq("organization_id", orgData.id)
+          .order("full_name"),
+      ]);
+
+      setDiscountTypes(dtRes.data || []);
+      setDiscountAssignments(daRes.data || []);
+      setGuardians(guardiansRes.data || []);
+      setDiscountStudents(studentsRes.data || []);
     } catch (err: any) {
       console.error("Settings load error:", err);
       setError(err.message || "Не удалось загрузить настройки");
@@ -422,7 +461,7 @@ export default function CrmSettingsPage() {
         window.location.assign("/crm/settings/payments");
         return;
       }
-      if (requestedTab && ["organization", "branches", "courses", "groups", "staff", "payments", "system"].includes(requestedTab)) {
+      if (requestedTab && ["organization", "branches", "courses", "groups", "staff", "payments", "discounts", "system"].includes(requestedTab)) {
         setActiveTab(requestedTab);
       }
     }
@@ -831,6 +870,109 @@ export default function CrmSettingsPage() {
     }
   }
 
+  async function saveDiscountAssignment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!discountAssignmentDraft) return;
+    try {
+      setSaving(true);
+      const payload = {
+        organization_id: org.id,
+        discount_type_id: discountAssignmentDraft.discount_type_id,
+        guardian_id: discountAssignmentDraft.guardian_id || null,
+        student_id: discountAssignmentDraft.student_id || null,
+        status: "pending" as const,
+        comment: discountAssignmentDraft.comment || null,
+      };
+      if (demo) {
+        const localAssignment = {
+          ...payload,
+          id: `demo-da-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          discount_type: discountTypes.find((dt) => dt.id === payload.discount_type_id),
+          guardian: guardians.find((g) => g.id === payload.guardian_id),
+          student: discountStudents.find((s) => s.id === payload.student_id),
+          approver: null,
+          approved_at: null,
+          approved_by: null,
+        };
+        setDiscountAssignments((prev) => [localAssignment, ...prev]);
+      } else {
+        const { error: insertError } = await (supabase.from("discount_assignments") as any).insert(payload);
+        if (insertError) throw insertError;
+        await loadData();
+      }
+      setDiscountAssignmentDraft(null);
+      setNotice("Скидка назначена и ожидает подтверждения");
+    } catch (err: any) {
+      setError(err.message || "Не удалось назначить скидку");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function approveDiscountAssignment(assignment: any) {
+    try {
+      setSaving(true);
+      if (demo) {
+        setDiscountAssignments((prev) =>
+          prev.map((item) =>
+            item.id === assignment.id
+              ? { ...item, status: "approved", approved_at: new Date().toISOString(), approver: { full_name: "Администратор" } }
+              : item
+          )
+        );
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: updateError } = await (supabase.from("discount_assignments") as any)
+          .update({
+            status: "approved",
+            approved_by: user?.id || null,
+            approved_at: new Date().toISOString(),
+          })
+          .eq("id", assignment.id);
+        if (updateError) throw updateError;
+        await loadData();
+      }
+      setNotice("Скидка подтверждена");
+    } catch (err: any) {
+      setError(err.message || "Не удалось подтвердить скидку");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function rejectDiscountAssignment(assignment: any) {
+    if (!window.confirm(`Отклонить скидку "${assignment.discount_type?.title || ""}" ?`)) return;
+    try {
+      setSaving(true);
+      if (demo) {
+        setDiscountAssignments((prev) =>
+          prev.map((item) =>
+            item.id === assignment.id
+              ? { ...item, status: "rejected", approved_at: new Date().toISOString(), approver: { full_name: "Администратор" } }
+              : item
+          )
+        );
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: updateError } = await (supabase.from("discount_assignments") as any)
+          .update({
+            status: "rejected",
+            approved_by: user?.id || null,
+            approved_at: new Date().toISOString(),
+          })
+          .eq("id", assignment.id);
+        if (updateError) throw updateError;
+        await loadData();
+      }
+      setNotice("Скидка отклонена");
+    } catch (err: any) {
+      setError(err.message || "Не удалось отклонить скидку");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const tabs = [
     { id: "organization", label: "Организация", icon: Building2 },
     { id: "branches", label: "Филиалы и кабинеты", icon: DoorOpen },
@@ -838,6 +980,7 @@ export default function CrmSettingsPage() {
     { id: "groups", label: "Группы и расписание", icon: CalendarClock },
     { id: "staff", label: "Сотрудники и доступы", icon: Users },
     { id: "payments", label: "Платежи → Альфа-Банк", icon: CreditCard },
+    { id: "discounts", label: "Скидки", icon: Percent },
     { id: "system", label: "Системные параметры", icon: Settings },
   ] as const;
 
@@ -1240,6 +1383,199 @@ export default function CrmSettingsPage() {
                   </div>
                 </div>
               </form>
+            </>
+          )}
+
+
+          {activeTab === "discounts" && (
+            <>
+              <div className="settings-panel-title">
+                <div>
+                  <h2>Скидки</h2>
+                  <p>Типы скидок и назначения скидок ученикам / родителям.</p>
+                </div>
+                <Button variant="primary-crm" onClick={() => setDiscountAssignmentDraft({ discount_type_id: "", guardian_id: "", student_id: "", comment: "" })}>
+                  <Plus size={16} /> Назначить скидку
+                </Button>
+              </div>
+
+              {/* Discount Types */}
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--color-text)" }}>Доступные типы скидок</h3>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="settings-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Название</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Код</th>
+                        <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 700 }}>Процент</th>
+                        <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700 }}>Разовая</th>
+                        <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700 }}>Активна</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {discountTypes.map((dt: any) => (
+                        <tr key={dt.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                          <td style={{ padding: "10px 12px" }}>{dt.title}</td>
+                          <td style={{ padding: "10px 12px" }}><code style={{ background: "#F3F4F6", padding: "2px 6px", borderRadius: "4px", fontSize: "12px" }}>{dt.code}</code></td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "var(--color-primary)" }}>{dt.percent}%</td>
+                          <td style={{ padding: "10px 12px", textAlign: "center" }}>{dt.is_one_time ? "✓" : "—"}</td>
+                          <td style={{ padding: "10px 12px", textAlign: "center" }}>{dt.is_active ? <span className="badge badge-green">Да</span> : <span className="badge badge-gray">Нет</span>}</td>
+                        </tr>
+                      ))}
+                      {discountTypes.length === 0 && (
+                        <tr><td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "var(--color-text-muted)" }}>Типы скидок не настроены.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Discount Assignments */}
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--color-text)" }}>Назначенные скидки</h3>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="settings-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Тип</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Родитель</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Ученик</th>
+                        <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700 }}>Статус</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700 }}>Комментарий</th>
+                        <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 700 }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {discountAssignments.map((da: any) => {
+                        const dt = Array.isArray(da.discount_type) ? da.discount_type[0] : da.discount_type;
+                        const guardian = Array.isArray(da.guardian) ? da.guardian[0] : da.guardian;
+                        const student = Array.isArray(da.student) ? da.student[0] : da.student;
+                        const statusBadge: Record<string, string> = { pending: "badge-amber", approved: "badge-green", rejected: "badge-red" };
+                        const statusLabel: Record<string, string> = { pending: "Ожидает", approved: "Одобрена", rejected: "Отклонена" };
+
+                        return (
+                          <tr key={da.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                            <td style={{ padding: "10px 12px" }}>{dt?.title || "—"} <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>({dt?.percent || 0}%)</span></td>
+                            <td style={{ padding: "10px 12px" }}>{guardian?.full_name || "—"}</td>
+                            <td style={{ padding: "10px 12px" }}>{student?.full_name || "—"}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "center" }}><span className={`badge ${statusBadge[da.status] || "badge-gray"}`}>{statusLabel[da.status] || da.status}</span></td>
+                            <td style={{ padding: "10px 12px", fontSize: "12px", color: "var(--color-text-muted)", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{da.comment || ""}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                              {da.status === "pending" && (
+                                <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                                  <Button variant="primary-crm" style={{ padding: "4px 10px", fontSize: "12px" }}
+                                    onClick={async () => {
+                                      try {
+                                        setSaving(true);
+                                        const { data: userData } = await supabase.auth.getUser();
+                                        const { error: err } = await (supabase.from("discount_assignments") as any)
+                                          .update({ status: "approved", approved_by: userData.user?.id || null, approved_at: new Date().toISOString() })
+                                          .eq("id", da.id);
+                                        if (err) throw err;
+                                        setNotice("Скидка одобрена");
+                                        loadData();
+                                      } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+                                    }}
+                                  >
+                                    <CheckCircle2 size={12} /> Одобрить
+                                  </Button>
+                                  <Button variant="secondary-crm" style={{ padding: "4px 10px", fontSize: "12px", color: "#EF4444" }}
+                                    onClick={async () => {
+                                      try {
+                                        setSaving(true);
+                                        const { data: userData } = await supabase.auth.getUser();
+                                        const { error: err } = await (supabase.from("discount_assignments") as any)
+                                          .update({ status: "rejected", approved_by: userData.user?.id || null, approved_at: new Date().toISOString() })
+                                          .eq("id", da.id);
+                                        if (err) throw err;
+                                        setNotice("Скидка отклонена");
+                                        loadData();
+                                      } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+                                    }}
+                                  >
+                                    <X size={12} /> Отклонить
+                                  </Button>
+                                </div>
+                              )}
+                              {da.status !== "pending" && (
+                                <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                                  {da.approved_at ? new Date(da.approved_at).toLocaleDateString("ru-RU") : ""}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {discountAssignments.length === 0 && (
+                        <tr><td colSpan={6} style={{ textAlign: "center", padding: "20px", color: "var(--color-text-muted)" }}>Назначенных скидок пока нет.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* New Assignment Modal */}
+              {discountAssignmentDraft && (
+                <Modal title="Назначить скидку" onClose={() => setDiscountAssignmentDraft(null)}>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      setSaving(true);
+                      const { error: insertErr } = await (supabase.from("discount_assignments") as any).insert({
+                        organization_id: org.id,
+                        discount_type_id: discountAssignmentDraft.discount_type_id,
+                        guardian_id: discountAssignmentDraft.guardian_id || null,
+                        student_id: discountAssignmentDraft.student_id || null,
+                        status: "pending",
+                        comment: discountAssignmentDraft.comment || null,
+                      });
+                      if (insertErr) throw insertErr;
+                      setNotice("Скидка назначена и ожидает одобрения");
+                      setDiscountAssignmentDraft(null);
+                      loadData();
+                    } catch (err: any) { setError(err.message); } finally { setSaving(false); }
+                  }} style={{ display: "grid", gap: "16px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Тип скидки *</label>
+                      <select value={discountAssignmentDraft.discount_type_id} onChange={(e) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, discount_type_id: e.target.value })} required className="settings-input">
+                        <option value="">Выберите тип скидки</option>
+                        {discountTypes.filter((dt: any) => dt.is_active).map((dt: any) => (
+                          <option key={dt.id} value={dt.id}>{dt.title} ({dt.percent}%)</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Родитель</label>
+                      <select value={discountAssignmentDraft.guardian_id} onChange={(e) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, guardian_id: e.target.value })} className="settings-input">
+                        <option value="">Не указан</option>
+                        {guardians.map((g: any) => (
+                          <option key={g.id} value={g.id}>{g.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Ученик</label>
+                      <select value={discountAssignmentDraft.student_id} onChange={(e) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, student_id: e.target.value })} className="settings-input">
+                        <option value="">Не указан</option>
+                        {discountStudents.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Комментарий</label>
+                      <input type="text" className="settings-input" value={discountAssignmentDraft.comment} onChange={(e) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, comment: e.target.value })} placeholder="Например: документ №123 от 01.01.2026" />
+                    </div>
+                    <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                      <Button variant="secondary-crm" type="button" onClick={() => setDiscountAssignmentDraft(null)}>Отмена</Button>
+                      <Button variant="primary-crm" type="submit" disabled={saving || !discountAssignmentDraft.discount_type_id}>
+                        <Tag size={16} /> Назначить
+                      </Button>
+                    </div>
+                  </form>
+                </Modal>
+              )}
             </>
           )}
 

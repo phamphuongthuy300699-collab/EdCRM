@@ -5,8 +5,8 @@ import { getPublicLegalData } from "../legal-data";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Условия возврата | Робокс48",
-  description: "Правила обращения за возвратом оплаты за услуги школы робототехники Робокс48.",
+  title: "Условия возврата | Робокс Липецк",
+  description: "Правила обращения за возвратом оплаты за услуги школы робототехники Робокс.",
 };
 
 export default async function RefundPage() {

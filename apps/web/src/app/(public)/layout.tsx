@@ -3,6 +3,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { Button } from "@robotics-crm/ui";
 import { Phone, Menu } from "lucide-react";
+import { getMediaUrl } from "@/shared/utils/media";
 
 export default function PublicLayout({
   children,
@@ -64,29 +65,20 @@ export default function PublicLayout({
           alignItems: "center"
         }}>
           {/* Logo */}
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "8px",
-              background: "var(--color-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 800,
-              fontSize: "1.2rem",
-              fontFamily: "var(--font-geologica)"
-            }}>
-              R
-            </div>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+            <img 
+              src={getMediaUrl("branding/roboks-logo.svg")} 
+              alt="Робокс" 
+              style={{ height: "42px", width: "auto" }}
+            />
             <span style={{
               fontWeight: 800,
-              fontSize: "1.25rem",
+              fontSize: "1.35rem",
               fontFamily: "var(--font-geologica)",
-              color: "var(--color-text)"
+              color: "var(--color-text)",
+              letterSpacing: "-0.02em"
             }}>
-              Robotics<span style={{ color: "var(--color-primary)" }}>.</span>
+              Робокс<span style={{ color: "var(--color-primary)" }}>.</span>
             </span>
           </Link>
 
@@ -110,7 +102,7 @@ export default function PublicLayout({
 
           {/* Actions */}
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <a href="tel:+79991234567" style={{
+            <a href="tel:+79947774848" style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
@@ -120,7 +112,7 @@ export default function PublicLayout({
               transition: "color 0.2s"
             }}>
               <Phone size={16} style={{ color: "var(--color-primary)" }} />
-              <span>+7 (999) 123-45-67</span>
+              <span>+7 (994) 777-48-48</span>
             </a>
             <a href="#lead-form">
               <Button variant="primary-site" style={{ height: "42px", fontSize: "var(--font-small)" }}>
@@ -151,22 +143,14 @@ export default function PublicLayout({
             marginBottom: "48px"
           }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <div style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "8px",
-                  background: "var(--color-primary)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontWeight: 800
-                }}>
-                  R
-                </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+                <img 
+                  src={getMediaUrl("branding/roboks-logo.svg")} 
+                  alt="Робокс" 
+                  style={{ height: "32px", width: "auto" }}
+                />
                 <span style={{ fontWeight: 800, fontFamily: "var(--font-geologica)", fontSize: "1.2rem" }}>
-                  Robotics
+                  Робокс
                 </span>
               </div>
               <p style={{ color: "#9CA3AF", fontSize: "var(--font-small)", maxWidth: "250px" }}>
@@ -181,6 +165,7 @@ export default function PublicLayout({
                 <li><Link href="/programmirovanie-dlya-detey-lipetsk" style={{ color: "#E5E7EB" }}>Программирование</Link></li>
                 <li><Link href="/raspisanie" style={{ color: "#E5E7EB" }}>Расписание</Link></li>
                 <li><Link href="/stoimost" style={{ color: "#E5E7EB" }}>Стоимость</Link></li>
+                <li><Link href="/teachers" style={{ color: "#E5E7EB" }}>Преподаватели</Link></li>
               </ul>
             </div>
 
@@ -201,13 +186,13 @@ export default function PublicLayout({
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Контакты</h4>
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "8px" }}>
-                г. Липецк, ул. Ленина, д. 10
+                г. Липецк, ул. Артемова, д. 5а, оф. 126
               </p>
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)", marginBottom: "8px" }}>
-                +7 (999) 123-45-67
+                +7 (994) 777-48-48
               </p>
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)" }}>
-                info@robotics-lipetsk.ru
+                robokslip48@mail.ru
               </p>
             </div>
           </div>
@@ -221,7 +206,7 @@ export default function PublicLayout({
             fontSize: "var(--font-xs)",
             color: "#9CA3AF"
           }}>
-            <span>© {new Date().getFullYear()} Robotics Липецк. Все права защищены.</span>
+            <span>© {new Date().getFullYear()} Робокс Липецк. Все права защищены.</span>
             <Link href="/login" style={{ color: "#6B7280", textDecoration: "underline" }} className="hover-link-primary">
               Вход для сотрудников
             </Link>

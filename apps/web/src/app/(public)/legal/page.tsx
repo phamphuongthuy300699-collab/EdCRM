@@ -5,8 +5,8 @@ import { getPublicLegalData } from "../legal-data";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Юридическая информация | Робокс48",
-  description: "Реквизиты, адреса и юридическая информация школы робототехники Робокс48.",
+  title: "Юридическая информация | Робокс Липецк",
+  description: "Реквизиты, адреса и юридическая информация школы робототехники Робокс в Липецке.",
 };
 
 export default async function LegalPage() {
@@ -15,9 +15,8 @@ export default async function LegalPage() {
   return (
     <LegalPageShell
       title="Юридическая информация"
-      lead="Раздел с реквизитами организации, фактическим адресом, контактами и банковскими данными для проверки интернет-эквайринга."
+      lead="Раздел с реквизитами организации, фактическим адресом, контактами и банковскими данными для проведения оплат и проверок интернет-эквайринга."
     >
-      <PlaceholderNotice>{data.placeholderNotice}</PlaceholderNotice>
       <InfoGrid
         items={[
           { label: "Полное наименование", value: data.fullName },
@@ -31,11 +30,9 @@ export default async function LegalPage() {
           { label: "Банковские реквизиты", value: data.bankDetails },
         ]}
       />
-      <LegalSection title="Источник данных">
+      <LegalSection title="Юридические основания">
         <p>
-          Неизвестные реквизиты выводятся как placeholder. Значения можно заменить через блок
-          <strong> legal.requisites </strong>
-          в таблице <strong>site_content_blocks</strong> или через поля организации после их заполнения заказчиком.
+          Все платежные операции проводятся в соответствии с Правилами платежных систем и действующим законодательством Российской Федерации. Договор-оферта заключается в электронном виде и имеет полную юридическую силу.
         </p>
       </LegalSection>
     </LegalPageShell>

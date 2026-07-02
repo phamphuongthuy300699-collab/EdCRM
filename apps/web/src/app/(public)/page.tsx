@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
       .eq("slug", "robotics-lipetsk")
       .single();
 
-    let title = "Робототехника и программирование для детей в Липецке | Школа Robotics";
+    let title = "Робототехника и программирование для детей в Липецке | Робокс";
     let description = "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.";
 
     if (org) {
@@ -40,7 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
   } catch (e) {
     console.error("Error generating metadata dynamically:", e);
     return {
-      title: "Робототехника и программирование для детей в Липецке | Школа Robotics",
+      title: "Робототехника и программирование для детей в Липецке | Робокс",
       description: "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.",
       alternates: {
         canonical: "https://robotics-lipetsk.ru",
@@ -55,8 +55,8 @@ export default async function Page() {
   let initialBlocks: any[] = [];
   let initialTeachers: any[] = [];
   let initialBranches: any[] = [];
-  let orgPhone = "+7-999-123-45-67";
-  let orgAddress = "ул. Ленина, д. 10";
+  let orgPhone = "+7-994-777-48-48";
+  let orgAddress = "ул. Артемова, д. 5а, оф. 126";
 
   try {
     const supabase = createSupabaseAdminClient();
@@ -185,11 +185,11 @@ export default async function Page() {
     "@context": "https://schema.org",
     "@type": ["EducationalOrganization", "LocalBusiness"],
     "@id": "https://robotics-lipetsk.ru/#organization",
-    "name": "Школа робототехники и программирования Robotics Липецк",
+    "name": "Робокс — школа робототехники и программирования в Липецке",
     "url": "https://robotics-lipetsk.ru",
     "logo": "https://robotics-lipetsk.ru/favicon.ico",
     "image": "https://robotics-lipetsk.ru/images/classroom_lipetsk.png",
-    "description": "Школа инженерного мышления и программирования для детей 6–14 лет в Липецке. Сборка роботов, разработка игр, Scratch, Python, Arduino в мини-группах.",
+    "description": "Робокс — школа инженерного мышления и программирования для детей 6–14 лет в Липецке. Сборка роботов, разработка игр, Scratch, Python, Arduino в мини-группах.",
     "telephone": orgPhone,
     "address": {
       "@type": "PostalAddress",

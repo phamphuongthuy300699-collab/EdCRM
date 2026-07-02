@@ -10,7 +10,8 @@ import {
   XCircle, 
   CornerDownLeft, 
   Calendar,
-  History
+  History,
+  Percent
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
@@ -23,6 +24,7 @@ export default function ParentPaymentsPage() {
   
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [discounts, setDiscounts] = useState<any[]>([]);
   const supabase = createSupabaseBrowserClient();
 
   const demoInvoices = [
@@ -48,6 +50,7 @@ export default function ParentPaymentsPage() {
         if (isDemoMode()) {
           setInvoices(demoInvoices);
           setPayments(demoPayments);
+          setDiscounts([{ id: 'demo-d1', discount_type: { title: 'Многодетная семья', percent: 10, code: 'large_family', is_one_time: false }, status: 'approved' }]);
           setLoading(false);
           return;
         }
@@ -126,6 +129,25 @@ export default function ParentPaymentsPage() {
         }));
 
         setPayments(formattedPayments);
+
+        // Load active approved discounts
+        const { data: dbDiscounts } = await supabase
+          .from("discount_assignments")
+          .select(`
+            id,
+            status,
+            discount_type:discount_types (
+              title,
+              percent,
+              code,
+              kind,
+              is_one_time
+            )
+          `)
+          .eq("guardian_id", linkData.guardian_id)
+          .eq("status", "approved") as any;
+
+        setDiscounts(dbDiscounts || []);
       } catch (err) {
         console.error("Error loading parent payment info:", err);
       } finally {
@@ -237,6 +259,48 @@ export default function ParentPaymentsPage() {
         </p>
       </div>
 
+      {/* Active Discounts */}
+      <div className="card-crm" style={{ background: "white", padding: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+          <Percent size={20} style={{ color: "var(--color-primary)" }} />
+          <h3 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0 }}>
+            Ваши активные скидки
+          </h3>
+        </div>
+        {discounts.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--color-text-muted)", fontSize: "13px" }}>
+            У вас нет активных скидок
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {discounts.map((d) => (
+              <div key={d.id} style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderBottom: "1px solid var(--color-border)",
+                gap: "12px"
+              }}>
+                <span style={{ fontSize: "13px", fontWeight: 700 }}>
+                  {d.discount_type?.title}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="badge badge-green" style={{ fontSize: "12px" }}>
+                    -{d.discount_type?.percent}%
+                  </span>
+                  {d.discount_type?.is_one_time && (
+                    <span className="badge badge-gray" style={{ fontSize: "10px" }}>
+                      Разовая
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr",
@@ -297,6 +361,22 @@ export default function ParentPaymentsPage() {
                       {parseFloat(inv.amount).toLocaleString()} ₽
                     </span>
                   </div>
+
+                  {(inv.discount_percent || inv.discount_amount) && (
+                    <div style={{ marginTop: "4px" }}>
+                      <span style={{ fontSize: "12px", color: "var(--color-success)", fontWeight: 600 }}>
+                        Скидка: {inv.discount_title} (-{inv.discount_percent}%)
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                        <span style={{ fontSize: "11px", color: "var(--color-text-muted)", textDecoration: "line-through" }}>
+                          {parseFloat(inv.discount_amount ? (parseFloat(inv.amount) + parseFloat(inv.discount_amount)).toString() : inv.amount).toLocaleString()} ₽
+                        </span>
+                        <span style={{ fontSize: "12px", color: "var(--color-success)", fontWeight: 700 }}>
+                          -{parseFloat(inv.discount_amount || 0).toLocaleString()} ₽
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {inv.status !== "paid" && inv.status !== "cancelled" && (
                     <>

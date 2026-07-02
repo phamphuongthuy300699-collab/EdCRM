@@ -18,7 +18,7 @@ export function LegalPageShell({
         </Link>
         <div style={{ marginTop: "28px", display: "grid", gap: "18px" }}>
           <p style={{ color: "var(--color-primary)", fontWeight: 800, textTransform: "uppercase", fontSize: "12px", letterSpacing: "0.06em" }}>
-            Робокс48
+            Робокс
           </p>
           <h1 style={{ fontFamily: "var(--font-geologica)", fontSize: "clamp(2rem, 4vw, 3.2rem)", lineHeight: 1.08, color: "var(--color-text)" }}>
             {title}

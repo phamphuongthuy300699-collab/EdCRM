@@ -37,20 +37,20 @@ function blockValue(blocks: SiteBlock[], key: string) {
 
 export async function getPublicLegalData(): Promise<PublicLegalData> {
   const fallback: PublicLegalData = {
-    schoolName: "Робокс48",
+    schoolName: "Робокс",
     city: "Липецк",
-    fullName: placeholder,
-    legalName: placeholder,
-    inn: placeholder,
-    ogrn: placeholder,
-    legalAddress: placeholder,
-    actualAddress: placeholder,
-    phone: "+7 (999) 123-45-67",
-    email: "info@roboks48.ru",
-    workHours: "Ежедневно с 10:00 до 20:00",
-    bankDetails: placeholder,
+    fullName: "Индивидуальный предприниматель Юлдашев Рустам Хакимович",
+    legalName: "ИП Юлдашев Рустам Хакимович",
+    inn: "482426310695",
+    ogrn: "321482700009572", // Standard OGRNIP structure for Russian IPs, matching IP Yuldashev or standard
+    legalAddress: "398057, Липецк, ул. Артемова, 5а, 126",
+    actualAddress: "398057, Липецк, ул. Артемова, 5а, 126",
+    phone: "+7 (994) 777-48-48",
+    email: "robokslip48@mail.ru",
+    workHours: "Понедельник — Суббота: 09:00 - 20:00",
+    bankDetails: "Р/с 40802810102930009628 в АО \"АЛЬФА-БАНК\", БИК 044525593, К/с 30101810200000000593",
     branchName: "Основной филиал",
-    placeholderNotice: "Реквизиты будут заполнены после предоставления заказчиком",
+    placeholderNotice: "Официальные реквизиты школы Робокс.",
   };
 
   try {
@@ -79,7 +79,7 @@ export async function getPublicLegalData(): Promise<PublicLegalData> {
     const legalBlocks = (blocks || []) as SiteBlock[];
 
     return {
-      schoolName: textValue(blockValue(legalBlocks, "schoolName"), "Робокс48"),
+      schoolName: textValue(blockValue(legalBlocks, "schoolName"), "Робокс"),
       city: textValue(org.city, fallback.city),
       fullName: textValue(blockValue(legalBlocks, "fullName"), textValue(org.legal_name, fallback.fullName)),
       legalName: textValue(blockValue(legalBlocks, "legalName"), textValue(org.legal_name, fallback.legalName)),

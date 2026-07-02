@@ -745,7 +745,7 @@ export default function LandingPageClient({
                 />
               </div>
               <div style={{ padding: "24px" }}>
-                <span className="badge badge-amber" style={{ marginBottom: "12px" }}>Lego Robotics · 8-10 лет</span>
+                <span className="badge badge-amber" style={{ marginBottom: "12px" }}>Lego Education · 8-10 лет</span>
                 <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>Робот для соревнований «Сумо»</h4>
                 <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
                   Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания.
@@ -1115,7 +1115,7 @@ export default function LandingPageClient({
 
             <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Сын увлекался играми, решили направить interest в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Robotics Липецк!»
+                «Сын увлекался играми, решили направить интерес в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Робокс!»
               </p>
               <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
                 <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-accent-dark)" }}>ДП</div>

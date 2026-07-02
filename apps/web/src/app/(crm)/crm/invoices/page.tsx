@@ -12,7 +12,8 @@ import {
   XCircle, 
   Copy, 
   RefreshCw, 
-  FileText 
+  FileText,
+  Percent 
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
@@ -31,6 +32,8 @@ export default function CrmInvoicesPage() {
   const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
   const [newAmount, setNewAmount] = useState("4500");
   const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+  const [discountInfo, setDiscountInfo] = useState<{ title: string; percent: number; discount_type_id: string } | null>(null);
+  const [loadingDiscount, setLoadingDiscount] = useState(false);
 
   const [students, setStudents] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -39,6 +42,67 @@ export default function CrmInvoicesPage() {
   const [onlinePaymentError, setOnlinePaymentError] = useState("");
   const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
+
+  // Auto-detect discount for selected student
+  useEffect(() => {
+    if (!newStudentId) {
+      setDiscountInfo(null);
+      return;
+    }
+    let cancelled = false;
+    async function fetchDiscount() {
+      setLoadingDiscount(true);
+      try {
+        // 1. Get guardian for the student
+        const { data: sgRows } = await (supabase.from("student_guardians") as any)
+          .select("guardian_id")
+          .eq("student_id", newStudentId);
+        if (!sgRows || sgRows.length === 0) {
+          if (!cancelled) setDiscountInfo(null);
+          return;
+        }
+        const guardianIds = sgRows.map((r: any) => r.guardian_id);
+
+        // 2. Fetch approved active discount assignments for guardians
+        const { data: assignments } = await (supabase.from("discount_assignments") as any)
+          .select("id, percent, discount_type_id, discount_types ( title, percent )")
+          .in("guardian_id", guardianIds)
+          .eq("status", "approved")
+          .eq("is_active", true);
+
+        if (cancelled) return;
+        if (!assignments || assignments.length === 0) {
+          setDiscountInfo(null);
+          return;
+        }
+
+        // 3. Pick the best (highest percent) discount
+        let best: any = null;
+        for (const a of assignments) {
+          const pct = a.percent ?? a.discount_types?.percent ?? 0;
+          if (!best || pct > best._pct) {
+            best = { ...a, _pct: pct };
+          }
+        }
+        if (best) {
+          setDiscountInfo({
+            title: best.discount_types?.title || "Скидка",
+            percent: best._pct,
+            discount_type_id: best.discount_type_id
+          });
+        } else {
+          setDiscountInfo(null);
+        }
+      } catch (err) {
+        console.error("Error fetching discount:", err);
+        if (!cancelled) setDiscountInfo(null);
+      } finally {
+        if (!cancelled) setLoadingDiscount(false);
+      }
+    }
+    fetchDiscount();
+    return () => { cancelled = true; };
+  }, [newStudentId]);
 
   const initialInvoices = [
     { id: "i1", studentName: "Игорь Петров", parentName: "Анна Петрова", groupName: "LEGO Start 1", amount: 4500, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" },
@@ -406,7 +470,7 @@ export default function CrmInvoicesPage() {
       const parentName = primaryGuardianLink?.guardians?.full_name || "Не указан";
       const groupTitle = activeEnrollment?.groups?.title || "Без группы";
 
-      const insertData = {
+      const insertData: any = {
         organization_id: orgRes.data.id,
         student_id: newStudentId,
         guardian_id: primaryGuardianLink?.guardian_id || null,
@@ -420,8 +484,24 @@ export default function CrmInvoicesPage() {
         issued_at: new Date().toISOString()
       };
 
+      if (discountInfo) {
+        insertData.discount_amount = parseFloat(newAmount) * discountInfo.percent / 100;
+        insertData.discount_title = discountInfo.title;
+        insertData.discount_percent = discountInfo.percent;
+      }
+
       const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single();
       if (error) throw error;
+
+      // Insert discount record if applicable
+      if (discountInfo && data?.id) {
+        await (supabase.from("invoice_discounts") as any).insert({
+          invoice_id: data.id,
+          discount_type_id: discountInfo.discount_type_id,
+          percent: discountInfo.percent,
+          amount: parseFloat(newAmount) * discountInfo.percent / 100
+        });
+      }
 
       const newInvObj = {
         id: data.id,
@@ -831,6 +911,32 @@ export default function CrmInvoicesPage() {
                   />
                 </div>
               </div>
+
+              {/* Discount Info */}
+              {loadingDiscount && (
+                <div style={{ padding: "10px 14px", marginTop: "12px", borderRadius: "8px", background: "var(--color-bg-secondary, #f5f5f5)", color: "var(--color-text-muted)", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} />
+                  Проверка скидок...
+                </div>
+              )}
+              {!loadingDiscount && discountInfo && newAmount && (
+                <div style={{ padding: "12px 14px", marginTop: "12px", borderRadius: "8px", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", fontWeight: 600, fontSize: "13px", color: "var(--color-success, #16a34a)" }}>
+                    <Percent size={14} />
+                    {discountInfo.title} — {discountInfo.percent}%
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-muted)", display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <span>Сумма: {parseFloat(newAmount).toLocaleString("ru-RU")} ₽</span>
+                    <span>Скидка: −{(parseFloat(newAmount) * discountInfo.percent / 100).toLocaleString("ru-RU")} ₽</span>
+                    <span style={{ fontWeight: 600, color: "var(--color-text, inherit)" }}>Итого: {(parseFloat(newAmount) - parseFloat(newAmount) * discountInfo.percent / 100).toLocaleString("ru-RU")} ₽</span>
+                  </div>
+                </div>
+              )}
+              {!loadingDiscount && !discountInfo && newStudentId && (
+                <div style={{ padding: "8px 14px", marginTop: "12px", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                  Скидки не найдены
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 

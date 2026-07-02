@@ -5,8 +5,8 @@ import { getPublicLegalData } from "../legal-data";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Контакты | Робокс48",
-  description: "Контактная информация школы робототехники Робокс48 в Липецке.",
+  title: "Контакты | Робокс Липецк",
+  description: "Контактная информация школы робототехники Робокс в Липецке.",
 };
 
 export default async function ContactsPage() {
@@ -31,8 +31,7 @@ export default async function ContactsPage() {
       />
       <LegalSection title="Реквизиты организации">
         <p>
-          Полные юридические реквизиты ИП/ООО будут размещены после предоставления заказчиком. До замены placeholder-значений
-          информация на этой странице используется как технический шаблон для проверки структуры сайта.
+          Официальные юридические реквизиты ИП Юлдашев Рустам Хакимович для совершения платежей и заключения договоров-оферт.
         </p>
         <InfoGrid
           items={[

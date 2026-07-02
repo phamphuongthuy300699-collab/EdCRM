@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LegalPageShell, LegalSection } from "../LegalPageShell";
 
 export const metadata: Metadata = {
-  title: "Условия оплаты | Робокс48",
-  description: "Условия оплаты услуг школы робототехники Робокс48 банковской картой и другими способами.",
+  title: "Условия оплаты | Робокс Липецк",
+  description: "Условия оплаты услуг школы робототехники и программирования Робокс банковской картой.",
 };
 
 export default function PaymentPage() {
