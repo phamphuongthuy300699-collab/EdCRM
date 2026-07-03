@@ -154,54 +154,6 @@ export default function LandingPageClient({
     }
   };
 
-  // Static Fallback Data
-  const coursesList = [
-    {
-      id: "4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a",
-      slug: "/robototekhnika-dlya-detey-lipetsk",
-      title: "Робототехника (Lego Education)",
-      age: "6–9 лет",
-      desc: "Изучение механики и основ программирования роботов через конструирование.",
-      mission: "Собрать робота-уборщика, объезжающего препятствия",
-      results: ["первый рабочий механизм", "базовые алгоритмы", "защита мини-проекта"],
-      icon: Cpu,
-      price: "4 500 ₽ / мес"
-    },
-    {
-      id: "1d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/scratch-dlya-detey-lipetsk",
-      title: "Scratch и основы программирования",
-      age: "7–11 лет",
-      desc: "Создание собственных игр, мультфильмов и интерактивных проектов.",
-      mission: "Создать 2D-платформер с физикой прыжков и врагами",
-      results: ["своя игра на Scratch", "логические ветвления", "опыт геймдизайна"],
-      icon: Gamepad2,
-      price: "4 000 ₽ / мес"
-    },
-    {
-      id: "2d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/python-dlya-detey-lipetsk",
-      title: "Программирование на Python",
-      age: "10–14 лет",
-      desc: "Освоение профессионального программирования на простых и понятных задачах.",
-      mission: "Написать ИИ-помощника для Telegram",
-      results: ["синтаксис Python", "работа с API", "деплой первого чат-бота"],
-      icon: Code,
-      price: "4 800 ₽ / мес"
-    },
-    {
-      id: "3d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/arduino-dlya-detey-lipetsk",
-      title: "Arduino и схемотехника",
-      age: "10–15 лет",
-      desc: "Проектирование электронных схем, умных устройств и программирование микроконтроллеров.",
-      mission: "Спроектировать систему автополива растений с датчиком влажности",
-      results: ["сборка схем без пайки", "программирование C/C++", "работа с сенсорами"],
-      icon: Lightbulb,
-      price: "5 200 ₽ / мес"
-    }
-  ];
-
   const steps = [
     { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=200" },
     { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=200" },
@@ -235,36 +187,6 @@ export default function LandingPageClient({
   const showTeachers = teachersBlock?.content?.showBlock !== false;
   const teachersTitle = teachersBlock?.title || "Наши преподаватели";
   const teachersSubtitle = teachersBlock?.subtitle || "Практикующие наставники, которые умеют объяснять сложное детям простым языком";
-  const teacherFallbackList = [
-    {
-      name: "Загрядская Дарья",
-      role: "LEGO Education, DUPLO, WeDo 2.0, EV3, Scratch",
-      text: "Дарья ведёт занятия по робототехнике для дошкольников и школьников. Помогает детям освоить конструирование, первые алгоритмы и программирование.",
-      imageUrl: "",
-      alt: "Загрядская Дарья"
-    },
-    {
-      name: "Шамрай Алена",
-      role: "WeDo 2.0, EV3, SPIKE Prime, Scratch",
-      text: "Алена работает со школьниками старшего возраста и помогает им переходить от простого конструирования к более осознанной инженерной логике.",
-      imageUrl: "",
-      alt: "Шамрай Алена"
-    },
-    {
-      name: "Троянова Дарья",
-      role: "LEGO Education, DUPLO, WeDo 2.0, Scratch",
-      text: "Дарья ведёт занятия для дошкольников и школьников младшего возраста. Основной акцент — развитие логики, внимания и интереса к творчеству.",
-      imageUrl: "",
-      alt: "Троянова Дарья"
-    },
-    {
-      name: "Федоренко Сергей",
-      role: "Программирование, алгоритмика, цифровые проекты",
-      text: "Сергей ведёт направление программирования для детей. На занятиях ребята развивают алгоритмическое мышление и учатся создавать цифровые проекты.",
-      imageUrl: "",
-      alt: "Федоренко Сергей"
-    }
-  ];
   const teachersListToRender = initialTeachers && initialTeachers.length > 0
     ? initialTeachers.map((teacher: any) => ({
         name: teacher.name,
@@ -297,23 +219,23 @@ export default function LandingPageClient({
   const primaryBranch = initialBranches?.[0] || null;
   const contactAddress = primaryBranch?.address || "Адрес филиала уточняется в CRM";
   const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
+  const heroLocationLabel = initialBranches && initialBranches.length > 1
+    ? `${initialBranches.length} филиала в Липецке`
+    : primaryBranch?.address || "Адреса филиалов уточняются";
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
-    ? initialCourses.map(dbCourse => {
-        const localConfig = coursesList.find(c => c.id === dbCourse.id || c.title.toLowerCase().includes(dbCourse.title.toLowerCase()));
-        return {
-          id: dbCourse.id,
-          title: dbCourse.title,
-          slug: dbCourse.slug ? `/${dbCourse.slug}` : (localConfig?.slug || "/"),
-          age: dbCourse.min_age && dbCourse.max_age ? `${dbCourse.min_age}–${dbCourse.max_age} лет` : (localConfig?.age || "6-14 лет"),
-          desc: dbCourse.short_description || dbCourse.full_description || (localConfig?.desc || ""),
-          mission: localConfig?.mission || "Собрать и запрограммировать собственный проект",
-          results: localConfig?.results || ["первые навыки", "логическое мышление"],
-          icon: localConfig?.icon || Cpu,
-          price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : (localConfig?.price || "4 000 ₽ / мес")
-        };
-      })
+    ? initialCourses.map(dbCourse => ({
+        id: dbCourse.id,
+        title: dbCourse.title,
+        slug: dbCourse.slug ? `/${dbCourse.slug}` : "#lead-form",
+        age: dbCourse.min_age && dbCourse.max_age ? `${dbCourse.min_age}–${dbCourse.max_age} лет` : "Возраст уточняется",
+        desc: dbCourse.short_description || dbCourse.full_description || "Описание направления уточняется в CRM.",
+        mission: "",
+        results: [],
+        icon: Cpu,
+        price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : "Цена уточняется"
+      }))
     : [];
 
   // Dynamic Schedule Mapping & Filters
@@ -616,7 +538,7 @@ export default function LandingPageClient({
             }}>
               <Cpu size={16} style={{ color: "var(--color-primary)" }} />
               <div style={{ fontWeight: 800, fontSize: "12px", color: "var(--color-text)" }}>
-                Липецк · ул. Ленина, 10
+                {heroLocationLabel}
               </div>
             </div>
           </div>
@@ -750,36 +672,40 @@ export default function LandingPageClient({
                       </h3>
                     </Link>
                     
-                    <div style={{ 
-                      background: "var(--color-bg)", 
-                      padding: "12px", 
-                      borderRadius: "8px", 
-                      marginBottom: "16px",
-                      borderLeft: "3px solid var(--color-accent)" 
-                    }}>
-                      <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Миссия курса:</div>
-                      <div style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-text)" }}>{course.mission}</div>
-                    </div>
+                    {course.mission && (
+                      <div style={{ 
+                        background: "var(--color-bg)", 
+                        padding: "12px", 
+                        borderRadius: "8px", 
+                        marginBottom: "16px",
+                        borderLeft: "3px solid var(--color-accent)" 
+                      }}>
+                        <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Миссия курса:</div>
+                        <div style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-text)" }}>{course.mission}</div>
+                      </div>
+                    )}
 
                     <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "16px" }}>{course.desc}</p>
                     
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {course.results.map((res: string, i: number) => (
-                          <span key={i} style={{
-                            background: "rgba(37, 99, 235, 0.05)",
-                            color: "var(--color-primary-dark)",
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            fontSize: "11px",
-                            fontWeight: 600
-                          }}>
-                            ✓ {res}
-                          </span>
-                        ))}
+                    {course.results.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                          {course.results.map((res: string, i: number) => (
+                            <span key={i} style={{
+                              background: "rgba(37, 99, 235, 0.05)",
+                              color: "var(--color-primary-dark)",
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: 600
+                            }}>
+                              ✓ {res}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
                     <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--color-text)" }}>{course.price}</span>

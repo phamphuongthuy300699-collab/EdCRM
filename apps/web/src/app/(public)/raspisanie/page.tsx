@@ -122,16 +122,6 @@ export default async function RaspisaniePage() {
     console.error("Error loading schedule page from database:", e);
   }
 
-  // Fallback if DB empty or error
-  if (scheduleToRender.length === 0) {
-    scheduleToRender = [
-      { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
-      { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
-      { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
-      { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
-    ];
-  }
-
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
@@ -192,16 +182,22 @@ export default async function RaspisaniePage() {
                 <span>Наличие мест</span>
               </div>
               
-              {scheduleToRender.map((sched, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px", gap: "12px" }}>
-                  <span style={{ fontWeight: 700 }}>{sched.age}</span>
-                  <span>{sched.course}</span>
-                  <span>{sched.time}</span>
-                  <span>{sched.branch || sched.address || "Адрес уточняется"}{sched.room ? ` · ${sched.room}` : ""}</span>
-                  <span>{sched.teacher || "Наставник назначается"}</span>
-                  <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+              {scheduleToRender.length === 0 ? (
+                <div style={{ padding: "40px 32px", textAlign: "center", color: "var(--color-text-muted)", borderTop: "1px solid var(--color-border)" }}>
+                  Расписание пока не заполнено в CRM.
                 </div>
-              ))}
+              ) : (
+                scheduleToRender.map((sched, idx) => (
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px", gap: "12px" }}>
+                    <span style={{ fontWeight: 700 }}>{sched.age}</span>
+                    <span>{sched.course}</span>
+                    <span>{sched.time}</span>
+                    <span>{sched.branch || sched.address || "Адрес уточняется"}{sched.room ? ` · ${sched.room}` : ""}</span>
+                    <span>{sched.teacher || "Наставник назначается"}</span>
+                    <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
