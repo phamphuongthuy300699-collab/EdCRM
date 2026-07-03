@@ -16,7 +16,7 @@ export const staffPayloadSchema = z.object({
   specialty: z.string().max(160).optional().nullable(),
   publicBio: z.string().max(1200).optional().nullable(),
   internalComment: z.string().max(1200).optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable().or(z.literal("")),
+  avatarUrl: z.string().optional().nullable().or(z.literal("")),
   showOnSite: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });

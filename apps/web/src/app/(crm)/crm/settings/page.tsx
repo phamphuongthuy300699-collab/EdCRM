@@ -271,6 +271,7 @@ export default function CrmSettingsPage() {
   const [groupDraft, setGroupDraft] = useState<any | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<any[]>([]);
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
+  const [staffError, setStaffError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
 
   const supabase = createSupabaseBrowserClient();
@@ -762,6 +763,7 @@ export default function CrmSettingsPage() {
     if (!staffDraft) return;
     try {
       setSaving(true);
+      setStaffError("");
       setTemporaryPassword("");
       const endpoint = staffDraft.userId ? "/api/crm/staff/update" : "/api/crm/staff/create";
       const response = await fetch(endpoint, {
@@ -797,7 +799,7 @@ export default function CrmSettingsPage() {
       setStaffDraft(null);
       setNotice("Сотрудник сохранен");
     } catch (err: any) {
-      setError(err.message || "Не удалось сохранить сотрудника");
+      setStaffError(err.message || "Не удалось сохранить сотрудника");
     } finally {
       setSaving(false);
     }
@@ -1750,8 +1752,13 @@ export default function CrmSettingsPage() {
       )}
 
       {staffDraft && (
-        <Modal title={staffDraft.userId ? "Редактировать сотрудника" : "Новый сотрудник"} onClose={() => setStaffDraft(null)} width={820}>
+        <Modal title={staffDraft.userId ? "Редактировать сотрудника" : "Новый сотрудник"} onClose={() => { setStaffDraft(null); setStaffError(""); }} width={820}>
           <form onSubmit={saveStaff} className="settings-card-list">
+            {staffError && (
+              <div className="settings-alert error" style={{ margin: "0 0 16px 0" }}>
+                ✕ {staffError}
+              </div>
+            )}
             <div className="settings-grid-2">
               <Field label="ФИО"><TextInput required value={staffDraft.fullName} onChange={(e) => setStaffDraft({ ...staffDraft, fullName: e.target.value })} /></Field>
               <Field label="Email / логин"><TextInput type="email" required value={staffDraft.email} onChange={(e) => setStaffDraft({ ...staffDraft, email: e.target.value })} /></Field>
@@ -1772,7 +1779,7 @@ export default function CrmSettingsPage() {
             <Field label="Публичное описание"><TextArea value={staffDraft.publicBio} onChange={(e) => setStaffDraft({ ...staffDraft, publicBio: e.target.value })} /></Field>
             <Field label="Внутренний комментарий"><TextArea value={staffDraft.internalComment} onChange={(e) => setStaffDraft({ ...staffDraft, internalComment: e.target.value })} /></Field>
             <Toggle checked={staffDraft.showOnSite} onChange={(checked) => setStaffDraft({ ...staffDraft, showOnSite: checked })} label="Показывать на сайте" />
-            <div className="settings-form-actions"><Button type="submit" variant="primary-crm" disabled={saving}>Сохранить сотрудника</Button></div>
+            <div className="settings-form-actions"><Button type="submit" variant="primary-crm" disabled={saving}>{saving ? "Сохранение..." : "Сохранить сотрудника"}</Button></div>
           </form>
         </Modal>
       )}

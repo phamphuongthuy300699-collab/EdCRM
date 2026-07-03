@@ -2,6 +2,7 @@ import React from "react";
 import { Metadata } from "next";
 import LandingPageClient from "./LandingPageClient";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { getMediaUrl } from "@/shared/utils/media";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -123,7 +124,7 @@ export default async function Page() {
             name: profile.full_name,
             role: profile.specialty || "Наставник инженерной лаборатории",
             text: profile.public_bio,
-            imageUrl: profile.avatar_url,
+            imageUrl: profile.avatar_url ? getMediaUrl(profile.avatar_url) : "",
             alt: profile.full_name,
           }));
       }

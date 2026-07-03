@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { InfoGrid, LegalPageShell, LegalSection, PlaceholderNotice } from "../LegalPageShell";
 import { getPublicLegalData } from "../legal-data";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import { getMediaUrl } from "@/shared/utils/media";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,6 +15,31 @@ export const metadata: Metadata = {
 
 export default async function ContactsPage() {
   const data = await getPublicLegalData();
+
+  let contactImages: string[] = [];
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", "robotics-lipetsk")
+      .single();
+
+    if (org) {
+      const { data: block } = await (supabase.from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("block_key", "contacts.media")
+        .eq("status", "published")
+        .maybeSingle();
+
+      if (block?.content?.images) {
+        contactImages = Array.isArray(block.content.images) ? block.content.images : [];
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load contacts media block", err);
+  }
 
   return (
     <LegalPageShell
@@ -68,6 +95,32 @@ export default async function ContactsPage() {
           )}
         </div>
       </LegalSection>
+
+      {/* Classroom/Contacts Images Section */}
+      {contactImages.length > 0 && (
+        <LegalSection title="Фотографии наших классов">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", marginTop: "16px" }}>
+            {contactImages.map((path, idx) => (
+              <div
+                key={idx}
+                style={{
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  border: "1px solid var(--color-border)",
+                  height: "200px",
+                  position: "relative"
+                }}
+              >
+                <img
+                  src={getMediaUrl(path)}
+                  alt={`Фото класса ${idx + 1}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+            ))}
+          </div>
+        </LegalSection>
+      )}
 
       <LegalSection title="Юридические реквизиты">
         <p style={{ margin: "0 0 16px 0" }}>

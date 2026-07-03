@@ -37,6 +37,7 @@ export default async function PublicLayout({
   let copyrightText = "© {year} Робокс Липецк. Все права защищены.";
   let socials = { vk: "", telegram: "", whatsapp: "" };
   let branches: any[] = [];
+  let mapImage = "";
 
   let brandName = "Робокс";
   let brandLogo = "branding/roboks-logo.svg";
@@ -79,6 +80,7 @@ export default async function PublicLayout({
         if (c.showLegalAddress !== undefined) showLegalAddress = c.showLegalAddress;
         if (c.copyrightText) copyrightText = c.copyrightText;
         if (c.socials) socials = { ...socials, ...c.socials };
+        if (c.mapImage) mapImage = c.mapImage;
       }
 
       // Load branding settings
@@ -275,6 +277,11 @@ export default async function PublicLayout({
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)" }}>
                 {email}
               </p>
+              {mapImage && (
+                <div style={{ marginTop: "16px", borderRadius: "8px", overflow: "hidden", border: "1px solid #374151", maxWidth: "300px" }}>
+                  <img src={getMediaUrl(mapImage)} alt="Схема проезда" style={{ width: "100%", height: "auto", display: "block" }} />
+                </div>
+              )}
             </div>
           </div>
 

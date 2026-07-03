@@ -629,16 +629,83 @@ export default function CrmSitePage() {
     e.preventDefault();
     setSaving(true);
     setSuccessMsg("");
+    setErrorMsg("");
     try {
-      await saveBlock(selectedDocKey, docTitle, docSubtitle, {
-        meta_title: docMetaTitle,
-        meta_description: docMetaDesc,
-        body: docBody,
-        show_in_footer: docShowInFooter
-      });
+      const { data: existing } = await (supabase.from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("block_key", selectedDocKey)
+        .maybeSingle();
+
+      const mergedContent = {
+        ...(existing?.content || {})
+      };
+
+      const finalTitle = docTitle || existing?.title || "";
+      const finalSubtitle = docSubtitle || existing?.subtitle || "";
+      const finalBody = docBody || existing?.content?.body || "";
+      const finalMetaTitle = docMetaTitle || existing?.content?.meta_title || "";
+      const finalMetaDesc = docMetaDesc || existing?.content?.meta_description || "";
+
+      mergedContent.body = finalBody;
+      mergedContent.meta_title = finalMetaTitle;
+      mergedContent.meta_description = finalMetaDesc;
+      mergedContent.show_in_footer = docShowInFooter;
+
+      await saveBlock(selectedDocKey, finalTitle, finalSubtitle, mergedContent);
       setSuccessMsg("Юридический документ сохранен!");
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAssignFileToBlock = async (blockKey: string, fieldName: string, isArray: boolean) => {
+    if (!selectedFile) return;
+    try {
+      setSaving(true);
+      setSuccessMsg("");
+      setErrorMsg("");
+
+      const { data: existing, error: fetchErr } = await (supabase.from("site_content_blocks") as any)
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("block_key", blockKey)
+        .maybeSingle();
+
+      if (fetchErr) throw fetchErr;
+
+      let title = existing?.title;
+      let subtitle = existing?.subtitle;
+
+      if (!title) {
+        if (blockKey === "home.media") { title = "Медиа главной"; subtitle = "Изображения первого экрана"; }
+        else if (blockKey === "home.facilities") { title = "Фото помещений"; subtitle = "Наши учебные классы"; }
+        else if (blockKey === "home.student_projects") { title = "Проекты учеников"; subtitle = "Инженерные разработки"; }
+        else if (blockKey === "home.lesson_process") { title = "Как проходят занятия"; subtitle = "Этапы уроков"; }
+        else if (blockKey === "home.equipment") { title = "Классы и оборудование"; subtitle = "Материалы и стенды"; }
+        else if (blockKey === "contacts.media") { title = "Медиа контактов"; subtitle = "Фотографии контактов"; }
+        else if (blockKey === "site.footer") { title = "Футер сайта"; subtitle = "Параметры отображения нижней части страниц"; }
+        else { title = blockKey; subtitle = ""; }
+      }
+
+      const mergedContent = { ...(existing?.content || {}) };
+
+      if (isArray) {
+        const currentImages = Array.isArray(mergedContent[fieldName]) ? mergedContent[fieldName] : [];
+        if (!currentImages.includes(selectedFile.path)) {
+          mergedContent[fieldName] = [...currentImages, selectedFile.path];
+        }
+      } else {
+        mergedContent[fieldName] = selectedFile.path;
+      }
+
+      await saveBlock(blockKey, title, subtitle, mergedContent);
+      setSuccessMsg(`Изображение добавлено/установлено в раздел "${title}"!`);
+      await loadData();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Не удалось применить файл");
     } finally {
       setSaving(false);
     }
@@ -1472,11 +1539,11 @@ export default function CrmSitePage() {
             <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "24px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[
-                  { key: "legal.page.legal", label: "Юр. информация" },
+                  { key: "legal.page.legal", label: "Реквизиты" },
                   { key: "legal.page.privacy", label: "Персональные данные" },
-                  { key: "legal.page.offer", label: "Публичная оферта" },
-                  { key: "legal.page.payment", label: "Условия оплаты" },
-                  { key: "legal.page.refund", label: "Условия возврата" }
+                  { key: "legal.page.offer", label: "Оферта" },
+                  { key: "legal.page.payment", label: "Оплата" },
+                  { key: "legal.page.refund", label: "Возврат" }
                 ].map(doc => (
                   <button
                     key={doc.key}
@@ -1537,9 +1604,19 @@ export default function CrmSitePage() {
                   <label htmlFor="docShowInFooter" style={{ fontSize: "12px", fontWeight: 700 }}>Показывать ссылку на страницу в футере</label>
                 </div>
 
-                <div>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                   <Button type="submit" variant="primary-crm" disabled={saving}>
                     <Save size={16} /> Сохранить документ
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary-crm"
+                    onClick={() => {
+                      const slug = selectedDocKey.split(".").pop();
+                      window.open(`/${slug}`, "_blank");
+                    }}
+                  >
+                    Открыть на сайте
                   </Button>
                 </div>
               </form>
@@ -1794,71 +1871,110 @@ export default function CrmSitePage() {
                           </>
                         )}
 
-                        {activeMediaFolder === "teachers" && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "#f3f4f6", padding: "8px", borderRadius: "6px" }}>
-                            <label style={{ fontSize: "10px", fontWeight: 700 }}>Привязать к учителю:</label>
-                            <select
-                              value={selectedTeacherId}
-                              onChange={(e) => setSelectedTeacherId(e.target.value)}
-                              className="form-input"
-                              style={{ height: "30px", fontSize: "11px", padding: "0 6px" }}
-                            >
-                              <option value="">-- Выберите учителя --</option>
-                              {staff.filter((s: any) => s.role === "teacher" || s.role === "owner" || s.role === "admin").map((s: any) => (
-                                <option key={s.user_id} value={s.user_id}>{s.full_name || s.email}</option>
-                              ))}
-                            </select>
-                            <Button
-                              type="button"
-                              variant="primary-crm"
-                              disabled={!selectedTeacherId}
-                              onClick={async () => {
-                                if (!selectedTeacherId) return;
-                                const { error } = await (supabase
-                                  .from("profiles") as any)
-                                  .update({ avatar_url: selectedFile.path })
-                                  .eq("id", selectedTeacherId);
-                                if (error) {
-                                  alert(error.message);
-                                } else {
-                                  setSuccessMsg(`Фото установлено преподавателю!`);
-                                  await loadData();
-                                }
-                              }}
-                              style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)" }}
-                            >
-                              Поставить фото преподавателю
-                            </Button>
-                          </div>
-                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "12px", marginTop: "12px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text)" }}>Применить файл к блокам:</span>
+                          
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("home.media", "heroImage", false)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-accent)", color: "white" }}
+                          >
+                            Использовать в Hero
+                          </Button>
 
-                        {/* General integration actions */}
-                        <Button
-                          type="button"
-                          variant="primary-crm"
-                          onClick={async () => {
-                            await saveBlock("home.media", "Медиа главной", "Изображение первого экрана", {
-                              image: selectedFile.path
-                            });
-                            setSuccessMsg("Изображение установлено для первого экрана (Hero)!");
-                          }}
-                          style={{ width: "100%", fontSize: "11px", height: "32px", background: "var(--color-accent)", color: "white" }}
-                        >
-                          Использовать в Hero
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="primary-crm"
-                          onClick={async () => {
-                            await saveBlock("contacts.media", "Медиа контактов", "Изображение для контактов/класса", {
-                              image: selectedFile.path
-                            });
-                            setSuccessMsg("Изображение установлено для раздела Фото классов!");
-                          }}
-                          style={{ width: "100%", fontSize: "11px", height: "32px", background: "var(--color-accent)", color: "white" }}
-                        >
-                          Использовать в контактах
-                        </Button>
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("home.facilities", "images", true)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)", color: "white" }}
+                          >
+                            Добавить в “Фото помещений”
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("home.student_projects", "images", true)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)", color: "white" }}
+                          >
+                            Добавить в “Проекты учеников”
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("home.lesson_process", "images", true)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)", color: "white" }}
+                          >
+                            Добавить в “Как проходят занятия”
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("home.equipment", "images", true)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)", color: "white" }}
+                          >
+                            Добавить в “Классы и оборудование”
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("contacts.media", "images", true)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)", color: "white" }}
+                          >
+                            Добавить в “Фото контактов”
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="primary-crm"
+                            onClick={() => handleAssignFileToBlock("site.footer", "mapImage", false)}
+                            style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-accent)", color: "white" }}
+                          >
+                            Использовать как карту в футере
+                          </Button>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "#f3f4f6", padding: "8px", borderRadius: "6px", marginTop: "4px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: 700 }}>Поставить фото преподавателю:</label>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <select
+                                value={selectedTeacherId}
+                                onChange={(e) => setSelectedTeacherId(e.target.value)}
+                                className="form-input"
+                                style={{ height: "30px", fontSize: "11px", padding: "0 6px", flex: 1 }}
+                              >
+                                <option value="">-- Выберите учителя --</option>
+                                {staff.filter((s: any) => s.role === "teacher" || s.role === "owner" || s.role === "admin").map((s: any) => (
+                                  <option key={s.user_id} value={s.user_id}>{s.full_name || s.email}</option>
+                                ))}
+                              </select>
+                              <Button
+                                type="button"
+                                variant="primary-crm"
+                                disabled={!selectedTeacherId}
+                                onClick={async () => {
+                                  if (!selectedTeacherId) return;
+                                  const { error } = await (supabase
+                                    .from("profiles") as any)
+                                    .update({ avatar_url: selectedFile.path })
+                                    .eq("id", selectedTeacherId);
+                                  if (error) {
+                                    alert(error.message);
+                                  } else {
+                                    setSuccessMsg(`Фото установлено преподавателю!`);
+                                    await loadData();
+                                  }
+                                }}
+                                style={{ fontSize: "11px", height: "30px", background: "var(--color-primary)", padding: "0 10px" }}
+                              >
+                                ОК
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </>
                   ) : (

@@ -225,10 +225,79 @@ export default function LandingPageClient({
     : primaryBranch?.address || "Адреса филиалов уточняются";
 
   const homeMediaBlock = getBlock('home.media');
-  const customHeroImage = homeMediaBlock?.content?.image || "";
+  const customHeroImage = homeMediaBlock?.content?.heroImage || "";
+
+  const facilitiesBlock = getBlock('home.facilities');
+  const facilitiesImages = facilitiesBlock?.content?.images || [];
+
+  const studentProjectsBlock = getBlock('home.student_projects');
+  const studentProjectsImages = studentProjectsBlock?.content?.images || [];
+
+  const lessonProcessBlock = getBlock('home.lesson_process');
+  const lessonProcessImages = lessonProcessBlock?.content?.images || [];
+
+  const equipmentBlock = getBlock('home.equipment');
+  const equipmentImages = equipmentBlock?.content?.images || [];
 
   const contactsMediaBlock = getBlock('contacts.media');
-  const customClassroomImage = contactsMediaBlock?.content?.image || "";
+  const contactsImages = contactsMediaBlock?.content?.images || [];
+  const customClassroomImage = contactsImages[0] || contactsMediaBlock?.content?.image || "";
+
+  const stepsToRender = steps.map((step, idx) => {
+    const customImg = lessonProcessImages[idx];
+    return {
+      ...step,
+      img: customImg ? getMediaUrl(customImg) : step.img
+    };
+  });
+
+  const defaultProjects = [
+    {
+      img: "/images/robot_sumo.png",
+      tag: "Lego Education · 8-10 лет",
+      tagColor: "badge-amber",
+      title: "Робот для соревнований «Сумо»",
+      desc: "Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания."
+    },
+    {
+      img: "/images/arduino_greenhouse.png",
+      tag: "Arduino & C++ · 11-14 лет",
+      tagColor: "badge-purple",
+      title: "Автоматическая микро-теплица",
+      desc: "Проект Ивана (12 лет). Конструкция автоматически включает светодиодное освещение при затенении и поливает почву при срабатывании датчика влажности."
+    }
+  ];
+
+  const projectsToRender = studentProjectsImages.length > 0
+    ? studentProjectsImages.map((img: string, idx: number) => {
+        const defaultProj = defaultProjects[idx] || {
+          tag: "Инженерный проект",
+          tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
+          title: `Роботехническая разработка ${idx + 1}`,
+          desc: "Ребенок собрал и запрограммировал действующий механизм, решающий конкретную задачу."
+        };
+        return {
+          img: getMediaUrl(img),
+          tag: defaultProj.tag,
+          tagColor: defaultProj.tagColor,
+          title: defaultProj.title,
+          desc: defaultProj.desc
+        };
+      })
+    : defaultProjects;
+
+  const resolvedClassroomMainImage = facilitiesImages[0] 
+    ? getMediaUrl(facilitiesImages[0]) 
+    : "/images/classroom_lipetsk.png";
+
+  const resolvedEquipmentTopImage = equipmentImages[0]
+    ? getMediaUrl(equipmentImages[0])
+    : "https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=80&w=400";
+
+  const resolvedEquipmentBottomImage = equipmentImages[1]
+    ? getMediaUrl(equipmentImages[1])
+    : "https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&q=80&w=400";
+
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -749,40 +818,25 @@ export default function LandingPageClient({
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-            <div className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ height: "240px", position: "relative" }}>
-                <img 
-                  src="/images/robot_sumo.png" 
-                  alt="Робот-сумоист на базе LEGO" 
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "32px" }}>
+            {projectsToRender.map((proj: any, idx: number) => (
+              <div key={idx} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ height: "240px", position: "relative" }}>
+                  <img 
+                    src={proj.img} 
+                    alt={proj.title} 
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </div>
+                <div style={{ padding: "24px" }}>
+                  <span className={`badge ${proj.tagColor}`} style={{ marginBottom: "12px" }}>{proj.tag}</span>
+                  <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>{proj.title}</h4>
+                  <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                    {proj.desc}
+                  </p>
+                </div>
               </div>
-              <div style={{ padding: "24px" }}>
-                <span className="badge badge-amber" style={{ marginBottom: "12px" }}>Lego Education · 8-10 лет</span>
-                <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>Робот для соревнований «Сумо»</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-                  Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания.
-                </p>
-              </div>
-            </div>
-
-            <div className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ height: "240px", position: "relative" }}>
-                <img 
-                  src="/images/arduino_greenhouse.png" 
-                  alt="Умная теплица на Arduino" 
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-              <div style={{ padding: "24px" }}>
-                <span className="badge badge-purple" style={{ marginBottom: "12px" }}>Arduino & C++ · 11-14 лет</span>
-                <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>Автоматическая микро-теплица</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-                  Проект Ивана (12 лет). Конструкция автоматически включает светодиодное освещение при затенении и поливает почву при срабатывании датчика влажности.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -816,7 +870,7 @@ export default function LandingPageClient({
               pointerEvents: "none"
             }} />
 
-            {steps.map((step, idx) => (
+            {stepsToRender.map((step, idx) => (
               <div key={idx} style={{
                 position: "relative",
                 display: "flex",
@@ -885,14 +939,14 @@ export default function LandingPageClient({
           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "24px" }}>
             <div style={{ height: "400px", position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid var(--color-border)" }}>
               <img 
-                src="/images/classroom_lipetsk.png" 
+                src={resolvedClassroomMainImage} 
                 alt="Кабинет робототехники Липецк" 
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
             <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: "24px" }}>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=80&w=400') center/cover no-repeat",
+                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentTopImage}') center/cover no-repeat`,
                 borderRadius: "20px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -901,7 +955,7 @@ export default function LandingPageClient({
                 <span style={{ position: "absolute", bottom: "16px", left: "20px", fontSize: "12px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>Оригинальное оборудование LEGO</span>
               </div>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&q=80&w=400') center/cover no-repeat",
+                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentBottomImage}') center/cover no-repeat`,
                 borderRadius: "20px",
                 border: "1px solid var(--color-border)",
                 position: "relative",

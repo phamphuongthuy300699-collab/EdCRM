@@ -22,13 +22,19 @@ export async function POST(request: Request) {
     const organizationId = await resolveOrganizationId(input.organizationId || access.organizationId);
     const admin = createSupabaseAdminClient();
 
-    const { error: authError } = await admin.auth.admin.updateUserById(input.userId, {
-      email: input.email,
-      user_metadata: {
-        full_name: input.fullName,
-      },
-    });
-    if (authError) throw authError;
+    try {
+      const { error: authError } = await admin.auth.admin.updateUserById(input.userId, {
+        email: input.email,
+        user_metadata: {
+          full_name: input.fullName,
+        },
+      });
+      if (authError) {
+        console.warn("Auth user update warning (non-fatal):", authError);
+      }
+    } catch (e) {
+      console.warn("Auth user update exception (non-fatal):", e);
+    }
 
     const { error: profileError } = await (admin.from("profiles") as any).upsert({
       id: input.userId,

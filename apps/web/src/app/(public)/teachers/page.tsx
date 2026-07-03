@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { Users, ArrowRight, BookOpen, Star } from "lucide-react";
+import { getMediaUrl } from "@/shared/utils/media";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -195,7 +196,7 @@ export default async function TeachersPage() {
                   >
                     {teacher.avatar_url ? (
                       <img
-                        src={teacher.avatar_url}
+                        src={getMediaUrl(teacher.avatar_url)}
                         alt={teacher.full_name}
                         style={{
                           width: "100%",

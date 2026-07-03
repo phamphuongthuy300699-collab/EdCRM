@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { ArrowLeft, Award, BookOpen, Users } from "lucide-react";
+import { getMediaUrl } from "@/shared/utils/media";
 
 export const revalidate = 300;
 
@@ -191,7 +192,7 @@ export default async function TeacherDetailPage({
           >
             {teacher.avatar_url ? (
               <img
-                src={teacher.avatar_url}
+                src={getMediaUrl(teacher.avatar_url)}
                 alt={teacher.full_name}
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
