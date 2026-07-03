@@ -4,7 +4,7 @@ import Script from "next/script";
 import { Button } from "@robotics-crm/ui";
 import { Phone } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
-import { buildYandexMapEmbedUrl } from "@/shared/utils/public-map";
+import { buildYandexMapEmbedUrl, publicFooterMapBranches, publicMapBranches } from "@/shared/utils/public-map";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import Header from "./Header";
 
@@ -101,10 +101,9 @@ export default async function PublicLayout({
 
       // Load branches
       const { data: branchesData } = await (supabase.from("branches") as any)
-        .select("name, address")
+        .select("name, address, is_active, show_on_site")
         .eq("organization_id", org.id)
         .eq("is_active", true)
-        .eq("show_on_site", true)
         .order("sort_order", { ascending: true });
       if (branchesData) {
         branches = branchesData;
@@ -137,7 +136,9 @@ export default async function PublicLayout({
   ` : "";
 
   const resolvedCopyright = copyrightText.replace("{year}", new Date().getFullYear().toString());
-  const mapEmbedUrl = buildYandexMapEmbedUrl(branches);
+  const footerBranches = publicMapBranches(branches);
+  const mapBranches = publicFooterMapBranches(branches, legalAddress, fullLegalName);
+  const mapEmbedUrl = buildYandexMapEmbedUrl(mapBranches);
 
   return (
     <>
@@ -248,10 +249,10 @@ export default async function PublicLayout({
                 </p>
               )}
               
-              {showBranchAddresses && branches.length > 0 && (
+              {showBranchAddresses && footerBranches.length > 0 && (
                 <div style={{ marginBottom: "12px" }}>
                   <span style={{ fontSize: "var(--font-xs)", color: "#9CA3AF", display: "block", marginBottom: "4px", textTransform: "uppercase" }}>Филиалы:</span>
-                  {branches.map((b, idx) => (
+                  {footerBranches.map((b, idx) => (
                     <p key={idx} style={{ color: "#E5E7EB", fontSize: "var(--font-small)", margin: "0 0 4px 0" }}>
                       {b.address}
                     </p>

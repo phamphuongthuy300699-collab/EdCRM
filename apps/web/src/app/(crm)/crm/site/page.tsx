@@ -30,6 +30,7 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
+import { buildSiteImageItem, readableMediaTitle } from "@/shared/utils/site-media";
 
 type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -89,16 +90,6 @@ function toImageItem(value: any, index: number) {
     title: typeof value === "object" && value?.title ? value.title : mediaTitleFromPath(path),
     alt: typeof value === "object" && value?.alt ? value.alt : mediaTitleFromPath(path),
     sortOrder: typeof value === "object" && Number.isFinite(Number(value?.sortOrder)) ? Number(value.sortOrder) : (index + 1) * 10,
-  };
-}
-
-function imageItemFromFile(file: any, sortOrder: number) {
-  const title = mediaTitleFromPath(file.path);
-  return {
-    path: file.path,
-    title,
-    alt: title,
-    sortOrder,
   };
 }
 
@@ -185,7 +176,17 @@ export default function CrmSitePage() {
   const [docShowInFooter, setDocShowInFooter] = useState(true);
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any | null>(null);
+  const [selectedFileTitle, setSelectedFileTitle] = useState("");
+  const [selectedFileAlt, setSelectedFileAlt] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
+
+  const handleSelectMediaFile = (file: any | null) => {
+    setSelectedFile(file);
+    const path = mediaPath(file);
+    const fallbackTitle = path ? readableMediaTitle(path) : "";
+    setSelectedFileTitle(file?.title || fallbackTitle);
+    setSelectedFileAlt(file?.alt || file?.title || fallbackTitle);
+  };
 
   // Tab 7: Footer
   const [footerShowLegalName, setFooterShowLegalName] = useState(true);
@@ -387,7 +388,7 @@ export default function CrmSitePage() {
 
   useEffect(() => {
     if (activeTab === "media") {
-      setSelectedFile(null);
+      handleSelectMediaFile(null);
       loadMediaFiles();
     }
   }, [activeTab, activeMediaFolder]);
@@ -766,9 +767,19 @@ export default function CrmSitePage() {
           ? mergedContent[fieldName].map((item: any, index: number) => toImageItem(item, index)).filter((item: any) => item.path)
           : [];
         if (!currentImages.some((item: any) => item.path === selectedFile.path)) {
-          mergedContent[fieldName] = [...currentImages, imageItemFromFile(selectedFile, (currentImages.length + 1) * 10)];
+          mergedContent[fieldName] = [
+            ...currentImages,
+            buildSiteImageItem(selectedFile, (currentImages.length + 1) * 10, {
+              title: selectedFileTitle,
+              alt: selectedFileAlt,
+            }),
+          ];
         } else {
-          mergedContent[fieldName] = currentImages;
+          mergedContent[fieldName] = currentImages.map((item: any) => (
+            item.path === selectedFile.path
+              ? buildSiteImageItem(selectedFile, item.sortOrder, { title: selectedFileTitle, alt: selectedFileAlt })
+              : item
+          ));
         }
       } else {
         mergedContent[fieldName] = selectedFile.path;
@@ -838,7 +849,7 @@ export default function CrmSitePage() {
       setSuccessMsg(`Файл ${file.name} успешно загружен!`);
       const relativePath = data.path;
       await loadMediaFiles();
-      setSelectedFile({
+      handleSelectMediaFile({
         name: relativePath.split("/").pop() || "",
         path: relativePath,
         url: data.url || getMediaUrl(relativePath),
@@ -2010,7 +2021,7 @@ export default function CrmSitePage() {
                       type="button"
                       onClick={() => {
                         setActiveMediaFolder(folder.id);
-                        setSelectedFile(null);
+                        handleSelectMediaFile(null);
                       }}
                       style={{
                         border: activeMediaFolder === folder.id ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
@@ -2036,7 +2047,7 @@ export default function CrmSitePage() {
                     return (
                       <div
                         key={idx}
-                        onClick={() => setSelectedFile(file)}
+                        onClick={() => handleSelectMediaFile(file)}
                         style={{
                           background: "white",
                           border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
@@ -2087,6 +2098,32 @@ export default function CrmSitePage() {
                         ) : (
                           <FileText size={48} style={{ color: "var(--color-text-muted)" }} />
                         )}
+                      </div>
+
+                      <div className="form-grid-2">
+                        <div className="form-group">
+                          <label className="form-label">Название на сайте</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={selectedFileTitle}
+                            onChange={(event) => setSelectedFileTitle(event.target.value)}
+                            placeholder="Например: Робот-сумо на занятии"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Alt-текст</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={selectedFileAlt}
+                            onChange={(event) => setSelectedFileAlt(event.target.value)}
+                            placeholder="Короткое описание изображения"
+                          />
+                        </div>
+                        <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+                          Эти значения попадут в карточки и галереи вместо технического имени файла.
+                        </p>
                       </div>
                       
                       <div style={{ fontSize: "11px", display: "flex", flexDirection: "column", gap: "8px" }}>

@@ -1,10 +1,29 @@
 type BranchForMap = {
   name?: string | null;
   address?: string | null;
+  is_active?: boolean | null;
+  show_on_site?: boolean | null;
 };
 
+export function publicMapBranches(branches: BranchForMap[]) {
+  return branches.filter((branch) => {
+    const address = String(branch.address || "").trim();
+    return address && branch.is_active !== false && branch.show_on_site !== false;
+  });
+}
+
+export function publicFooterMapBranches(branches: BranchForMap[], fallbackAddress?: string | null, fallbackName?: string | null) {
+  const visibleBranches = publicMapBranches(branches);
+  if (visibleBranches.length > 0) return visibleBranches;
+
+  const address = String(fallbackAddress || "").trim();
+  if (!address) return [];
+
+  return [{ name: fallbackName || null, address }];
+}
+
 export function buildYandexMapEmbedUrl(branches: BranchForMap[]) {
-  const addresses = branches
+  const addresses = publicMapBranches(branches)
     .map((branch) => String(branch.address || "").trim())
     .filter(Boolean);
 
