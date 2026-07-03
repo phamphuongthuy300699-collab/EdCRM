@@ -50,7 +50,7 @@ const mediaFolders = [
   { id: "lesson-process", label: "Как проходят занятия" },
   { id: "equipment", label: "Классы и оборудование" },
   { id: "contacts", label: "Фото контактов" },
-  { id: "footer", label: "Карта / футер" },
+  { id: "footer", label: "Футер: резервные изображения" },
   { id: "documents", label: "Документы" },
   { id: "misc", label: "Разное" },
 ];
@@ -1040,7 +1040,7 @@ export default function CrmSitePage() {
           onClick={() => handleAssignFileToBlock("site.footer", "mapImage", false)}
           style={actionButtonStyle}
         >
-          Использовать как карту в футере
+          Использовать как резервную схему проезда
         </Button>
       );
     }
@@ -1055,14 +1055,15 @@ export default function CrmSitePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       <style>{`
-        .card-crm { background: #fff; border: 1px solid var(--color-border); border-radius: 12px; padding: 24px; display: flex; flexDirection: column; gap: 16px; }
+        .card-crm { background: #fff; border: 1px solid var(--color-border); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
         .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-label { font-size: 13px; fontWeight: 700; color: var(--color-text); }
-        .form-input { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 13px; width: 100%; box-sizing: border-box; }
+        .form-label { font-size: 13px; font-weight: 700; color: var(--color-text); }
+        .form-input { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 13px; width: 100%; min-height: 42px; box-sizing: border-box; }
+        textarea.form-input { min-height: 104px; line-height: 1.5; resize: vertical; }
         .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-        .site-editor-shell { display: grid; grid-template-columns: 240px 1fr; gap: 32px; margin-top: 24px; align-items: start; }
-        .site-editor-nav { display: flex; flex-direction: column; gap: 6px; }
+        .site-editor-shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+        .site-editor-nav { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 16px; }
         .site-editor-panel { display: flex; flex-direction: column; gap: 24px; }
         .site-tab-nav-mobile { display: none; }
         @media (max-width: 768px) {
@@ -1075,6 +1076,7 @@ export default function CrmSitePage() {
         }
         @media (max-width: 768px) {
           .legal-editor-layout { grid-template-columns: 1fr !important; gap: 16px !important; }
+          .form-grid-2, .form-grid-3 { grid-template-columns: 1fr !important; }
         }
         .badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
         .badge-blue { background: var(--color-primary-soft); color: var(--color-primary-dark); }
@@ -1144,15 +1146,15 @@ export default function CrmSitePage() {
       <div className="site-editor-shell">
         <div className="site-editor-nav">
           {[
-            { id: "home", label: "Главная страница", icon: Globe },
-            { id: "branding", label: "Брендинг", icon: Sparkles },
-            { id: "teachers", label: "Преподаватели", icon: Users },
-            { id: "branches", label: "Контакты & Филиалы", icon: MapPin },
-            { id: "prices", label: "Цены & Тарифы", icon: DollarSign },
-            { id: "schedule", label: "Расписание", icon: Calendar },
-            { id: "legal", label: "Юридические страницы", icon: FileText },
-            { id: "footer", label: "Футер", icon: Building },
-            { id: "media", label: "Медиа-менеджер", icon: ImageIcon }
+            { id: "home", label: "Контент главной", desc: "Hero, преимущества, кабинет", icon: Globe },
+            { id: "branding", label: "Бренд и логотип", desc: "Логотип, favicon, цвета", icon: Sparkles },
+            { id: "teachers", label: "Команда", desc: "Преподаватели на сайте", icon: Users },
+            { id: "branches", label: "Филиалы и контакты", desc: "Адреса, телефоны, часы", icon: MapPin },
+            { id: "prices", label: "Продажи и тарифы", desc: "Пробный, абонементы, цены", icon: DollarSign },
+            { id: "schedule", label: "Расписание", desc: "Группы и свободные места", icon: Calendar },
+            { id: "legal", label: "Юридические документы", desc: "Оферта, оплата, возврат", icon: FileText },
+            { id: "footer", label: "Футер и карта", desc: "Реквизиты, ссылки, филиалы", icon: Building },
+            { id: "media", label: "Медиа для сайта", desc: "Фото по блокам сайта", icon: ImageIcon }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1167,23 +1169,27 @@ export default function CrmSitePage() {
                 }}
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "none",
+                  alignItems: "flex-start",
+                  gap: "12px",
+                  padding: "13px 14px",
+                  borderRadius: "10px",
+                  border: isActive ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
                   cursor: "pointer",
                   fontWeight: 700,
                   fontSize: "13px",
-                  background: isActive ? "var(--color-primary-soft)" : "transparent",
+                  background: isActive ? "var(--color-primary-soft)" : "#FFFFFF",
                   color: isActive ? "var(--color-primary-dark)" : "var(--color-text-muted)",
                   textAlign: "left",
                   width: "100%",
-                  transition: "all 0.2s"
+                  transition: "all 0.2s",
+                  boxShadow: isActive ? "0 8px 20px rgba(70, 62, 142, 0.08)" : "none"
                 }}
               >
-                <Icon size={16} />
-                {tab.label}
+                <Icon size={18} style={{ marginTop: "2px", flexShrink: 0 }} />
+                <span style={{ display: "grid", gap: "3px" }}>
+                  <span>{tab.label}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", lineHeight: 1.35 }}>{tab.desc}</span>
+                </span>
               </button>
             );
           })}
@@ -1911,7 +1917,12 @@ export default function CrmSitePage() {
           {/* TAB 7: FOOTER */}
           {activeTab === "footer" && (
             <form onSubmit={handleSaveFooter} className="card-crm" style={{ gap: "20px" }}>
-              <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Настройки футера</h3>
+              <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>Футер и карта филиалов</h3>
+                <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>
+                  В футере показываются реквизиты, ссылки и интерактивная Яндекс.Карта по филиалам, у которых включено отображение на сайте.
+                </p>
+              </div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1959,6 +1970,13 @@ export default function CrmSitePage() {
                 </div>
               </div>
 
+              <div style={{ border: "1px solid var(--color-border)", background: "#F9FAFB", borderRadius: "10px", padding: "14px 16px", display: "grid", gap: "6px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 800 }}>Карта в футере</div>
+                <div style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                  Отдельно загружать картинку карты больше не нужно: сайт берёт адреса из раздела “Филиалы и контакты” и строит интерактивную Яндекс.Карту с метками поиска.
+                </div>
+              </div>
+
               <div>
                 <Button type="submit" variant="primary-crm" disabled={saving}>
                   <Save size={16} /> Сохранить настройки футера
@@ -1970,8 +1988,11 @@ export default function CrmSitePage() {
           {/* TAB 8: MEDIA MANAGER */}
           {activeTab === "media" && (
             <div className="card-crm" style={{ gap: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Медиа-менеджер</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", borderBottom: "1px solid var(--color-border)", paddingBottom: "16px" }}>
+                <div>
+                  <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>Медиа для сайта</h3>
+                  <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>Загрузите фото и сразу примените их к нужному блоку: первый экран, контакты, проекты, оборудование или преподаватели.</p>
+                </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input type="file" ref={fileInputRef} onChange={handleUploadFile} style={{ display: "none" }} />
                   <Button variant="primary-crm" disabled={uploadingFile} onClick={() => fileInputRef.current?.click()}>
@@ -1980,7 +2001,7 @@ export default function CrmSitePage() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0, 1fr) 320px", gap: "20px", alignItems: "start" }} className="media-manager-layout">
+              <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0, 1fr)", gap: "20px", alignItems: "start" }} className="media-manager-layout">
                 {/* 1. Left side: Directories list */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {mediaFolders.map(folder => (
@@ -1992,11 +2013,11 @@ export default function CrmSitePage() {
                         setSelectedFile(null);
                       }}
                       style={{
-                        border: "none",
+                        border: activeMediaFolder === folder.id ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
                         background: activeMediaFolder === folder.id ? "var(--color-primary-soft)" : "#F3F4F6",
                         color: activeMediaFolder === folder.id ? "var(--color-primary-dark)" : "var(--color-text-muted)",
-                        padding: "9px 12px",
-                        borderRadius: "6px",
+                        padding: "12px 14px",
+                        borderRadius: "8px",
                         fontWeight: 700,
                         cursor: "pointer",
                         fontSize: "12px",
@@ -2009,7 +2030,7 @@ export default function CrmSitePage() {
                 </div>
 
                 {/* 2. Center: Files grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "12px", minHeight: "350px", background: "#F9FAFB", padding: "12px", borderRadius: "8px", border: "1px dashed var(--color-border)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px", minHeight: "420px", background: "#F9FAFB", padding: "14px", borderRadius: "10px", border: "1px dashed var(--color-border)", alignContent: "start" }}>
                   {mediaFiles.map((file, idx) => {
                     const isSelected = selectedFile?.path === file.path;
                     return (
@@ -2029,7 +2050,7 @@ export default function CrmSitePage() {
                           transition: "all 0.2s"
                         }}
                       >
-                        <div style={{ height: "90px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ height: "118px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {isImageFile(file) ? (
                             <img src={mediaUrl(file)} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                           ) : (
@@ -2055,12 +2076,12 @@ export default function CrmSitePage() {
                 </div>
 
                 {/* 3. Right side: Details & Action panel */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#FFFFFF", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "16px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#FFFFFF", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "18px", gridColumn: "1 / -1" }}>
                   {selectedFile ? (
                     <>
-                      <h4 style={{ fontSize: "13px", fontWeight: 700, margin: 0, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Выбранный файл</h4>
+                      <h4 style={{ fontSize: "15px", fontWeight: 800, margin: 0, borderBottom: "1px solid var(--color-border)", paddingBottom: "10px" }}>Выбранный файл</h4>
                       
-                      <div style={{ height: "140px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ height: "220px", background: "#F3F4F6", borderRadius: "8px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {isImageFile(selectedFile) ? (
                           <img src={mediaUrl(selectedFile)} alt={selectedFile.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                         ) : (
@@ -2070,15 +2091,15 @@ export default function CrmSitePage() {
                       
                       <div style={{ fontSize: "11px", display: "flex", flexDirection: "column", gap: "8px" }}>
                         <div>
-                          <strong style={{ display: "block" }}>Filename:</strong>
+                          <strong style={{ display: "block" }}>Файл:</strong>
                           <span style={{ wordBreak: "break-all", color: "var(--color-text-muted)" }}>{selectedFile.name || mediaNameFromPath(selectedFile.path)}</span>
                         </div>
                         <div>
-                          <strong style={{ display: "block" }}>Storage path:</strong>
+                          <strong style={{ display: "block" }}>Путь в хранилище:</strong>
                           <span style={{ wordBreak: "break-all", fontFamily: "monospace", color: "var(--color-text-muted)" }}>{selectedFile.path}</span>
                         </div>
                         <div>
-                          <strong style={{ display: "block" }}>Public URL:</strong>
+                          <strong style={{ display: "block" }}>Публичная ссылка:</strong>
                           <span style={{ wordBreak: "break-all", fontFamily: "monospace", color: "var(--color-text-muted)" }}>{mediaUrl(selectedFile)}</span>
                         </div>
                       </div>
@@ -2093,7 +2114,7 @@ export default function CrmSitePage() {
                           }}
                           style={{ width: "100%", fontSize: "11px", height: "32px" }}
                         >
-                          Копировать path
+                          Копировать путь
                         </Button>
                         <Button
                           type="button"
@@ -2104,7 +2125,7 @@ export default function CrmSitePage() {
                           }}
                           style={{ width: "100%", fontSize: "11px", height: "32px" }}
                         >
-                          Копировать Public URL
+                          Копировать публичную ссылку
                         </Button>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "12px", marginTop: "12px" }}>
@@ -2114,7 +2135,7 @@ export default function CrmSitePage() {
                       </div>
                     </>
                   ) : (
-                    <div style={{ textAlign: "center", color: "var(--color-text-muted)", fontSize: "11px", padding: "32px 0" }}>
+                    <div style={{ textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px", padding: "72px 16px", lineHeight: 1.45 }}>
                       Выберите файл в сетке для просмотра деталей и применения действий
                     </div>
                   )}
