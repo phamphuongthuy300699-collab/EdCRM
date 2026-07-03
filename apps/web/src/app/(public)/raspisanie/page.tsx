@@ -5,6 +5,9 @@ import { Button } from "@robotics-crm/ui";
 import { Calendar, ArrowLeft } from "lucide-react";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Расписание занятий по робототехнике в Липецке",
   description: "Расписание учебных групп школы робототехники и программирования Robotics Липецк. Группы по возрастам для детей от 6 до 15 лет.",

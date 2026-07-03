@@ -3,6 +3,9 @@ import { Metadata } from "next";
 import LandingPageClient from "./LandingPageClient";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function generateMetadata(): Promise<Metadata> {
   try {
     const supabase = createSupabaseAdminClient();
@@ -192,7 +195,7 @@ export default async function Page() {
       if (tariffsData) initialTariffs = tariffsData;
     }
   } catch (e) {
-    console.error("Error loading server side landing page data:", e);
+    console.error("PUBLIC_DATA_LOAD_ERROR", e);
   }
 
   const jsonLdOrg = {

@@ -5,6 +5,9 @@ import { Button } from "@robotics-crm/ui";
 import { CreditCard, ArrowLeft, Check, Percent } from "lucide-react";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Стоимость обучения робототехнике в Липецке | Цены кружка",
   description: "Тарифы и стоимость обучения робототехнике и программированию для детей в Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { Users, ArrowRight, BookOpen, Star } from "lucide-react";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Наши преподаватели | Робокс Липецк",
