@@ -33,6 +33,13 @@ type GroupStatus = "draft" | "active" | "paused" | "closed";
 type StaffRole = "owner" | "admin" | "manager" | "teacher" | "accountant";
 
 const DEFAULT_ORG_SLUG = process.env.NEXT_PUBLIC_DEFAULT_ORG_SLUG || "robotics-lipetsk";
+const roleLabels: Record<string, string> = {
+  owner: "Владелец",
+  admin: "Администратор",
+  manager: "Менеджер",
+  teacher: "Преподаватель",
+  accountant: "Бухгалтер",
+};
 const weekdays = [
   { value: 1, label: "Пн" },
   { value: 2, label: "Вт" },
@@ -365,7 +372,7 @@ export default function CrmSettingsPage() {
         roomsRes,
         coursesRes,
         groupsRes,
-        membershipsRes,
+        staffListRes,
         paymentRes,
       ] = await Promise.all([
         (supabase.from("branches") as any).select("*").eq("organization_id", orgData.id).order("sort_order"),
@@ -383,15 +390,7 @@ export default function CrmSettingsPage() {
           `)
           .eq("organization_id", orgData.id)
           .order("sort_order"),
-        (supabase.from("org_memberships") as any)
-          .select(`
-            user_id,
-            role,
-            is_active,
-            profiles(id, full_name, phone, email, avatar_url, specialty, public_bio, internal_comment, show_on_site, sort_order)
-          `)
-          .eq("organization_id", orgData.id)
-          .order("created_at", { ascending: true }),
+        fetch("/api/crm/staff/list").then((res) => res.json()).catch(() => ({ ok: false, staff: [] })),
         fetch("/api/crm/payment-settings/alfabank").then((res) => res.json()).catch(() => null),
       ]);
 
@@ -399,18 +398,15 @@ export default function CrmSettingsPage() {
       if (roomsRes.error) throw roomsRes.error;
       if (coursesRes.error) throw coursesRes.error;
       if (groupsRes.error) throw groupsRes.error;
-      if (membershipsRes.error) throw membershipsRes.error;
+      if (staffListRes && !staffListRes.ok) {
+        throw new Error(staffListRes.error || "Не удалось загрузить список сотрудников");
+      }
 
       setBranches(branchesRes.data || []);
       setRooms(roomsRes.data || []);
       setCourses(coursesRes.data || []);
       setGroups(groupsRes.data || []);
-      setStaff((membershipsRes.data || []).map((membership: any) => ({
-        user_id: membership.user_id,
-        role: membership.role,
-        is_active: membership.is_active,
-        ...(Array.isArray(membership.profiles) ? membership.profiles[0] : membership.profiles),
-      })));
+      setStaff(staffListRes.staff || []);
       if (paymentRes?.ok) {
         setPaymentSettings(paymentRes.settings || paymentSettings);
         setPaymentSecretsConfigured(Boolean(paymentRes.passwordConfigured));
@@ -1279,16 +1275,23 @@ export default function CrmSettingsPage() {
                   <div key={person.user_id} className="settings-card">
                     <div className="settings-card-head">
                       <div>
-                        <h3>{person.full_name || "Без имени"}</h3>
+                        <h3>{person.full_name || person.email || "Без имени"}</h3>
                         <p>{person.email || "email не указан"} · {person.phone || "телефон не указан"}</p>
                       </div>
                       <div className="settings-actions">
-                        <span className="badge badge-blue">{person.role}</span>
+                        <span className="badge badge-blue">{roleLabels[person.role] || person.role}</span>
                         <span className={`badge ${person.is_active ? "badge-green" : "badge-gray"}`}>{person.is_active ? "Доступ активен" : "Доступ выключен"}</span>
                         <span className={`badge ${person.show_on_site ? "badge-green" : "badge-gray"}`}>{person.show_on_site ? "На сайте" : "Скрыт"}</span>
                       </div>
                     </div>
-                    <p>{person.specialty || "Специализация не заполнена"} · {person.public_bio || "Публичное описание не заполнено"}</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", margin: "8px 0" }}>
+                      <p style={{ fontSize: "13px", color: "var(--color-text)", margin: 0 }}>
+                        <strong>Специализация:</strong> {person.specialty || "не указана"}
+                      </p>
+                      <p style={{ fontSize: "13px", color: "var(--color-text-muted)", margin: 0 }}>
+                        <strong>О себе на сайте:</strong> {person.public_bio ? (person.public_bio.length > 120 ? person.public_bio.slice(0, 120) + "..." : person.public_bio) : "нет описания"}
+                      </p>
+                    </div>
                     <div className="settings-actions">
                       <Button
                         type="button"

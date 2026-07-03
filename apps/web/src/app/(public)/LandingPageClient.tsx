@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import Link from "next/link";
+import { getMediaUrl } from "@/shared/utils/media";
 import { 
   Users, 
   Layers, 
@@ -222,6 +223,12 @@ export default function LandingPageClient({
   const heroLocationLabel = initialBranches && initialBranches.length > 1
     ? `${initialBranches.length} филиала в Липецке`
     : primaryBranch?.address || "Адреса филиалов уточняются";
+
+  const homeMediaBlock = getBlock('home.media');
+  const customHeroImage = homeMediaBlock?.content?.image || "";
+
+  const contactsMediaBlock = getBlock('contacts.media');
+  const customClassroomImage = contactsMediaBlock?.content?.image || "";
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -452,7 +459,7 @@ export default function LandingPageClient({
                 left: 0,
                 width: "100%",
                 height: "100%",
-                backgroundImage: "linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800')",
+                backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('${customHeroImage ? getMediaUrl(customHeroImage) : "https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800"}')`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 opacity: 0.15,
@@ -1694,7 +1701,7 @@ export default function LandingPageClient({
                 <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Фасад школы</span>
               </div>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('/images/classroom_lipetsk.png') center/cover no-repeat",
+                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${customClassroomImage ? getMediaUrl(customClassroomImage) : "/images/classroom_lipetsk.png"}') center/cover no-repeat`,
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 position: "relative",

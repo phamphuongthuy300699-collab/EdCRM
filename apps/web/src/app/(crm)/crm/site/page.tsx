@@ -79,6 +79,7 @@ export default function CrmSitePage() {
   const [teachersSubtitle, setTeachersSubtitle] = useState("");
   const [teachersShowBlock, setTeachersShowBlock] = useState(true);
   const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
 
   // Tab 3: Branches & Organization Contacts
   const [orgPhone, setOrgPhone] = useState("");
@@ -113,6 +114,9 @@ export default function CrmSitePage() {
   const [docMetaDesc, setDocMetaDesc] = useState("");
   const [docBody, setDocBody] = useState("");
   const [docShowInFooter, setDocShowInFooter] = useState(true);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<any | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
 
   // Tab 7: Footer
   const [footerShowLegalName, setFooterShowLegalName] = useState(true);
@@ -279,6 +283,12 @@ export default function CrmSitePage() {
         .order("sort_order", { ascending: true });
       if (groupsData) setGroups(groupsData);
 
+      // 7. Fetch Staff via API endpoint (bypasses RLS)
+      const staffRes = await fetch("/api/crm/staff/list").then((res) => res.json()).catch(() => ({ ok: false, staff: [] }));
+      if (staffRes && staffRes.ok) {
+        setStaff(staffRes.staff || []);
+      }
+
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Ошибка загрузки данных сайта");
@@ -308,6 +318,7 @@ export default function CrmSitePage() {
 
   useEffect(() => {
     if (activeTab === "media") {
+      setSelectedFile(null);
       loadMediaFiles();
     }
   }, [activeTab, activeMediaFolder]);
@@ -315,7 +326,8 @@ export default function CrmSitePage() {
   // Load active legal page details
   useEffect(() => {
     if (activeTab === "legal") {
-      setLoading(true);
+      if (!orgId) return;
+      setLoadingDoc(true);
       const docKey = selectedDocKey;
       (supabase
         .from("site_content_blocks") as any)
@@ -330,7 +342,10 @@ export default function CrmSitePage() {
           setDocMetaDesc(data?.content?.meta_description || "");
           setDocBody(data?.content?.body || "");
           setDocShowInFooter(data?.content?.show_in_footer !== false);
-          setLoading(false);
+          setLoadingDoc(false);
+        })
+        .catch(() => {
+          setLoadingDoc(false);
         });
     }
   }, [activeTab, selectedDocKey, orgId]);
@@ -675,7 +690,14 @@ export default function CrmSitePage() {
       if (!res.ok) throw new Error(data.error);
 
       setSuccessMsg(`Файл ${file.name} успешно загружен!`);
-      loadMediaFiles();
+      const relativePath = data.path;
+      await loadMediaFiles();
+      setSelectedFile({
+        name: relativePath.split("/").pop() || "",
+        path: relativePath,
+        url: data.url || getMediaUrl(relativePath),
+        size: file.size
+      });
     } catch (err: any) {
       alert(err.message || "Не удалось загрузить файл");
     } finally {
@@ -692,6 +714,18 @@ export default function CrmSitePage() {
         .form-input { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 13px; width: 100%; box-sizing: border-box; }
         .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .site-editor-shell { display: grid; grid-template-columns: 240px 1fr; gap: 32px; margin-top: 24px; align-items: start; }
+        .site-editor-nav { display: flex; flex-direction: column; gap: 6px; }
+        .site-editor-panel { display: flex; flex-direction: column; gap: 24px; }
+        .site-tab-nav-mobile { display: none; }
+        @media (max-width: 768px) {
+          .site-editor-shell { grid-template-columns: 1fr !important; gap: 16px !important; }
+          .site-editor-nav { display: none !important; }
+          .site-tab-nav-mobile { display: block !important; margin-bottom: 16px; }
+        }
+        @media (max-width: 992px) {
+          .media-manager-layout { grid-template-columns: 1fr !important; gap: 16px !important; }
+        }
         .badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
         .badge-blue { background: var(--color-primary-soft); color: var(--color-primary-dark); }
         .badge-red { background: #FEF2F2; color: #991B1B; }
@@ -757,53 +791,59 @@ export default function CrmSitePage() {
         </select>
       </div>
 
-      <div className="site-tab-nav">
-        {[
-          { id: "home", label: "Главная страница", icon: Globe },
-          { id: "branding", label: "Брендинг", icon: Sparkles },
-          { id: "teachers", label: "Преподаватели", icon: Users },
-          { id: "branches", label: "Контакты & Филиалы", icon: MapPin },
-          { id: "prices", label: "Цены & Тарифы", icon: DollarSign },
-          { id: "schedule", label: "Расписание", icon: Calendar },
-          { id: "legal", label: "Юридические страницы", icon: FileText },
-          { id: "footer", label: "Футер", icon: Building },
-          { id: "media", label: "Медиа-менеджер", icon: ImageIcon }
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as TabId);
-                setSuccessMsg("");
-                setErrorMsg("");
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: "12px",
-                background: isActive ? "var(--color-primary-soft)" : "transparent",
-                color: isActive ? "var(--color-primary-dark)" : "var(--color-text-muted)"
-              }}
-            >
-              <Icon size={14} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <div className="site-editor-shell">
+        <div className="site-editor-nav">
+          {[
+            { id: "home", label: "Главная страница", icon: Globe },
+            { id: "branding", label: "Брендинг", icon: Sparkles },
+            { id: "teachers", label: "Преподаватели", icon: Users },
+            { id: "branches", label: "Контакты & Филиалы", icon: MapPin },
+            { id: "prices", label: "Цены & Тарифы", icon: DollarSign },
+            { id: "schedule", label: "Расписание", icon: Calendar },
+            { id: "legal", label: "Юридические страницы", icon: FileText },
+            { id: "footer", label: "Футер", icon: Building },
+            { id: "media", label: "Медиа-менеджер", icon: ImageIcon }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id as TabId);
+                  setSuccessMsg("");
+                  setErrorMsg("");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "13px",
+                  background: isActive ? "var(--color-primary-soft)" : "transparent",
+                  color: isActive ? "var(--color-primary-dark)" : "var(--color-text-muted)",
+                  textAlign: "left",
+                  width: "100%",
+                  transition: "all 0.2s"
+                }}
+              >
+                <Icon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
-      {loading ? (
-        <div style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Загрузка...</div>
-      ) : (
-        <div style={{ display: "grid", gap: "24px" }}>
+        <div className="site-editor-panel" style={{ flex: 1 }}>
+          {loading ? (
+            <div style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Загрузка...</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           
           {/* TAB 1: HOME */}
           {activeTab === "home" && (
@@ -1578,88 +1618,263 @@ export default function CrmSitePage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
-                {[
-                  { id: "branding", label: "Брендинг & лого" },
-                  { id: "teachers", label: "Фото преподавателей" },
-                  { id: "pricing", label: "Тарифы" },
-                  { id: "schedule", label: "Сетка расписания" },
-                  { id: "legal", label: "Документы" },
-                  { id: "misc", label: "Разное" }
-                ].map(folder => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    onClick={() => setActiveMediaFolder(folder.id)}
-                    style={{
-                      border: "none",
-                      background: activeMediaFolder === folder.id ? "var(--color-primary-soft)" : "#F3F4F6",
-                      color: activeMediaFolder === folder.id ? "var(--color-primary-dark)" : "var(--color-text-muted)",
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontSize: "11px"
-                    }}
-                  >
-                    {folder.label}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px", minHeight: "200px", background: "#F9FAFB", padding: "16px", borderRadius: "8px", border: "1px dashed var(--color-border)" }}>
-                {mediaFiles.map((file, idx) => (
-                  <div key={idx} style={{ background: "white", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "8px", display: "flex", flexDirection: "column", gap: "8px", justifyContent: "space-between" }}>
-                    <div style={{ height: "100px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {file.name.endsWith(".svg") || file.name.endsWith(".png") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") ? (
-                        <img src={file.url} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      ) : (
-                        <FileText size={32} style={{ color: "var(--color-text-muted)" }} />
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={file.name}>
-                        {file.name}
-                      </div>
-                      <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
-                        {(file.size / 1024).toFixed(1)} KB
-                      </div>
-                    </div>
+              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 280px", gap: "20px", alignItems: "start" }} className="media-manager-layout">
+                {/* 1. Left side: Directories list */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {[
+                    { id: "branding", label: "📁 Брендинг и лого" },
+                    { id: "teachers", label: "📁 Фото учителей" },
+                    { id: "pricing", label: "📁 Тарифы" },
+                    { id: "schedule", label: "📁 Расписание" },
+                    { id: "legal", label: "📁 Документы" },
+                    { id: "misc", label: "📁 Разное" }
+                  ].map(folder => (
                     <button
+                      key={folder.id}
                       type="button"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(file.path);
-                        alert(`Путь скопирован: ${file.path}`);
+                      onClick={() => {
+                        setActiveMediaFolder(folder.id);
+                        setSelectedFile(null);
                       }}
                       style={{
-                        background: "var(--color-primary-soft)",
-                        color: "var(--color-primary-dark)",
                         border: "none",
-                        borderRadius: "4px",
-                        padding: "4px",
-                        fontSize: "10px",
+                        background: activeMediaFolder === folder.id ? "var(--color-primary-soft)" : "#F3F4F6",
+                        color: activeMediaFolder === folder.id ? "var(--color-primary-dark)" : "var(--color-text-muted)",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
                         fontWeight: 700,
                         cursor: "pointer",
-                        textAlign: "center"
+                        fontSize: "11px",
+                        textAlign: "left"
                       }}
                     >
-                      Копировать путь
+                      {folder.label}
                     </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
-                {mediaFiles.length === 0 && (
-                  <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)" }}>
-                    <ImageIcon size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
-                    <span style={{ fontSize: "12px" }}>В этой папке нет файлов. Загрузите первый!</span>
-                  </div>
-                )}
+                {/* 2. Center: Files grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "12px", minHeight: "350px", background: "#F9FAFB", padding: "12px", borderRadius: "8px", border: "1px dashed var(--color-border)" }}>
+                  {mediaFiles.map((file, idx) => {
+                    const isSelected = selectedFile?.path === file.path;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedFile(file)}
+                        style={{
+                          background: "white",
+                          border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                          borderRadius: "8px",
+                          padding: "8px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                          cursor: "pointer",
+                          boxShadow: isSelected ? "0 4px 12px rgba(70, 62, 142, 0.15)" : "none",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        <div style={{ height: "90px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {file.name.endsWith(".svg") || file.name.endsWith(".png") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") ? (
+                            <img src={file.url} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          ) : (
+                            <FileText size={24} style={{ color: "var(--color-text-muted)" }} />
+                          )}
+                        </div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={file.name}>
+                          {file.name}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
+                          {(file.size / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {mediaFiles.length === 0 && (
+                    <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", padding: "48px 0" }}>
+                      <ImageIcon size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                      <span style={{ fontSize: "12px" }}>В этой папке нет файлов. Загрузите первый!</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Right side: Details & Action panel */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#FFFFFF", border: "1px solid var(--color-border)", borderRadius: "8px", padding: "16px" }}>
+                  {selectedFile ? (
+                    <>
+                      <h4 style={{ fontSize: "13px", fontWeight: 700, margin: 0, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>Выбранный файл</h4>
+                      
+                      <div style={{ height: "140px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {selectedFile.name.endsWith(".svg") || selectedFile.name.endsWith(".png") || selectedFile.name.endsWith(".jpg") || selectedFile.name.endsWith(".jpeg") ? (
+                          <img src={selectedFile.url} alt={selectedFile.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        ) : (
+                          <FileText size={48} style={{ color: "var(--color-text-muted)" }} />
+                        )}
+                      </div>
+                      
+                      <div style={{ fontSize: "11px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div>
+                          <strong style={{ display: "block" }}>Путь в хранилище:</strong>
+                          <span style={{ wordBreak: "break-all", fontFamily: "monospace", color: "var(--color-text-muted)" }}>{selectedFile.path}</span>
+                        </div>
+                        <div>
+                          <strong style={{ display: "block" }}>Размер:</strong>
+                          <span style={{ color: "var(--color-text-muted)" }}>{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "12px" }}>
+                        <Button
+                          type="button"
+                          variant="secondary-crm"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(selectedFile.path);
+                            alert(`Путь скопирован: ${selectedFile.path}`);
+                          }}
+                          style={{ width: "100%", fontSize: "11px", height: "32px" }}
+                        >
+                          Копировать путь
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary-crm"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(selectedFile.url);
+                            alert(`Public URL скопирован: ${selectedFile.url}`);
+                          }}
+                          style={{ width: "100%", fontSize: "11px", height: "32px" }}
+                        >
+                          Копировать Public URL
+                        </Button>
+
+                        {/* Folder-specific Context actions */}
+                        {activeMediaFolder === "branding" && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="primary-crm"
+                              onClick={async () => {
+                                setBrandLogo(selectedFile.path);
+                                await saveBlock("site.branding", brandName, "Настройки брендинга", {
+                                  logo: selectedFile.path,
+                                  favicon: brandFavicon,
+                                  primaryColor: brandPrimaryColor,
+                                  accentColor: brandAccentColor,
+                                  gradient: brandGradient,
+                                  logoDisplay: brandLogoDisplay,
+                                  logoAlt: brandLogoAlt
+                                });
+                                setSuccessMsg("Логотип обновлен!");
+                              }}
+                              style={{ width: "100%", fontSize: "11px", height: "32px", background: "#10b981", color: "white" }}
+                            >
+                              Использовать как логотип
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="primary-crm"
+                              onClick={async () => {
+                                setBrandFavicon(selectedFile.path);
+                                await saveBlock("site.branding", brandName, "Настройки брендинга", {
+                                  logo: brandLogo,
+                                  favicon: selectedFile.path,
+                                  primaryColor: brandPrimaryColor,
+                                  accentColor: brandAccentColor,
+                                  gradient: brandGradient,
+                                  logoDisplay: brandLogoDisplay,
+                                  logoAlt: brandLogoAlt
+                                });
+                                setSuccessMsg("Favicon обновлен!");
+                              }}
+                              style={{ width: "100%", fontSize: "11px", height: "32px" }}
+                            >
+                              Использовать как favicon
+                            </Button>
+                          </>
+                        )}
+
+                        {activeMediaFolder === "teachers" && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "#f3f4f6", padding: "8px", borderRadius: "6px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: 700 }}>Привязать к учителю:</label>
+                            <select
+                              value={selectedTeacherId}
+                              onChange={(e) => setSelectedTeacherId(e.target.value)}
+                              className="form-input"
+                              style={{ height: "30px", fontSize: "11px", padding: "0 6px" }}
+                            >
+                              <option value="">-- Выберите учителя --</option>
+                              {staff.filter((s: any) => s.role === "teacher" || s.role === "owner" || s.role === "admin").map((s: any) => (
+                                <option key={s.user_id} value={s.user_id}>{s.full_name || s.email}</option>
+                              ))}
+                            </select>
+                            <Button
+                              type="button"
+                              variant="primary-crm"
+                              disabled={!selectedTeacherId}
+                              onClick={async () => {
+                                if (!selectedTeacherId) return;
+                                const { error } = await (supabase
+                                  .from("profiles") as any)
+                                  .update({ avatar_url: selectedFile.path })
+                                  .eq("id", selectedTeacherId);
+                                if (error) {
+                                  alert(error.message);
+                                } else {
+                                  setSuccessMsg(`Фото установлено преподавателю!`);
+                                  await loadData();
+                                }
+                              }}
+                              style={{ width: "100%", fontSize: "11px", height: "30px", background: "var(--color-primary)" }}
+                            >
+                              Поставить фото преподавателю
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* General integration actions */}
+                        <Button
+                          type="button"
+                          variant="primary-crm"
+                          onClick={async () => {
+                            await saveBlock("home.media", "Медиа главной", "Изображение первого экрана", {
+                              image: selectedFile.path
+                            });
+                            setSuccessMsg("Изображение установлено для первого экрана (Hero)!");
+                          }}
+                          style={{ width: "100%", fontSize: "11px", height: "32px", background: "var(--color-accent)", color: "white" }}
+                        >
+                          Использовать в Hero
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="primary-crm"
+                          onClick={async () => {
+                            await saveBlock("contacts.media", "Медиа контактов", "Изображение для контактов/класса", {
+                              image: selectedFile.path
+                            });
+                            setSuccessMsg("Изображение установлено для раздела Фото классов!");
+                          }}
+                          style={{ width: "100%", fontSize: "11px", height: "32px", background: "var(--color-accent)", color: "white" }}
+                        >
+                          Использовать в контактах
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", color: "var(--color-text-muted)", fontSize: "11px", padding: "32px 0" }}>
+                      Выберите файл в сетке для просмотра деталей и применения действий
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -410,3 +410,38 @@ a {
   animation: robo-float 3s ease-in-out infinite;
 }
 
+/* Responsive adjustments for grids and layouts */
+@media (max-width: 1024px) {
+  /* Specific sections adjustments */
+  #contacts .container {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+  /* Grid conversions */
+  div[style*="grid-template-columns: repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+  }
+  div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+  }
+  div[style*="grid-template-columns: 1.2fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Under 640px force single column on almost all grids */
+  div[style*="grid-template-columns: repeat(4, 1fr)"],
+  div[style*="grid-template-columns: repeat(3, 1fr)"],
+  div[style*="grid-template-columns: repeat(2, 1fr)"],
+  div[style*="grid-template-columns: 1.2fr 1fr"],
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
+

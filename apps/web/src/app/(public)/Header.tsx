@@ -45,22 +45,19 @@ export default function Header({
           alignItems: "center",
           padding: "0 20px"
         }}>
-          {/* Logo / Brand Name */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
             {logoDisplay !== "sign" && brandLogo && !logoError ? (
-              <img 
-                src={getMediaUrl(brandLogo)} 
-                alt={logoAlt || brandName} 
-                onError={() => setLogoError(true)}
-                style={{ 
-                  height: "38px", 
-                  width: "auto",
-                  maxWidth: "160px"
-                }}
-              />
+              <div className="logo-container">
+                <img 
+                  src={getMediaUrl(brandLogo)} 
+                  alt={logoAlt || brandName} 
+                  onError={() => setLogoError(true)}
+                  className="logo-img"
+                />
+              </div>
             ) : null}
             
-            {logoDisplay === "sign" || !brandLogo || logoError ? (
+            {(logoDisplay === "sign" || !brandLogo || logoError) ? (
               <span style={{
                 fontWeight: 900,
                 fontSize: "1.4rem",
@@ -210,7 +207,24 @@ export default function Header({
 
       {/* Global CSS for responsive show/hide */}
       <style jsx global>{`
+        .logo-container {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          width: 130px;
+          height: 38px;
+        }
+        .logo-img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+          display: block;
+        }
         @media (min-width: 769px) {
+          .logo-container {
+            width: 175px;
+            height: 44px;
+          }
           .desktop-nav { display: flex !important; }
           .desktop-actions { display: flex !important; }
           .mobile-burger-btn { display: none !important; }

@@ -4,12 +4,23 @@
  * and locally served via `/media/` prefix in production mode.
  */
 export function getMediaUrl(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  
   // Use env setting MEDIA_DRIVER. Fallback to 'supabase' in dev, or 'local' if configured.
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
 
+  // Safely encode Cyrillic / spaces in each path segment without double-encoding
+  const encodedPath = path
+    .split("/")
+    .map(segment => encodeURIComponent(segment))
+    .join("/");
+
   if (driver === "local") {
     // Production local disk directory mapping
-    return `/media/${path}`;
+    return `/media/${encodedPath}`;
   }
 
   // Develop: Supabase Storage public bucket URL
@@ -19,5 +30,5 @@ export function getMediaUrl(path: string): string {
   const normalizedBaseUrl = supabaseUrl.endsWith("/") ? supabaseUrl.slice(0, -1) : supabaseUrl;
   const bucketName = process.env.NEXT_PUBLIC_MEDIA_BUCKET || "site-assets";
 
-  return `${normalizedBaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
+  return `${normalizedBaseUrl}/storage/v1/object/public/${bucketName}/${encodedPath}`;
 }
