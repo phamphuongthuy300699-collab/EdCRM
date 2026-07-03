@@ -93,4 +93,38 @@ describe("Media API Endpoint Security", () => {
     const json = await response.json();
     expect(json.error).toContain("is not whitelisted");
   });
+
+  it("allows the CRM to list hero media for the public first screen", async () => {
+    const originalMediaDriver = process.env.MEDIA_DRIVER;
+    process.env.MEDIA_DRIVER = "local";
+
+    const mockSupabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+      }),
+    };
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+
+    try {
+      const req = new NextRequest("http://localhost:3000/api/crm/media?folder=hero", {
+        method: "GET",
+      });
+
+      const response = await GET(req);
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(Array.isArray(json.files)).toBe(true);
+    } finally {
+      if (originalMediaDriver === undefined) {
+        delete process.env.MEDIA_DRIVER;
+      } else {
+        process.env.MEDIA_DRIVER = originalMediaDriver;
+      }
+    }
+  });
 });

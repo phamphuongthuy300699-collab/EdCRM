@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
 const DEFAULT_ORG_SLUG = process.env.NEXT_PUBLIC_DEFAULT_ORG_SLUG || "robotics-lipetsk";
 
@@ -35,6 +36,25 @@ async function countRows(
 }
 
 export async function GET() {
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Необходима авторизация" }, { status: 401 });
+  }
+
+  const { data: membership } = await (authClient.from("org_memberships") as any)
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    return NextResponse.json({ ok: false, error: "Недостаточно прав" }, { status: 403 });
+  }
+
   const env = {
     hasSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
     hasPublishableKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),

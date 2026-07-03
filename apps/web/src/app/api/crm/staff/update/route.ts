@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (!access.ok) return access.response;
 
     const input = parsed.data;
-    const organizationId = await resolveOrganizationId(input.organizationId || access.organizationId);
+    const organizationId = await resolveOrganizationId(access.organizationId);
     const admin = createSupabaseAdminClient();
 
     try {

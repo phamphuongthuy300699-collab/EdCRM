@@ -44,6 +44,29 @@ const triggerGoal = (goalName: string) => {
   }
 };
 
+function mediaPath(value: any) {
+  return typeof value === "string" ? value : value?.path || "";
+}
+
+function mediaTitle(value: any, fallback: string) {
+  if (typeof value === "object" && value?.title) return value.title;
+  return fallback;
+}
+
+function mediaAlt(value: any, fallback: string) {
+  if (typeof value === "object" && value?.alt) return value.alt;
+  return mediaTitle(value, fallback);
+}
+
+function mediaItems(values: any[] | undefined) {
+  return Array.isArray(values) ? values.filter((item) => mediaPath(item)) : [];
+}
+
+function mediaSrc(value: any) {
+  const path = mediaPath(value);
+  return path ? getMediaUrl(path) : "";
+}
+
 interface LandingPageClientProps {
   initialCourses?: any[];
   initialSchedule?: any[];
@@ -156,11 +179,11 @@ export default function LandingPageClient({
   };
 
   const steps = [
-    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=200" },
-    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=200" },
-    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200" },
-    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=200" },
-    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=200" }
+    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "/images/classroom_lipetsk.png" },
+    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "/images/robot_sumo.png" },
+    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "/images/arduino_greenhouse.png" },
+    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "/images/robot_sumo.png" },
+    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "/images/classroom_lipetsk.png" }
   ];
 
   const faqItems = [
@@ -225,29 +248,33 @@ export default function LandingPageClient({
     : primaryBranch?.address || "Адреса филиалов уточняются";
 
   const homeMediaBlock = getBlock('home.media');
-  const customHeroImage = homeMediaBlock?.content?.heroImage || "";
+  const customHeroImage = mediaPath(homeMediaBlock?.content?.heroImage);
 
   const facilitiesBlock = getBlock('home.facilities');
-  const facilitiesImages = facilitiesBlock?.content?.images || [];
+  const facilitiesImages = mediaItems(facilitiesBlock?.content?.images);
 
   const studentProjectsBlock = getBlock('home.student_projects');
-  const studentProjectsImages = studentProjectsBlock?.content?.images || [];
+  const studentProjectsImages = mediaItems(studentProjectsBlock?.content?.images);
 
   const lessonProcessBlock = getBlock('home.lesson_process');
-  const lessonProcessImages = lessonProcessBlock?.content?.images || [];
+  const lessonProcessImages = mediaItems(lessonProcessBlock?.content?.images);
 
   const equipmentBlock = getBlock('home.equipment');
-  const equipmentImages = equipmentBlock?.content?.images || [];
+  const equipmentImages = mediaItems(equipmentBlock?.content?.images);
 
   const contactsMediaBlock = getBlock('contacts.media');
-  const contactsImages = contactsMediaBlock?.content?.images || [];
-  const customClassroomImage = contactsImages[0] || contactsMediaBlock?.content?.image || "";
+  const contactsImages = mediaItems(contactsMediaBlock?.content?.images);
+  const contactMapImage = mediaPath(contactsMediaBlock?.content?.mapImage) || mediaPath(contactsImages[0]);
+  const contactFacadeImage = mediaPath(contactsMediaBlock?.content?.facadeImage) || mediaPath(contactsImages[1]);
+  const contactClassroomImage = mediaPath(contactsMediaBlock?.content?.classroomImage)
+    || mediaPath(contactsMediaBlock?.content?.image)
+    || mediaPath(contactsImages[2]);
 
   const stepsToRender = steps.map((step, idx) => {
     const customImg = lessonProcessImages[idx];
     return {
       ...step,
-      img: customImg ? getMediaUrl(customImg) : step.img
+      img: customImg ? mediaSrc(customImg) : step.img
     };
   });
 
@@ -269,35 +296,40 @@ export default function LandingPageClient({
   ];
 
   const projectsToRender = studentProjectsImages.length > 0
-    ? studentProjectsImages.map((img: string, idx: number) => {
+    ? studentProjectsImages.map((img: any, idx: number) => {
         const defaultProj = defaultProjects[idx] || {
           tag: "Инженерный проект",
           tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
-          title: `Роботехническая разработка ${idx + 1}`,
+          title: mediaTitle(img, `Роботехническая разработка ${idx + 1}`),
           desc: "Ребенок собрал и запрограммировал действующий механизм, решающий конкретную задачу."
         };
         return {
-          img: getMediaUrl(img),
+          img: mediaSrc(img),
           tag: defaultProj.tag,
           tagColor: defaultProj.tagColor,
-          title: defaultProj.title,
+          title: mediaTitle(img, defaultProj.title),
+          alt: mediaAlt(img, defaultProj.title),
           desc: defaultProj.desc
         };
       })
     : defaultProjects;
 
   const resolvedClassroomMainImage = facilitiesImages[0] 
-    ? getMediaUrl(facilitiesImages[0]) 
+    ? mediaSrc(facilitiesImages[0])
     : "/images/classroom_lipetsk.png";
 
   const resolvedEquipmentTopImage = equipmentImages[0]
-    ? getMediaUrl(equipmentImages[0])
-    : "https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=80&w=400";
+    ? mediaSrc(equipmentImages[0])
+    : "/images/robot_sumo.png";
 
   const resolvedEquipmentBottomImage = equipmentImages[1]
-    ? getMediaUrl(equipmentImages[1])
-    : "https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&q=80&w=400";
+    ? mediaSrc(equipmentImages[1])
+    : "/images/arduino_greenhouse.png";
 
+  const resolvedHeroImage = customHeroImage ? getMediaUrl(customHeroImage) : resolvedClassroomMainImage;
+  const resolvedContactMapImage = contactMapImage ? mediaSrc(contactMapImage) : resolvedClassroomMainImage;
+  const resolvedContactFacadeImage = contactFacadeImage ? mediaSrc(contactFacadeImage) : resolvedEquipmentTopImage;
+  const resolvedContactClassroomImage = contactClassroomImage ? mediaSrc(contactClassroomImage) : resolvedClassroomMainImage;
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -528,7 +560,7 @@ export default function LandingPageClient({
                 left: 0,
                 width: "100%",
                 height: "100%",
-                backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('${customHeroImage ? getMediaUrl(customHeroImage) : "https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800"}')`,
+                backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('${resolvedHeroImage}')`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 opacity: 0.15,
@@ -824,7 +856,7 @@ export default function LandingPageClient({
                 <div style={{ height: "240px", position: "relative" }}>
                   <img 
                     src={proj.img} 
-                    alt={proj.title} 
+                    alt={proj.alt || proj.title}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 </div>
@@ -1719,7 +1751,10 @@ export default function LandingPageClient({
           <div style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
             {/* Address map mock */}
             <div style={{
-              background: "linear-gradient(to bottom, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.25)), url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=600') center/cover no-repeat",
+              backgroundImage: `linear-gradient(to bottom, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.25)), url('${resolvedContactMapImage}')`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+              backgroundRepeat: "no-repeat",
               borderRadius: "var(--radius-card-site)",
               position: "relative",
               border: "1px solid var(--color-border)",
@@ -1746,7 +1781,10 @@ export default function LandingPageClient({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=300') center/cover no-repeat",
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactFacadeImage}')`,
+                backgroundPosition: "center",
+                backgroundSize: "cover",
+                backgroundRepeat: "no-repeat",
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -1755,7 +1793,10 @@ export default function LandingPageClient({
                 <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Фасад школы</span>
               </div>
               <div style={{
-                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${customClassroomImage ? getMediaUrl(customClassroomImage) : "/images/classroom_lipetsk.png"}') center/cover no-repeat`,
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactClassroomImage}')`,
+                backgroundPosition: "center",
+                backgroundSize: "cover",
+                backgroundRepeat: "no-repeat",
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 position: "relative",

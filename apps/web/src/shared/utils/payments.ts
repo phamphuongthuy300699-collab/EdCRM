@@ -14,10 +14,29 @@ export type PaymentForStatus = {
 };
 
 const paidStatuses = new Set(["paid", "succeeded"]);
+const finalPaymentStatuses = new Set(["paid", "succeeded", "refunded"]);
 
 function toAmount(value: number | string | null | undefined) {
   const amount = typeof value === "number" ? value : Number(value || 0);
   return Number.isFinite(amount) ? amount : 0;
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+export function calculateDiscountedInvoiceAmount(amount: number | string, percent: number | string | null | undefined) {
+  const baseAmount = roundMoney(toAmount(amount));
+  const rawPercent = toAmount(percent);
+  const safePercent = Math.min(100, Math.max(0, rawPercent));
+  const discountAmount = roundMoney(baseAmount * safePercent / 100);
+  const finalAmount = roundMoney(Math.max(0, baseAmount - discountAmount));
+
+  return {
+    baseAmount,
+    discountAmount,
+    finalAmount,
+  };
 }
 
 function isPastDate(value: string | null | undefined, today: Date) {
@@ -34,6 +53,10 @@ export function paidAmount(payments: PaymentForStatus[]) {
     if (!paidStatuses.has(String(payment.status || ""))) return sum;
     return sum + toAmount(payment.amount);
   }, 0);
+}
+
+export function isFinalPaymentStatus(status: PaymentStatus | string | null | undefined) {
+  return finalPaymentStatuses.has(String(status || ""));
 }
 
 export function calculateInvoiceStatusFromPayments(

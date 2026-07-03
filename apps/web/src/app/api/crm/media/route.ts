@@ -7,7 +7,19 @@ import { getMediaUrl } from "@/shared/utils/media";
 import { isDemoMode } from "@/shared/utils/demo";
 
 const LOCAL_MEDIA_DIR = "/opt/edcrm/media";
-const WHITELIST_FOLDERS = ["branding", "teachers", "pricing", "schedule", "legal", "misc"];
+const WHITELIST_FOLDERS = [
+  "branding",
+  "hero",
+  "teachers",
+  "facilities",
+  "student-projects",
+  "lesson-process",
+  "equipment",
+  "contacts",
+  "footer",
+  "documents",
+  "misc",
+];
 
 // Helper to authenticate and verify user role
 async function checkAuthAndRole(req: NextRequest) {

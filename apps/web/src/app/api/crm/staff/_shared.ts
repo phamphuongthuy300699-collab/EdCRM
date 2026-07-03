@@ -5,9 +5,13 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { isDemoMode } from "@/shared/utils/demo";
 
 export const staffRoleSchema = z.enum(["owner", "admin", "manager", "teacher", "accountant"]);
+const optionalOrganizationIdSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().uuid().optional(),
+);
 
 export const staffPayloadSchema = z.object({
-  organizationId: z.string().uuid().optional(),
+  organizationId: optionalOrganizationIdSchema,
   userId: z.string().uuid().optional(),
   email: z.string().email(),
   fullName: z.string().min(2).max(160),

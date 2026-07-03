@@ -3,6 +3,7 @@ import { getAlfaOrderStatus } from "@/lib/payments/alfabank/client";
 import { mapAlfaStatusToCrmStatus, redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { AlfaBankError } from "@/lib/payments/alfabank/errors";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { isFinalPaymentStatus } from "@/shared/utils/payments";
 
 function jsonError(message: string, status = 400, code = "CALLBACK_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -70,7 +71,7 @@ async function processCallback(request: NextRequest) {
   });
 
   // 6. Idempotency check: if payment is already completed or refunded, do not process again
-  if (payment.status === "paid" || payment.status === "refunded") {
+  if (isFinalPaymentStatus(payment.status)) {
     return NextResponse.json({ ok: true, message: "Payment already processed", status: payment.status });
   }
 

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { calculateDiscountedInvoiceAmount } from "@/shared/utils/payments";
 
 export default function CrmInvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,7 +33,7 @@ export default function CrmInvoicesPage() {
   const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
   const [newAmount, setNewAmount] = useState("4500");
   const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-  const [discountInfo, setDiscountInfo] = useState<{ title: string; percent: number; discount_type_id: string } | null>(null);
+  const [discountInfo, setDiscountInfo] = useState<{ title: string; percent: number; discount_type_id: string; discount_assignment_id: string } | null>(null);
   const [loadingDiscount, setLoadingDiscount] = useState(false);
 
   const [students, setStudents] = useState<any[]>([]);
@@ -65,10 +66,10 @@ export default function CrmInvoicesPage() {
 
         // 2. Fetch approved active discount assignments for guardians
         const { data: assignments } = await (supabase.from("discount_assignments") as any)
-          .select("id, percent, discount_type_id, discount_types ( title, percent )")
+          .select("id, discount_type_id, discount_types!inner ( title, percent, is_active )")
           .in("guardian_id", guardianIds)
           .eq("status", "approved")
-          .eq("is_active", true);
+          .eq("discount_types.is_active", true);
 
         if (cancelled) return;
         if (!assignments || assignments.length === 0) {
@@ -79,7 +80,7 @@ export default function CrmInvoicesPage() {
         // 3. Pick the best (highest percent) discount
         let best: any = null;
         for (const a of assignments) {
-          const pct = a.percent ?? a.discount_types?.percent ?? 0;
+          const pct = a.discount_types?.percent ?? 0;
           if (!best || pct > best._pct) {
             best = { ...a, _pct: pct };
           }
@@ -88,7 +89,8 @@ export default function CrmInvoicesPage() {
           setDiscountInfo({
             title: best.discount_types?.title || "Скидка",
             percent: best._pct,
-            discount_type_id: best.discount_type_id
+            discount_type_id: best.discount_type_id,
+            discount_assignment_id: best.id
           });
         } else {
           setDiscountInfo(null);
@@ -470,6 +472,11 @@ export default function CrmInvoicesPage() {
       const parentName = primaryGuardianLink?.guardians?.full_name || "Не указан";
       const groupTitle = activeEnrollment?.groups?.title || "Без группы";
 
+      const invoiceAmounts = calculateDiscountedInvoiceAmount(newAmount, discountInfo?.percent || 0);
+      if (invoiceAmounts.baseAmount <= 0) {
+        throw new Error("Сумма счёта должна быть больше 0");
+      }
+
       const insertData: any = {
         organization_id: orgRes.data.id,
         student_id: newStudentId,
@@ -477,7 +484,7 @@ export default function CrmInvoicesPage() {
         enrollment_id: activeEnrollment?.id || null,
         title: newTitle,
         description: newTitle,
-        amount: parseFloat(newAmount),
+        amount: invoiceAmounts.finalAmount,
         currency: "RUB",
         status: "issued" as const,
         due_date: newDueDate,
@@ -485,7 +492,7 @@ export default function CrmInvoicesPage() {
       };
 
       if (discountInfo) {
-        insertData.discount_amount = parseFloat(newAmount) * discountInfo.percent / 100;
+        insertData.discount_amount = invoiceAmounts.discountAmount;
         insertData.discount_title = discountInfo.title;
         insertData.discount_percent = discountInfo.percent;
       }
@@ -495,12 +502,15 @@ export default function CrmInvoicesPage() {
 
       // Insert discount record if applicable
       if (discountInfo && data?.id) {
-        await (supabase.from("invoice_discounts") as any).insert({
+        const { error: discountInsertError } = await (supabase.from("invoice_discounts") as any).insert({
+          organization_id: orgRes.data.id,
           invoice_id: data.id,
-          discount_type_id: discountInfo.discount_type_id,
+          discount_assignment_id: (discountInfo as any).discount_assignment_id || null,
+          title: discountInfo.title,
           percent: discountInfo.percent,
-          amount: parseFloat(newAmount) * discountInfo.percent / 100
+          amount: invoiceAmounts.discountAmount
         });
+        if (discountInsertError) throw discountInsertError;
       }
 
       const newInvObj = {

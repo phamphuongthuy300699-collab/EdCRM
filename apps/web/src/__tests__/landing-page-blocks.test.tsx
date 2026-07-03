@@ -77,4 +77,33 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText("Месячный абонемент")).toBeInTheDocument();
     expect(screen.getByText(/4.*000/i)).toBeInTheDocument();
   });
+
+  it("uses CRM media for every contact photo slot", () => {
+    const { container } = render(
+      <LandingPageClient
+        initialBranches={[{ address: "ул. Тестовая, 1", work_hours: "10:00-20:00" }]}
+        initialBlocks={[
+          {
+            block_key: "contacts.media",
+            content: {
+              mapImage: "contacts/map.jpg",
+              facadeImage: { path: "contacts/facade.jpg", title: "Фасад" },
+              classroomImage: { path: "contacts/classroom.jpg", title: "Класс" },
+            },
+          },
+        ]}
+      />,
+    );
+
+    const contactsSection = container.querySelector("#contacts");
+    expect(contactsSection).not.toBeNull();
+    const styles = Array.from(contactsSection!.querySelectorAll<HTMLElement>("[style]"))
+      .map((element) => element.getAttribute("style") || "")
+      .join("\n");
+
+    expect(styles).toContain("contacts/map.jpg");
+    expect(styles).toContain("contacts/facade.jpg");
+    expect(styles).toContain("contacts/classroom.jpg");
+    expect(styles).not.toContain("images.unsplash.com");
+  });
 });

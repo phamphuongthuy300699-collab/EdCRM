@@ -104,6 +104,17 @@ CREATE POLICY "invoice_discounts_select_guardian" ON public.invoice_discounts
     exists (
       select 1 from public.invoices inv
       where inv.id = invoice_discounts.invoice_id
+        and (
+          public.has_org_role(inv.organization_id, ARRAY['owner','admin','manager','accountant']::public.app_role[])
+          or (inv.student_id is not null and public.is_guardian_of_student(inv.student_id))
+          or exists (
+            select 1
+            from public.guardian_users gu
+            where gu.user_id = auth.uid()
+              and gu.organization_id = inv.organization_id
+              and gu.guardian_id = inv.guardian_id
+          )
+        )
     )
   );
 

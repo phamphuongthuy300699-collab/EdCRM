@@ -13,10 +13,30 @@ export const metadata: Metadata = {
   description: "Контактная информация, адреса проведения занятий и юридические реквизиты школы Робокс в Липецке.",
 };
 
+function mediaPath(value: any) {
+  return typeof value === "string" ? value : value?.path || "";
+}
+
+function mediaAlt(value: any, fallback: string) {
+  if (typeof value === "object" && value?.alt) return value.alt;
+  if (typeof value === "object" && value?.title) return value.title;
+  return fallback;
+}
+
+function uniqueMediaItems(values: any[]) {
+  const seen = new Set<string>();
+  return values.filter((item) => {
+    const path = mediaPath(item);
+    if (!path || seen.has(path)) return false;
+    seen.add(path);
+    return true;
+  });
+}
+
 export default async function ContactsPage() {
   const data = await getPublicLegalData();
 
-  let contactImages: string[] = [];
+  let contactImages: any[] = [];
   try {
     const supabase = createSupabaseAdminClient();
     const { data: org } = await supabase
@@ -33,8 +53,13 @@ export default async function ContactsPage() {
         .eq("status", "published")
         .maybeSingle();
 
-      if (block?.content?.images) {
-        contactImages = Array.isArray(block.content.images) ? block.content.images : [];
+      if (block?.content) {
+        contactImages = uniqueMediaItems([
+          block.content.mapImage,
+          block.content.facadeImage,
+          block.content.classroomImage,
+          ...(Array.isArray(block.content.images) ? block.content.images : []),
+        ]);
       }
     }
   } catch (err) {
@@ -100,7 +125,7 @@ export default async function ContactsPage() {
       {contactImages.length > 0 && (
         <LegalSection title="Фотографии наших классов">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", marginTop: "16px" }}>
-            {contactImages.map((path, idx) => (
+            {contactImages.map((image, idx) => (
               <div
                 key={idx}
                 style={{
@@ -112,8 +137,8 @@ export default async function ContactsPage() {
                 }}
               >
                 <img
-                  src={getMediaUrl(path)}
-                  alt={`Фото класса ${idx + 1}`}
+                  src={getMediaUrl(mediaPath(image))}
+                  alt={mediaAlt(image, `Фото класса ${idx + 1}`)}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               </div>

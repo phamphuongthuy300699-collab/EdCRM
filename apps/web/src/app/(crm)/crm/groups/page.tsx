@@ -445,13 +445,23 @@ export default function CrmGroupsPage() {
   };
 
   const handleAddStudent = async () => {
-    if (!studentToAddId || addingStudentToGroup) return;
+    if (!studentToAddId || addingStudentToGroup || !selectedGroup) return;
     try {
       setAddingStudentToGroup(true);
       const demo = isDemoMode();
       const isMockId = typeof selectedGroup.id === "string" && selectedGroup.id.startsWith("g");
 
       const studentObj = allStudents.find(s => s.id === studentToAddId);
+      const alreadyEnrolled = groupStudents.some((student) => student.id === studentToAddId);
+      if (alreadyEnrolled) {
+        throw new Error("Ученик уже зачислен в эту группу");
+      }
+
+      const capacity = Number(selectedGroup.capacity || 0);
+      const enrolledCount = Math.max(Number(selectedGroup.enrolled || 0), groupStudents.length);
+      if (capacity > 0 && enrolledCount >= capacity) {
+        throw new Error("В группе нет свободных мест");
+      }
 
       if (demo || isMockId) {
         setGroupStudents(prev => [...prev, { id: studentToAddId, full_name: studentObj ? studentObj.full_name : "Новый ученик" }]);

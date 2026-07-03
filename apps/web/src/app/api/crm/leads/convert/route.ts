@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,18 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, error: "Не передан leadId" },
         { status: 400 }
+      );
+    }
+
+    const authClient = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Необходима авторизация" },
+        { status: 401 }
       );
     }
 
@@ -26,6 +39,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, error: "Заявка не найдена" },
         { status: 404 }
+      );
+    }
+
+    const { data: membership } = await (authClient.from("org_memberships") as any)
+      .select("role")
+      .eq("organization_id", lead.organization_id)
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!membership || !["owner", "admin", "manager"].includes(membership.role)) {
+      return NextResponse.json(
+        { ok: false, error: "Недостаточно прав" },
+        { status: 403 }
       );
     }
 

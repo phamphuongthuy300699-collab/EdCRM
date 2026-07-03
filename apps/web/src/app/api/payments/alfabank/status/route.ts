@@ -4,6 +4,7 @@ import { getAlfaOrderStatus } from "@/lib/payments/alfabank/client";
 import { mapAlfaStatusToCrmStatus, redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { isFinalPaymentStatus } from "@/shared/utils/payments";
 
 export const statusSchema = z.object({
   paymentId: z.string().uuid().optional(),
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     const newStatus = mapAlfaStatusToCrmStatus(orderStatus);
 
     // 8. Idempotency: paid or refunded payment cannot downgrade
-    if (["paid", "refunded"].includes(payment.status) && !["paid", "refunded"].includes(newStatus)) {
+    if (isFinalPaymentStatus(payment.status) && !isFinalPaymentStatus(newStatus)) {
       return NextResponse.json({
         ok: true,
         message: "Статус платежа в базе сохранен как окончательный",

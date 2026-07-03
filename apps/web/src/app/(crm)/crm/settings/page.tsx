@@ -165,6 +165,25 @@ function ruleLabel(rule: any) {
   return `${day} ${toTime(rule.starts_at)}-${toTime(rule.ends_at)}`;
 }
 
+function flattenValidationDetails(details: any, prefix = ""): string[] {
+  if (!details || typeof details !== "object") return [];
+  const ownErrors = Array.isArray(details._errors) ? details._errors : [];
+  const lines = ownErrors.map((message: string) => `${prefix || "form"}: ${message}`);
+
+  for (const [key, value] of Object.entries(details)) {
+    if (key === "_errors") continue;
+    lines.push(...flattenValidationDetails(value, prefix ? `${prefix}.${key}` : key));
+  }
+
+  return lines;
+}
+
+function staffErrorMessage(payload: any) {
+  const details = flattenValidationDetails(payload?.details);
+  if (details.length === 0) return payload?.error || "Не удалось сохранить сотрудника";
+  return `${payload?.error || "Некорректные данные сотрудника"}\n${details.join("\n")}`;
+}
+
 function Field({
   label,
   children,
@@ -769,13 +788,10 @@ export default function CrmSettingsPage() {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId: org.id,
-          ...staffDraft,
-        }),
+        body: JSON.stringify(staffDraft),
       });
       const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сохранить сотрудника");
+      if (!response.ok || !payload.ok) throw new Error(staffErrorMessage(payload));
       if (payload.temporaryPassword) setTemporaryPassword(payload.temporaryPassword);
       if (demo) {
         const local = {
@@ -797,7 +813,7 @@ export default function CrmSettingsPage() {
         await loadData();
       }
       setStaffDraft(null);
-      setNotice("Сотрудник сохранен");
+      setNotice("Сотрудник сохранён");
     } catch (err: any) {
       setStaffError(err.message || "Не удалось сохранить сотрудника");
     } finally {
@@ -1755,7 +1771,7 @@ export default function CrmSettingsPage() {
         <Modal title={staffDraft.userId ? "Редактировать сотрудника" : "Новый сотрудник"} onClose={() => { setStaffDraft(null); setStaffError(""); }} width={820}>
           <form onSubmit={saveStaff} className="settings-card-list">
             {staffError && (
-              <div className="settings-alert error" style={{ margin: "0 0 16px 0" }}>
+              <div className="settings-alert error" style={{ margin: "0 0 16px 0", whiteSpace: "pre-wrap" }}>
                 ✕ {staffError}
               </div>
             )}
@@ -1773,7 +1789,7 @@ export default function CrmSettingsPage() {
                 </SelectInput>
               </Field>
               <Field label="Специализация"><TextInput value={staffDraft.specialty} onChange={(e) => setStaffDraft({ ...staffDraft, specialty: e.target.value })} /></Field>
-              <Field label="URL фото"><TextInput value={staffDraft.avatarUrl} onChange={(e) => setStaffDraft({ ...staffDraft, avatarUrl: e.target.value })} /></Field>
+              <Field label="Фото: storage path или URL"><TextInput value={staffDraft.avatarUrl} onChange={(e) => setStaffDraft({ ...staffDraft, avatarUrl: e.target.value })} placeholder="teachers/photo.jpg" /></Field>
               <Field label="Порядок"><TextInput type="number" value={staffDraft.sortOrder} onChange={(e) => setStaffDraft({ ...staffDraft, sortOrder: e.target.value })} /></Field>
             </div>
             <Field label="Публичное описание"><TextArea value={staffDraft.publicBio} onChange={(e) => setStaffDraft({ ...staffDraft, publicBio: e.target.value })} /></Field>

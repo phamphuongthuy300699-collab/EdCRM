@@ -265,6 +265,13 @@ export default function CrmStudentsPage() {
       if (!orgRes.data) throw new Error("Organization not found");
       const organizationId = orgRes.data.id;
 
+      if (selectedGroupId) {
+        const selGroup = groups.find(g => g.id === selectedGroupId);
+        if (selGroup && Number(selGroup.capacity || 0) > 0 && Number(selGroup.enrolled || 0) >= Number(selGroup.capacity || 0)) {
+          throw new Error("В выбранной группе нет свободных мест");
+        }
+      }
+
       // 1. Create Student
       const { data: student, error: stError } = await (supabase.from("students") as any).insert({
         organization_id: organizationId,
