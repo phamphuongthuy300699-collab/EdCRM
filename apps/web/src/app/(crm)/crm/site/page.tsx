@@ -570,7 +570,6 @@ export default function CrmSitePage() {
           .select()
           .single();
         if (error) throw error;
-        editingTariff.id = data.id;
       }
       loadData();
       setEditingTariff(null);
@@ -699,6 +698,11 @@ export default function CrmSitePage() {
         .badge-green { background: #DCFCE7; color: #15803D; }
         .badge-gray { background: #F3F4F6; color: #4B5563; }
         .site-tab-nav { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 12px; }
+        .site-tab-nav-mobile { display: none; }
+        @media (max-width: 768px) {
+          .site-tab-nav { display: none !important; }
+          .site-tab-nav-mobile { display: block !important; margin-bottom: 16px; }
+        }
         .table-crm { width: 100%; border-collapse: collapse; font-size: 13px; }
         .table-crm th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--color-border); font-weight: 700; }
         .table-crm td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
@@ -722,6 +726,36 @@ export default function CrmSitePage() {
           ⚠️ {errorMsg}
         </div>
       )}
+
+      <div className="site-tab-nav-mobile">
+        <select
+          value={activeTab}
+          onChange={(e) => setActiveTab(e.target.value as TabId)}
+          className="form-input"
+          style={{
+            height: "44px",
+            fontSize: "14px",
+            fontWeight: 700,
+            border: "1px solid var(--color-primary)",
+            color: "var(--color-primary-dark)",
+            background: "var(--color-primary-soft)",
+            width: "100%",
+            borderRadius: "8px",
+            padding: "0 12px",
+            boxSizing: "border-box"
+          }}
+        >
+          <option value="home">🏠 Главная страница</option>
+          <option value="branding">✨ Брендинг</option>
+          <option value="teachers">👥 Преподаватели</option>
+          <option value="branches">📍 Контакты & Филиалы</option>
+          <option value="prices">💵 Цены & Тарифы</option>
+          <option value="schedule">📅 Расписание</option>
+          <option value="legal">📄 Юридические страницы</option>
+          <option value="footer">🏢 Футер</option>
+          <option value="media">🖼️ Медиа-менеджер</option>
+        </select>
+      </div>
 
       <div className="site-tab-nav">
         {[

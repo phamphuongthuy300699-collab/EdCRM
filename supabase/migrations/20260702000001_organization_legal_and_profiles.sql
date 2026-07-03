@@ -17,6 +17,9 @@ ADD COLUMN IF NOT EXISTS bank_address text;
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS show_public_contacts boolean not null default false;
 
+-- Drop foreign key constraint referencing auth.users to allow teachers without login
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+
 -- 3. Create course_tariffs table
 CREATE TABLE IF NOT EXISTS public.course_tariffs (
   id uuid primary key default gen_random_uuid(),
@@ -107,40 +110,7 @@ ON CONFLICT (id) DO UPDATE SET
   sort_order = excluded.sort_order,
   work_hours = excluded.work_hours;
 
--- 8. Seed/Update Teachers profiles with full, correct specialties & bios
-UPDATE public.profiles SET
-  specialty = 'дошкольники, школьники; LEGO Education, DUPLO, WeDo 2.0, EV3, Scratch',
-  public_bio = 'Дарья ведёт занятия по робототехнике для дошкольников и школьников. Помогает детям освоить конструирование, первые алгоритмы и программирование на наборах LEGO Education, DUPLO, WeDo 2.0, EV3 и Scratch. На занятиях делает акцент на понятные объяснения, аккуратную сборку моделей и уверенное вовлечение ребёнка в инженерное творчество.',
-  show_on_site = true,
-  sort_order = 10,
-  show_public_contacts = false
-WHERE id = 'a1111111-e222-3333-4444-555555555555';
-
-UPDATE public.profiles SET
-  specialty = 'школьники старшего возраста; LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch',
-  public_bio = 'Алена работает со школьниками старшего возраста и помогает им переходить от простого конструирования к более осознанной инженерной логике. На занятиях используются LEGO Education, WeDo 2.0, EV3, SPIKE Prime и Scratch. Ребята учатся собирать модели, программировать поведение роботов и разбирать задачи по шагам.',
-  show_on_site = true,
-  sort_order = 20,
-  show_public_contacts = false
-WHERE id = 'a2222222-e222-3333-4444-555555555555';
-
-UPDATE public.profiles SET
-  specialty = 'дошкольники и школьники младшего возраста; LEGO Education, DUPLO, WeDo 2.0, Scratch',
-  public_bio = 'Дарья ведёт занятия для дошкольников и школьников младшего возраста. Она помогает детям познакомиться с робототехникой через понятные практические задания, работу с LEGO Education, DUPLO, WeDo 2.0 и Scratch. Основной акцент — развитие логики, внимания, самостоятельности и интереса к техническому творчеству.',
-  show_on_site = true,
-  sort_order = 30,
-  show_public_contacts = false
-WHERE id = 'a3333333-e222-3333-4444-555555555555';
-
-UPDATE public.profiles SET
-  specialty = 'программирование, алгоритмика, визуальное и базовое текстовое программирование, цифровые проекты',
-  public_bio = 'Сергей ведёт направление программирования для детей. На занятиях ребята развивают алгоритмическое мышление, учатся разбирать задачи на шаги, создавать интерактивные проекты и постепенно переходить от визуального программирования к более системному пониманию кода. Занятия подходят детям, которым интересно создавать игры, анимации, цифровые проекты и понимать, как работает логика программ.',
-  show_on_site = true,
-  sort_order = 40,
-  show_public_contacts = false
-WHERE id = 'a4444444-e222-3333-4444-555555555555';
-
--- 9. Seed Default Tariffs
+-- 8. Seed Default Tariffs
 INSERT INTO public.course_tariffs (id, organization_id, title, audience, format, price, is_one_time, sort_order, show_on_site)
 VALUES
   (
@@ -184,3 +154,32 @@ ON CONFLICT (id) DO UPDATE SET
   is_one_time = excluded.is_one_time,
   sort_order = excluded.sort_order,
   show_on_site = excluded.show_on_site;
+
+-- 8. Seed/Update Teachers profiles with full, correct specialties & bios
+INSERT INTO public.profiles (id, full_name, phone, email, specialty, public_bio, show_on_site, sort_order, slug, show_public_contacts)
+VALUES
+  ('a1111111-e222-3333-4444-555555555555', 'Загрядская Дарья', '+7 905 684-60-65', 'paramonovadara838@mail.ru', 'дошкольники, школьники; LEGO Education, DUPLO, WeDo 2.0, EV3, Scratch', 'Дарья ведёт занятия по робототехнике для дошкольников и школьников. Помогает детям освоить конструирование, первые алгоритмы и программирование на наборах LEGO Education, DUPLO, WeDo 2.0, EV3 и Scratch. На занятиях делает акцент на понятные объяснения, аккуратную сборку моделей и уверенное вовлечение ребёнка в инженерное творчество.', true, 10, 'zagryadskaya-darya', false),
+  ('a2222222-e222-3333-4444-555555555555', 'Шамрай Алена', '8-905-045-10-12', 'alena-yakunina@mail.ru', 'школьники старшего возраста; LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch', 'Алена работает со школьниками старшего возраста и помогает им переходить от простого конструирования к более осознанной инженерной логике. На занятиях используются LEGO Education, WeDo 2.0, EV3, SPIKE Prime и Scratch. Ребята учатся собирать модели, программировать поведение роботов и разбирать задачи по шагам.', true, 20, 'shamray-alena', false),
+  ('a3333333-e222-3333-4444-555555555555', 'Троянова Дарья', '+7 920 501-54-91', 'dasha_pantyukhina@mail.ru', 'дошкольники и школьники младшего возраста; LEGO Education, DUPLO, WeDo 2.0, Scratch', 'Дарья ведёт занятия для дошкольников и школьников младшего возраста. Она помогает детям познакомиться с робототехникой через понятные практические задания, работу с LEGO Education, DUPLO, WeDo 2.0 и Scratch. Основной акцент — развитие логики, внимания, самостоятельности и интереса к техническому творчеству.', true, 30, 'troyanova-darya', false),
+  ('a4444444-e222-3333-4444-555555555555', 'Федоренко Сергей', NULL, 'fedorenko3d@yandex.ru', 'программирование, алгоритмика, визуальное и базовое текстовое программирование, цифровые проекты', 'Сергей ведёт направление программирования для детей. На занятиях ребята развивают алгоритмическое мышление, учатся разбирать задачи на шаги, создавать интерактивные проекты и постепенно переходить от визуального программирования к более системному пониманию кода. Занятия подходят детям, которым интересно создавать игры, анимации, цифровые проекты и понимать, как работает логика программ.', true, 40, 'fedorenko-sergey', false)
+ON CONFLICT (id) DO UPDATE SET
+  full_name = excluded.full_name,
+  phone = excluded.phone,
+  email = excluded.email,
+  specialty = excluded.specialty,
+  public_bio = excluded.public_bio,
+  show_on_site = excluded.show_on_site,
+  sort_order = excluded.sort_order,
+  slug = excluded.slug,
+  show_public_contacts = excluded.show_public_contacts;
+
+-- Seed Org Memberships for teachers
+INSERT INTO public.org_memberships (organization_id, user_id, role, is_active)
+VALUES
+  ('a3848a60-a292-491a-85eb-7f2824cf4e77', 'a1111111-e222-3333-4444-555555555555', 'teacher', true),
+  ('a3848a60-a292-491a-85eb-7f2824cf4e77', 'a2222222-e222-3333-4444-555555555555', 'teacher', true),
+  ('a3848a60-a292-491a-85eb-7f2824cf4e77', 'a3333333-e222-3333-4444-555555555555', 'teacher', true),
+  ('a3848a60-a292-491a-85eb-7f2824cf4e77', 'a4444444-e222-3333-4444-555555555555', 'teacher', true)
+ON CONFLICT (organization_id, user_id) DO UPDATE SET
+  role = excluded.role,
+  is_active = excluded.is_active;

@@ -273,7 +273,7 @@ export default function LandingPageClient({
         imageUrl: teacher.imageUrl || "",
         alt: teacher.alt || teacher.name,
       }))
-    : teacherFallbackList;
+    : [];
 
   const portalPreviewBlock = getBlock('home.parent_student_portal_preview');
   const portalPreviewTitle = portalPreviewBlock?.title || "Родители видят прогресс ребенка в личном кабинете";
@@ -295,8 +295,8 @@ export default function LandingPageClient({
   const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
   const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
   const primaryBranch = initialBranches?.[0] || null;
-  const contactAddress = primaryBranch?.address || "г. Липецк, ул. Ленина, д. 10";
-  const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Понедельник — Суббота: 09:00 - 20:00";
+  const contactAddress = primaryBranch?.address || "Адрес филиала уточняется в CRM";
+  const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -314,17 +314,12 @@ export default function LandingPageClient({
           price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : (localConfig?.price || "4 000 ₽ / мес")
         };
       })
-    : coursesList;
+    : [];
 
   // Dynamic Schedule Mapping & Filters
   const rawSchedule = (initialSchedule && initialSchedule.length > 0)
     ? initialSchedule
-    : [
-        { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spots: 2, branch: "Артемова", teacher: "Михаил Юрьевич" },
-        { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spots: 3, branch: "Победы", teacher: "Дмитрий Яковлев" },
-        { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spots: 0, branch: "Артемова", teacher: "Михаил Юрьевич" },
-        { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spots: 4, branch: "Победы", teacher: "Михаил Юрьевич" }
-      ];
+    : [];
 
   const uniqueCourses = Array.from(new Set(rawSchedule.map((s: any) => s.course).filter(Boolean)));
   const uniqueBranches = Array.from(new Set(rawSchedule.map((s: any) => s.branch).filter(Boolean)));
@@ -721,9 +716,14 @@ export default function LandingPageClient({
             gridTemplateColumns: "1fr 1fr",
             gap: "32px"
           }}>
-            {coursesToRender.map((course) => {
-              const IconComp = course.icon;
-              return (
+            {coursesToRender.length === 0 ? (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                Направления обучения пока не заполнены в CRM.
+              </div>
+            ) : (
+              coursesToRender.map((course) => {
+                const IconComp = course.icon;
+                return (
                 <div key={course.id} className="card-site" style={{
                   display: "flex",
                   flexDirection: "column",
@@ -798,7 +798,8 @@ export default function LandingPageClient({
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </div>
       </section>
@@ -1336,17 +1337,21 @@ export default function LandingPageClient({
             {(() => {
               const tariffsList = (initialTariffs && initialTariffs.length > 0)
                 ? initialTariffs
-                : [
-                    { id: "trial", title: "Пробный урок", price: 0, format: "Ознакомительное занятие 90 минут. Ребенок соберет первого робота.", is_one_time: true, audience: "Дошкольники" },
-                    { id: "monthly", title: "Месячный абонемент", price: 4000, format: "4 занятия по 90 минут. Все учебные материалы и LEGO включены.", is_one_time: false, audience: "Школьники" },
-                    { id: "indiv", title: "Индивидуальный урок", price: 1500, format: "Персональный урок с наставником. Индивидуальный разбор сложных проектов.", is_one_time: false, audience: "Индивидуально" }
-                  ];
+                : [];
+
+              if (tariffsList.length === 0) {
+                return (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                    Тарифы обучения пока не заполнены в CRM.
+                  </div>
+                );
+              }
 
               return tariffsList.map((t: any) => {
                 const isTrial = Number(t.price) === 0 || t.title.toLowerCase().includes("пробн") || t.audience?.toLowerCase().includes("дошкол");
                 const isMonthly = t.title.toLowerCase().includes("абонемент") || t.audience?.toLowerCase().includes("школ");
                 
-                let cardStyle: React.CSSProperties = {
+                const cardStyle: React.CSSProperties = {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
@@ -1426,11 +1431,16 @@ export default function LandingPageClient({
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: "32px"
             }}>
-              {teachersListToRender.map((teacher: any, idx: number) => {
-                const initials = teacher.name 
-                  ? teacher.name.split(" ").filter(Boolean).map((n: string) => n[0]).join("") 
-                  : "Р";
-                return (
+              {teachersListToRender.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                  Преподаватели пока не заполнены в CRM.
+                </div>
+              ) : (
+                teachersListToRender.map((teacher: any, idx: number) => {
+                  const initials = teacher.name 
+                    ? teacher.name.split(" ").filter(Boolean).map((n: string) => n[0]).join("") 
+                    : "Р";
+                  return (
                   <div key={idx} className="card-site" style={{ textAlign: "center" }}>
                     <div style={{
                       width: "120px",
@@ -1468,8 +1478,9 @@ export default function LandingPageClient({
                       «{teacher.text}»
                     </p>
                   </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </section>

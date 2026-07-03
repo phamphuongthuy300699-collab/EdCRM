@@ -22,6 +22,7 @@ export default function Header({
   phone,
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const cleanPhone = phone.replace(/[^0-9+]/g, "");
 
@@ -46,10 +47,11 @@ export default function Header({
         }}>
           {/* Logo / Brand Name */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-            {logoDisplay !== "sign" && brandLogo ? (
+            {logoDisplay !== "sign" && brandLogo && !logoError ? (
               <img 
                 src={getMediaUrl(brandLogo)} 
                 alt={logoAlt || brandName} 
+                onError={() => setLogoError(true)}
                 style={{ 
                   height: "38px", 
                   width: "auto",
@@ -58,7 +60,7 @@ export default function Header({
               />
             ) : null}
             
-            {logoDisplay === "sign" || !brandLogo ? (
+            {logoDisplay === "sign" || !brandLogo || logoError ? (
               <span style={{
                 fontWeight: 900,
                 fontSize: "1.4rem",
@@ -69,7 +71,7 @@ export default function Header({
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent"
               }}>
-                {brandName}
+                {brandName || "Робокс"}
               </span>
             ) : null}
           </Link>
@@ -84,11 +86,11 @@ export default function Header({
             fontSize: "var(--font-small)",
             color: "var(--color-text-muted)"
           }} className="desktop-nav">
-            <a href="#courses" style={{ transition: "color 0.2s" }} className="nav-link">Курсы</a>
-            <a href="#prices" style={{ transition: "color 0.2s" }} className="nav-link">Цены</a>
-            <a href="#schedule" style={{ transition: "color 0.2s" }} className="nav-link">Расписание</a>
-            <a href="#teachers" style={{ transition: "color 0.2s" }} className="nav-link">Преподаватели</a>
-            <a href="#contacts" style={{ transition: "color 0.2s" }} className="nav-link">Контакты</a>
+            <Link href="/#courses" style={{ transition: "color 0.2s" }} className="nav-link">Курсы</Link>
+            <Link href="/#prices" style={{ transition: "color 0.2s" }} className="nav-link">Цены</Link>
+            <Link href="/#schedule" style={{ transition: "color 0.2s" }} className="nav-link">Расписание</Link>
+            <Link href="/#teachers" style={{ transition: "color 0.2s" }} className="nav-link">Преподаватели</Link>
+            <Link href="/#contacts" style={{ transition: "color 0.2s" }} className="nav-link">Контакты</Link>
           </nav>
 
           {/* Desktop Actions */}
@@ -105,7 +107,7 @@ export default function Header({
               <Phone size={16} style={{ color: "var(--color-accent)" }} />
               <span>{phone}</span>
             </a>
-            <a href="#lead-form">
+            <Link href="/#lead-form">
               <Button variant="primary-site" style={{ 
                 height: "44px", 
                 fontSize: "13px", 
@@ -117,7 +119,7 @@ export default function Header({
               }}>
                 Записаться
               </Button>
-            </a>
+            </Link>
           </div>
 
           {/* Mobile Burger Button */}
@@ -164,11 +166,11 @@ export default function Header({
             fontWeight: 700,
             fontFamily: "var(--font-inter)"
           }}>
-            <a href="#courses" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Курсы</a>
-            <a href="#prices" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Цены</a>
-            <a href="#schedule" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Расписание</a>
-            <a href="#teachers" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Преподаватели</a>
-            <a href="#contacts" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Контакты</a>
+            <Link href="/#courses" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Курсы</Link>
+            <Link href="/#prices" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Цены</Link>
+            <Link href="/#schedule" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Расписание</Link>
+            <Link href="/#teachers" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Преподаватели</Link>
+            <Link href="/#contacts" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Контакты</Link>
           </nav>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "auto", paddingBottom: "48px" }}>
@@ -188,7 +190,7 @@ export default function Header({
               {phone}
             </a>
             
-            <a href="#lead-form" onClick={() => setIsMenuOpen(false)}>
+            <Link href="/#lead-form" onClick={() => setIsMenuOpen(false)}>
               <Button style={{
                 width: "100%",
                 height: "50px",
@@ -201,7 +203,7 @@ export default function Header({
               }}>
                 Записаться на занятие
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       )}

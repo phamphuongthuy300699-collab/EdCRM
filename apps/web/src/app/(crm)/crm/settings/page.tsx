@@ -124,14 +124,14 @@ const emptyStaff = {
 
 const demoOrg = {
   id: "demo-org",
-  name: "Robotics Липецк",
+  name: "Робокс",
   slug: "robotics-lipetsk",
   city: "Липецк",
   timezone: "Europe/Moscow",
-  phone: "+7 (999) 123-45-67",
-  email: "info@robotics-lipetsk.ru",
-  legal_name: "ООО Роботикс Липецк",
-  inn: "",
+  phone: "+7 994 777-48-48",
+  email: "robokslip48@mail.ru",
+  legal_name: "ИП Юлдашев Рустам Хакимович",
+  inn: "482426310695",
   ogrn: "",
 };
 
@@ -298,28 +298,28 @@ export default function CrmSettingsPage() {
           {
             ...emptyBranch,
             id: "demo-branch-1",
-            name: "Основной филиал",
-            address: "Липецк, ул. Ленина, 10",
-            phone: "+7 (999) 123-45-67",
-            email: "info@robotics-lipetsk.ru",
+            name: "Филиал на Осканова",
+            address: "Липецк, ул. Осканова, 3",
+            phone: "+7 994 777-48-48",
+            email: "robokslip48@mail.ru",
             work_hours: "Пн-Сб 09:00-20:00",
-            description: "Светлый учебный класс рядом с центром города.",
+            description: "Светлый учебный класс с современным робототехническим оборудованием.",
             sort_order: 10,
           },
         ];
         const demoCourses = [
-          { ...emptyCourse, id: "demo-course-1", title: "Робототехника LEGO", slug: "lego-robotics", min_age: 6, max_age: 9, price_monthly: 4500, sort_order: 10 },
-          { ...emptyCourse, id: "demo-course-2", title: "Scratch", slug: "scratch", min_age: 8, max_age: 11, price_monthly: 4000, sort_order: 20 },
+          { ...emptyCourse, id: "demo-course-1", title: "Робототехника (Lego Education)", slug: "robotics-lego", min_age: 6, max_age: 12, price_monthly: 3000, sort_order: 10 },
+          { ...emptyCourse, id: "demo-course-2", title: "Scratch и основы программирования", slug: "scratch", min_age: 8, max_age: 12, price_monthly: 3500, sort_order: 20 },
         ];
         const demoStaff = [
           {
             user_id: "demo-teacher-1",
-            full_name: "Алексей Дмитриев",
-            email: "teacher@robotics.local",
-            phone: "+7 (999) 000-00-01",
+            full_name: "Загрядская Дарья",
+            email: "paramonovadara838@mail.ru",
+            phone: "+7 905 684-60-65",
             role: "teacher",
-            specialty: "LEGO и Arduino",
-            public_bio: "Помогает детям доводить инженерные идеи до рабочего прототипа.",
+            specialty: "дошкольники, школьники; LEGO Education, DUPLO, WeDo 2.0, EV3, Scratch",
+            public_bio: "Дарья ведёт занятия по робототехнике для дошкольников и школьников. Помогает детям освоить конструирование, первые алгоритмы и программирование.",
             show_on_site: true,
             sort_order: 10,
             is_active: true,

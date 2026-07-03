@@ -12,19 +12,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("LandingPageClient dynamic data rendering and fallbacks", () => {
-  it("renders teachers block with default values when no props are provided", () => {
-    render(<LandingPageClient />);
+  it("renders teachers empty state when no teachers are provided", () => {
+    render(<LandingPageClient initialTeachers={[]} />);
     expect(screen.getByText("Наши преподаватели")).toBeInTheDocument();
-    expect(screen.getByText("Алексей Дмитриев")).toBeInTheDocument();
-    expect(screen.getByText("Мария Соколова")).toBeInTheDocument();
-    expect(screen.getByText("Егор Смирнов")).toBeInTheDocument();
+    expect(screen.getByText("Преподаватели пока не заполнены в CRM.")).toBeInTheDocument();
   });
 
-  it("renders parent/student portal preview block with default values when no props are provided", () => {
+  it("renders parent/student portal preview block with values", () => {
     render(<LandingPageClient />);
     expect(screen.getByText("Родители видят прогресс ребенка в личном кабинете")).toBeInTheDocument();
     expect(screen.getByText("Миша Иванов")).toBeInTheDocument();
-    expect(screen.getByText("Робот RoboSort-3000")).toBeInTheDocument();
   });
 
   it("uses courses from database props if provided", () => {
@@ -48,9 +45,9 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText("от 9999 ₽ / мес")).toBeInTheDocument();
   });
 
-  it("falls back to default courses list when initialCourses prop is empty", () => {
+  it("renders courses empty state when initialCourses prop is empty", () => {
     render(<LandingPageClient initialCourses={[]} />);
-    expect(screen.getAllByText("Робототехника (Lego Education)")[0]).toBeInTheDocument();
+    expect(screen.getByText("Направления обучения пока не заполнены в CRM.")).toBeInTheDocument();
   });
 
   it("uses schedule from database props if provided", () => {
@@ -64,26 +61,20 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     ];
 
     render(<LandingPageClient initialSchedule={mockSchedule} />);
-    expect(screen.getByText("Утреннее конструирование")).toBeInTheDocument();
+    expect(screen.getAllByText("Утреннее конструирование")[0]).toBeInTheDocument();
     expect(screen.getByText("Пн/Ср 10:00")).toBeInTheDocument();
-    expect(screen.getByText("Осталось 2 места")).toBeInTheDocument();
+    expect(screen.getByText("Мест: 2 (мало)")).toBeInTheDocument();
   });
 
-  it("uses prices from site blocks content props if provided", () => {
-    const mockBlocks = [
-      {
-        block_key: "home.prices",
-        content: {
-          trialPrice: "Бесплатно!",
-          monthlyPrice: "от 5 500 руб",
-          individualPrice: "от 2 000 руб"
-        }
-      }
+  it("uses tariffs from initialTariffs props if provided", () => {
+    const mockTariffs = [
+      { id: "trial", title: "Пробный урок", price: 0, format: "Ознакомительное занятие 90 минут.", is_one_time: true, audience: "Дошкольники" },
+      { id: "monthly", title: "Месячный абонемент", price: 4000, format: "4 занятия по 90 минут.", is_one_time: false, audience: "Школьники" }
     ];
 
-    render(<LandingPageClient initialBlocks={mockBlocks} />);
-    expect(screen.getByText("Бесплатно!")).toBeInTheDocument();
-    expect(screen.getByText("от 5 500 руб")).toBeInTheDocument();
-    expect(screen.getByText("от 2 000 руб")).toBeInTheDocument();
+    render(<LandingPageClient initialTariffs={mockTariffs} />);
+    expect(screen.getByText("Пробный урок")).toBeInTheDocument();
+    expect(screen.getByText("Месячный абонемент")).toBeInTheDocument();
+    expect(screen.getByText(/4.*000/i)).toBeInTheDocument();
   });
 });

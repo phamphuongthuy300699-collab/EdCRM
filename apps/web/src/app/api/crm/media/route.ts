@@ -2,55 +2,65 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
+import { isDemoMode } from "@/shared/utils/demo";
 
 const LOCAL_MEDIA_DIR = "/opt/edcrm/media";
+const WHITELIST_FOLDERS = ["branding", "teachers", "pricing", "schedule", "legal", "misc"];
 
-// Helper to check org permission
-async function checkAuth(req: NextRequest) {
-  try {
-    const supabase = createSupabaseAdminClient();
-    const authHeader = req.headers.get("authorization");
-    let token = "";
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    } else {
-      // Fallback to checking cookie session via admin client
-      const cookieHeader = req.headers.get("cookie");
-      if (cookieHeader) {
-        // If cookies exist, try to get the user session
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) return user;
-      }
-    }
-
-    if (token) {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (user) return user;
-    }
-  } catch (e) {
-    console.error("Auth check failed:", e);
+// Helper to authenticate and verify user role
+async function checkAuthAndRole(req: NextRequest) {
+  if (isDemoMode()) {
+    return { ok: true, role: "admin" };
   }
-  return null;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { ok: false, status: 401, error: "Unauthorized" };
+    }
+
+    const { data: membership } = await (supabase.from("org_memberships") as any)
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!membership || !["owner", "admin", "manager"].includes(membership.role)) {
+      return { ok: false, status: 403, error: "Forbidden - Insufficient permissions" };
+    }
+
+    return { ok: true, user, role: membership.role };
+  } catch (err: any) {
+    console.error("Auth check error in media API:", err);
+    return { ok: false, status: 500, error: "Internal authentication check error" };
+  }
 }
 
 export async function GET(req: NextRequest) {
-  const user = await checkAuth(req);
-  // Allow authenticated users to view/list files
-  // If not authenticated in production, we can restrict, but for local/demo let's be flexible or require auth
-  
+  const auth = await checkAuthAndRole(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const folder = searchParams.get("folder") || "misc";
+
+  if (!WHITELIST_FOLDERS.includes(folder)) {
+    return NextResponse.json({ error: `Folder '${folder}' is not whitelisted` }, { status: 400 });
+  }
+
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
 
   try {
     if (driver === "local") {
       const dirPath = path.join(LOCAL_MEDIA_DIR, folder);
       
-      // Fallback path inside public if /opt is not writable or during local development
       let resolvedDir = dirPath;
       if (!fs.existsSync(LOCAL_MEDIA_DIR)) {
-        // Fallback to project root /public/media
         const fallbackRoot = path.join(process.cwd(), "public/media");
         resolvedDir = path.join(fallbackRoot, folder);
         if (!fs.existsSync(resolvedDir)) {
@@ -64,7 +74,7 @@ export async function GET(req: NextRequest) {
 
       const files = fs.readdirSync(resolvedDir);
       const list = files
-        .filter(name => !name.startsWith(".")) // skip hidden files
+        .filter(name => !name.startsWith("."))
         .map(name => {
           const stats = fs.statSync(path.join(resolvedDir, name));
           return {
@@ -107,10 +117,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // Check auth
-  const user = await checkAuth(req);
-  // For safety, require authenticated user for uploads
-  
+  const auth = await checkAuthAndRole(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
 
   try {
@@ -122,6 +133,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    if (!WHITELIST_FOLDERS.includes(folder)) {
+      return NextResponse.json({ error: `Folder '${folder}' is not whitelisted` }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
 
@@ -129,7 +144,6 @@ export async function POST(req: NextRequest) {
       const dirPath = path.join(LOCAL_MEDIA_DIR, folder);
       let resolvedDir = dirPath;
       
-      // Fallback path inside public if /opt is not writable or during local development
       if (!fs.existsSync(LOCAL_MEDIA_DIR)) {
         const fallbackRoot = path.join(process.cwd(), "public/media");
         resolvedDir = path.join(fallbackRoot, folder);
@@ -142,7 +156,6 @@ export async function POST(req: NextRequest) {
             fs.mkdirSync(resolvedDir, { recursive: true });
           }
         } catch (dirErr) {
-          // If permission denied to /opt/edcrm/media, use fallback
           const fallbackRoot = path.join(process.cwd(), "public/media");
           resolvedDir = path.join(fallbackRoot, folder);
           if (!fs.existsSync(resolvedDir)) {

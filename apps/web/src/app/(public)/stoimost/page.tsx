@@ -73,14 +73,7 @@ export default async function StoimostPage() {
     console.error("Error loading pricing page dynamic data:", e);
   }
 
-  // Fallback Tariffs if DB empty
-  if (displayTariffs.length === 0) {
-    displayTariffs = [
-      { id: "fallback-trial", title: "Пробный урок", price: 0, format: "Ознакомительное занятие для ребенка длительностью 90 минут.", is_one_time: true },
-      { id: "fallback-monthly", title: "Месячный абонемент", price: 4000, format: "Регулярные занятия в мини-группе 2 раза в неделю по 90 минут.", is_one_time: false },
-      { id: "fallback-indiv", title: "Индивидуальный", price: 1500, format: "Персональный урок с наставником. Индивидуальный разбор сложных проектов.", is_one_time: false }
-    ];
-  }
+
 
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
@@ -130,49 +123,55 @@ export default async function StoimostPage() {
               gap: "24px",
               alignItems: "stretch"
             }}>
-              {displayTariffs.map((t) => {
-                const isTrial = Number(t.price) === 0;
-                const isPopular = t.title.toLowerCase().includes("абонемент");
-                const badgeLabel = isTrial ? "Знакомство" : isPopular ? "Популярно" : "Углубленный";
-                const badgeClass = isTrial ? "badge-blue" : isPopular ? "badge-green" : "badge-purple";
-                const borderStyle = isPopular 
-                  ? { border: "2px solid var(--color-primary)", transform: "scale(1.02)", boxShadow: "0 8px 30px rgba(37,99,235,0.06)" } 
-                  : { border: "1px solid var(--color-border)" };
+              {displayTariffs.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                  Данные о тарифах пока не заполнены в CRM.
+                </div>
+              ) : (
+                displayTariffs.map((t) => {
+                  const isTrial = Number(t.price) === 0;
+                  const isPopular = t.title.toLowerCase().includes("абонемент");
+                  const badgeLabel = isTrial ? "Знакомство" : isPopular ? "Популярно" : "Углубленный";
+                  const badgeClass = isTrial ? "badge-blue" : isPopular ? "badge-green" : "badge-purple";
+                  const borderStyle = isPopular 
+                    ? { border: "2px solid var(--color-primary)", transform: "scale(1.02)", boxShadow: "0 8px 30px rgba(37,99,235,0.06)" } 
+                    : { border: "1px solid var(--color-border)" };
 
-                return (
-                  <div 
-                    key={t.id} 
-                    style={{ 
-                      background: "white", 
-                      padding: "32px", 
-                      borderRadius: "16px", 
-                      display: "flex", 
-                      flexDirection: "column", 
-                      justifyContent: "space-between", 
-                      gap: "24px",
-                      ...borderStyle
-                    }}
-                  >
-                    <div>
-                      <span className={`badge ${badgeClass}`} style={{ marginBottom: "12px" }}>{badgeLabel}</span>
-                      <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>{t.title}</h3>
-                      <p style={{ fontSize: "12.5px", color: "var(--color-text-muted)", margin: "0 0 16px 0", lineHeight: 1.5 }}>{t.format}</p>
-                      <div style={{ fontSize: "28px", fontWeight: 900, color: "var(--color-text)" }}>
-                        {Number(t.price) === 0 ? "0 ₽" : `${Number(t.price).toLocaleString("ru-RU")} ₽`}
-                        {!t.is_one_time && Number(t.price) > 0 && <span style={{ fontSize: "14px", fontWeight: 550, color: "var(--color-text-muted)" }}> / мес</span>}
+                  return (
+                    <div 
+                      key={t.id} 
+                      style={{ 
+                        background: "white", 
+                        padding: "32px", 
+                        borderRadius: "16px", 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        justifyContent: "space-between", 
+                        gap: "24px",
+                        ...borderStyle
+                      }}
+                    >
+                      <div>
+                        <span className={`badge ${badgeClass}`} style={{ marginBottom: "12px" }}>{badgeLabel}</span>
+                        <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>{t.title}</h3>
+                        <p style={{ fontSize: "12.5px", color: "var(--color-text-muted)", margin: "0 0 16px 0", lineHeight: 1.5 }}>{t.format}</p>
+                        <div style={{ fontSize: "28px", fontWeight: 900, color: "var(--color-text)" }}>
+                          {Number(t.price) === 0 ? "0 ₽" : `${Number(t.price).toLocaleString("ru-RU")} ₽`}
+                          {!t.is_one_time && Number(t.price) > 0 && <span style={{ fontSize: "14px", fontWeight: 550, color: "var(--color-text-muted)" }}> / мес</span>}
+                        </div>
                       </div>
+                      <Link href="/#lead-form">
+                        <Button 
+                          variant={isPopular ? "primary-site" : "secondary-site"} 
+                          style={{ width: "100%", background: isPopular ? "var(--color-primary)" : undefined }}
+                        >
+                          {isTrial ? "Записаться" : "Выбрать тариф"}
+                        </Button>
+                      </Link>
                     </div>
-                    <Link href="/#lead-form">
-                      <Button 
-                        variant={isPopular ? "primary-site" : "secondary-site"} 
-                        style={{ width: "100%", background: isPopular ? "var(--color-primary)" : undefined }}
-                      >
-                        {isTrial ? "Записаться" : "Выбрать тариф"}
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
