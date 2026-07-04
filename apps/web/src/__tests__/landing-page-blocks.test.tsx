@@ -119,10 +119,11 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(styles).not.toContain("images.unsplash.com");
   });
 
-  it("renders two real fallback markers when CRM branches are unavailable", () => {
+  it("renders contact empty state instead of hardcoded branch markers when CRM branches are unavailable", () => {
     const { container } = render(<LandingPageClient initialBranches={[]} />);
-    expect(container.querySelectorAll("#contacts .branch-map-marker")).toHaveLength(2);
-    expect(screen.getByText("Липецк, ул. Осканова, 3")).toBeInTheDocument();
-    expect(screen.getByText("Липецк, ул. Славянова, 1")).toBeInTheDocument();
+    expect(container.querySelectorAll("#contacts .branch-map-marker")).toHaveLength(0);
+    expect(screen.getByText("Адреса филиалов появятся на карте после заполнения в CRM")).toBeInTheDocument();
+    expect(screen.queryByText("Липецк, ул. Осканова, 3")).not.toBeInTheDocument();
+    expect(screen.queryByText("Липецк, ул. Славянова, 1")).not.toBeInTheDocument();
   });
 });

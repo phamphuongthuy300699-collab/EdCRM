@@ -41,14 +41,8 @@ const triggerGoal = (goalName: string) => {
         'event_label': goalName
       });
     }
-    console.log(`[Analytics] Triggered goal: ${goalName}`);
   }
 };
-
-const defaultContactBranches = [
-  { name: "Филиал на Осканова", address: "Липецк, ул. Осканова, 3", is_active: true, show_on_site: true },
-  { name: "Филиал на Славянова", address: "Липецк, ул. Славянова, 1", is_active: true, show_on_site: true },
-];
 
 function mediaPath(value: any) {
   return typeof value === "string" ? value : value?.path || "";
@@ -247,8 +241,7 @@ export default function LandingPageClient({
   const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
   const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
   const primaryBranch = initialBranches?.[0] || null;
-  const contactBranchesFromCrm = publicMapBranches(initialBranches || []);
-  const contactBranches = contactBranchesFromCrm.length > 0 ? contactBranchesFromCrm : defaultContactBranches;
+  const contactBranches = publicMapBranches(initialBranches || []);
   const contactMapMarkers = resolveBranchMapMarkers(contactBranches);
   const contactStaticMapUrl = buildYandexStaticMapUrl(contactMapMarkers, { width: 650, height: 300 });
   const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
