@@ -30,7 +30,7 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
-import { buildSiteImageItem, readableMediaTitle } from "@/shared/utils/site-media";
+import { mergeSiteImageItems, readableMediaTitle } from "@/shared/utils/site-media";
 
 type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -178,14 +178,33 @@ export default function CrmSitePage() {
   const [selectedFile, setSelectedFile] = useState<any | null>(null);
   const [selectedFileTitle, setSelectedFileTitle] = useState("");
   const [selectedFileAlt, setSelectedFileAlt] = useState("");
+  const [selectedFilePaths, setSelectedFilePaths] = useState<string[]>([]);
+  const [mediaMetaByPath, setMediaMetaByPath] = useState<Record<string, { title?: string; alt?: string }>>({});
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
 
   const handleSelectMediaFile = (file: any | null) => {
     setSelectedFile(file);
     const path = mediaPath(file);
     const fallbackTitle = path ? readableMediaTitle(path) : "";
-    setSelectedFileTitle(file?.title || fallbackTitle);
-    setSelectedFileAlt(file?.alt || file?.title || fallbackTitle);
+    const existingMeta = path ? mediaMetaByPath[path] : undefined;
+    const title = existingMeta?.title || file?.title || fallbackTitle;
+    setSelectedFileTitle(title);
+    setSelectedFileAlt(existingMeta?.alt || file?.alt || file?.title || title);
+  };
+
+  const updateSelectedFileMeta = (field: "title" | "alt", value: string) => {
+    if (field === "title") setSelectedFileTitle(value);
+    if (field === "alt") setSelectedFileAlt(value);
+
+    const path = mediaPath(selectedFile);
+    if (!path) return;
+    setMediaMetaByPath((prev) => ({
+      ...prev,
+      [path]: {
+        ...(prev[path] || {}),
+        [field]: value,
+      },
+    }));
   };
 
   // Tab 7: Footer
@@ -204,6 +223,9 @@ export default function CrmSitePage() {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedFilePathSet = new Set(selectedFilePaths);
+  const selectedMediaFiles = mediaFiles.filter((file) => selectedFilePathSet.has(mediaPath(file)));
+  const selectedMediaCount = selectedFilePaths.length;
 
   // General SEO Tab (merged into SEO section)
   const [seoTitle, setSeoTitle] = useState("");
@@ -389,6 +411,7 @@ export default function CrmSitePage() {
   useEffect(() => {
     if (activeTab === "media") {
       handleSelectMediaFile(null);
+      setSelectedFilePaths([]);
       loadMediaFiles();
     }
   }, [activeTab, activeMediaFolder]);
@@ -732,7 +755,8 @@ export default function CrmSitePage() {
   };
 
   const handleAssignFileToBlock = async (blockKey: string, fieldName: string, isArray: boolean) => {
-    if (!selectedFile) return;
+    const filesToAssign = isArray ? (selectedMediaFiles.length > 0 ? selectedMediaFiles : (selectedFile ? [selectedFile] : [])) : (selectedFile ? [selectedFile] : []);
+    if (filesToAssign.length === 0) return;
     try {
       setSaving(true);
       setSuccessMsg("");
@@ -766,27 +790,19 @@ export default function CrmSitePage() {
         const currentImages = Array.isArray(mergedContent[fieldName])
           ? mergedContent[fieldName].map((item: any, index: number) => toImageItem(item, index)).filter((item: any) => item.path)
           : [];
-        if (!currentImages.some((item: any) => item.path === selectedFile.path)) {
-          mergedContent[fieldName] = [
-            ...currentImages,
-            buildSiteImageItem(selectedFile, (currentImages.length + 1) * 10, {
-              title: selectedFileTitle,
-              alt: selectedFileAlt,
-            }),
-          ];
-        } else {
-          mergedContent[fieldName] = currentImages.map((item: any) => (
-            item.path === selectedFile.path
-              ? buildSiteImageItem(selectedFile, item.sortOrder, { title: selectedFileTitle, alt: selectedFileAlt })
-              : item
-          ));
-        }
+        const metaByPath = {
+          ...mediaMetaByPath,
+          ...(selectedFile ? { [mediaPath(selectedFile)]: { title: selectedFileTitle, alt: selectedFileAlt } } : {}),
+        };
+        mergedContent[fieldName] = mergeSiteImageItems(currentImages, filesToAssign, metaByPath);
       } else {
-        mergedContent[fieldName] = selectedFile.path;
+        mergedContent[fieldName] = filesToAssign[0].path;
       }
 
       await saveBlock(blockKey, title, subtitle, mergedContent);
-      setSuccessMsg(`Изображение добавлено/установлено в раздел "${title}"!`);
+      setSuccessMsg(filesToAssign.length > 1
+        ? `${filesToAssign.length} изображений добавлены в раздел "${title}"!`
+        : `Изображение добавлено/установлено в раздел "${title}"!`);
       await loadData();
     } catch (err: any) {
       setErrorMsg(err.message || "Не удалось применить файл");
@@ -830,36 +846,64 @@ export default function CrmSitePage() {
 
   // Tab 8: Upload file
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setUploadingFile(true);
     try {
-      const file = files[0];
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", activeMediaFolder);
+      const uploadedFiles = [];
 
-      const res = await fetch("/api/crm/media", {
-        method: "POST",
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", activeMediaFolder);
 
-      setSuccessMsg(`Файл ${file.name} успешно загружен!`);
-      const relativePath = data.path;
+        const res = await fetch("/api/crm/media", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        const relativePath = data.path;
+        uploadedFiles.push({
+          name: relativePath.split("/").pop() || "",
+          path: relativePath,
+          url: data.url || getMediaUrl(relativePath),
+          size: file.size
+        });
+      }
+
+      setSuccessMsg(files.length > 1 ? `${files.length} файлов успешно загружены!` : `Файл ${files[0].name} успешно загружен!`);
       await loadMediaFiles();
-      handleSelectMediaFile({
-        name: relativePath.split("/").pop() || "",
-        path: relativePath,
-        url: data.url || getMediaUrl(relativePath),
-        size: file.size
-      });
+      setSelectedFilePaths(uploadedFiles.map((file) => file.path));
+      handleSelectMediaFile(uploadedFiles[uploadedFiles.length - 1] || null);
     } catch (err: any) {
       alert(err.message || "Не удалось загрузить файл");
     } finally {
       setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleToggleMediaSelection = (file: any) => {
+    const path = mediaPath(file);
+    if (!path) return;
+    handleSelectMediaFile(file);
+    setSelectedFilePaths((prev) => (
+      prev.includes(path)
+        ? prev.filter((item) => item !== path)
+        : [...prev, path]
+    ));
+  };
+
+  const handleSelectAllMediaFiles = () => {
+    const paths = mediaFiles.map((file) => mediaPath(file)).filter(Boolean);
+    setSelectedFilePaths(paths);
+    if (!selectedFile && mediaFiles[0]) handleSelectMediaFile(mediaFiles[0]);
+  };
+
+  const handleClearMediaSelection = () => {
+    setSelectedFilePaths([]);
   };
 
   const renderMediaApplyActions = () => {
@@ -1016,7 +1060,7 @@ export default function CrmSitePage() {
             onClick={() => handleAssignFileToBlock("contacts.media", "images", true)}
             style={actionButtonStyle}
           >
-            Добавить в галерею контактов
+            {selectedMediaCount > 1 ? `Добавить ${selectedMediaCount} фото в галерею контактов` : "Добавить в галерею контактов"}
           </Button>
         </div>
       );
@@ -1038,7 +1082,7 @@ export default function CrmSitePage() {
           onClick={() => handleAssignFileToBlock(arrayAction.blockKey, "images", true)}
           style={actionButtonStyle}
         >
-          {arrayAction.label}
+          {selectedMediaCount > 1 ? `${arrayAction.label} (${selectedMediaCount} фото)` : arrayAction.label}
         </Button>
       );
     }
@@ -2005,9 +2049,9 @@ export default function CrmSitePage() {
                   <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>Загрузите фото и сразу примените их к нужному блоку: первый экран, контакты, проекты, оборудование или преподаватели.</p>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <input type="file" ref={fileInputRef} onChange={handleUploadFile} style={{ display: "none" }} />
+                  <input type="file" ref={fileInputRef} onChange={handleUploadFile} multiple style={{ display: "none" }} />
                   <Button variant="primary-crm" disabled={uploadingFile} onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={14} /> {uploadingFile ? "Загрузка..." : "Загрузить файл"}
+                    <Upload size={14} /> {uploadingFile ? "Загрузка..." : "Загрузить файлы"}
                   </Button>
                 </div>
               </div>
@@ -2041,26 +2085,82 @@ export default function CrmSitePage() {
                 </div>
 
                 {/* 2. Center: Files grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px", minHeight: "420px", background: "#F9FAFB", padding: "14px", borderRadius: "10px", border: "1px dashed var(--color-border)", alignContent: "start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", minHeight: "420px", background: "#F9FAFB", padding: "14px", borderRadius: "10px", border: "1px dashed var(--color-border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-text)" }}>
+                      Выбрано: {selectedMediaCount}
+                    </span>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <Button
+                        type="button"
+                        variant="secondary-crm"
+                        onClick={handleSelectAllMediaFiles}
+                        disabled={mediaFiles.length === 0}
+                        style={{ height: "30px", fontSize: "11px", padding: "0 10px" }}
+                      >
+                        Выбрать все
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary-crm"
+                        onClick={handleClearMediaSelection}
+                        disabled={selectedMediaCount === 0}
+                        style={{ height: "30px", fontSize: "11px", padding: "0 10px" }}
+                      >
+                        Снять выбор
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px", alignContent: "start" }}>
                   {mediaFiles.map((file, idx) => {
-                    const isSelected = selectedFile?.path === file.path;
+                    const path = mediaPath(file);
+                    const isActive = selectedFile?.path === path;
+                    const isChecked = selectedFilePathSet.has(path);
                     return (
                       <div
                         key={idx}
                         onClick={() => handleSelectMediaFile(file)}
                         style={{
                           background: "white",
-                          border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                          border: isActive || isChecked ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
                           borderRadius: "8px",
                           padding: "8px",
                           display: "flex",
                           flexDirection: "column",
                           gap: "6px",
+                          position: "relative",
                           cursor: "pointer",
-                          boxShadow: isSelected ? "0 4px 12px rgba(70, 62, 142, 0.15)" : "none",
+                          boxShadow: isActive || isChecked ? "0 4px 12px rgba(70, 62, 142, 0.15)" : "none",
                           transition: "all 0.2s"
                         }}
                       >
+                        <label
+                          onClick={(event) => event.stopPropagation()}
+                          style={{
+                            position: "absolute",
+                            top: "10px",
+                            right: "10px",
+                            zIndex: 2,
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "8px",
+                            background: "rgba(255,255,255,0.92)",
+                            border: "1px solid var(--color-border)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer"
+                          }}
+                          title="Добавить в выделение"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleMediaSelection(file)}
+                            style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                          />
+                        </label>
                         <div style={{ height: "118px", background: "#F3F4F6", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {isImageFile(file) ? (
                             <img src={mediaUrl(file)} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -2084,13 +2184,21 @@ export default function CrmSitePage() {
                       <span style={{ fontSize: "12px" }}>В этой папке нет файлов. Загрузите первый!</span>
                     </div>
                   )}
+                  </div>
                 </div>
 
                 {/* 3. Right side: Details & Action panel */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#FFFFFF", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "18px", gridColumn: "1 / -1" }}>
                   {selectedFile ? (
                     <>
-                      <h4 style={{ fontSize: "15px", fontWeight: 800, margin: 0, borderBottom: "1px solid var(--color-border)", paddingBottom: "10px" }}>Выбранный файл</h4>
+                      <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "10px" }}>
+                        <h4 style={{ fontSize: "15px", fontWeight: 800, margin: 0 }}>Активный файл</h4>
+                        {selectedMediaCount > 1 && (
+                          <p className="form-hint" style={{ margin: "4px 0 0 0" }}>
+                            Выбрано {selectedMediaCount} файлов. Галерейные действия применятся ко всей пачке.
+                          </p>
+                        )}
+                      </div>
                       
                       <div style={{ height: "220px", background: "#F3F4F6", borderRadius: "8px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {isImageFile(selectedFile) ? (
@@ -2107,7 +2215,7 @@ export default function CrmSitePage() {
                             type="text"
                             className="form-input"
                             value={selectedFileTitle}
-                            onChange={(event) => setSelectedFileTitle(event.target.value)}
+                            onChange={(event) => updateSelectedFileMeta("title", event.target.value)}
                             placeholder="Например: Робот-сумо на занятии"
                           />
                         </div>
@@ -2117,12 +2225,12 @@ export default function CrmSitePage() {
                             type="text"
                             className="form-input"
                             value={selectedFileAlt}
-                            onChange={(event) => setSelectedFileAlt(event.target.value)}
+                            onChange={(event) => updateSelectedFileMeta("alt", event.target.value)}
                             placeholder="Короткое описание изображения"
                           />
                         </div>
                         <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-                          Эти значения попадут в карточки и галереи вместо технического имени файла.
+                          Эти значения сохраняются для активного файла. Можно кликать файлы в выделении и подписывать каждый перед добавлением пачки.
                         </p>
                       </div>
                       

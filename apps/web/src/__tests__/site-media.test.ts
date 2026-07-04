@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSiteImageItem } from "../shared/utils/site-media";
+import { buildSiteImageItem, mergeSiteImageItems } from "../shared/utils/site-media";
 
 describe("site media helpers", () => {
   it("uses editor-provided title and alt instead of technical filename", () => {
@@ -26,5 +26,23 @@ describe("site media helpers", () => {
       alt: "robot sumo final",
       sortOrder: 10,
     });
+  });
+
+  it("adds multiple selected files and updates duplicate metadata without reordering existing images", () => {
+    expect(mergeSiteImageItems(
+      [{ path: "student-projects/old.jpg", title: "Старый проект", alt: "Старый проект", sortOrder: 10 }],
+      [
+        { path: "student-projects/new_robot.jpg" },
+        { path: "student-projects/old.jpg" },
+        { path: "student-projects/second_robot.jpg" },
+      ],
+      {
+        "student-projects/old.jpg": { title: "Обновленный проект", alt: "Новое описание" },
+      },
+    )).toEqual([
+      { path: "student-projects/old.jpg", title: "Обновленный проект", alt: "Новое описание", sortOrder: 10 },
+      { path: "student-projects/new_robot.jpg", title: "new robot", alt: "new robot", sortOrder: 20 },
+      { path: "student-projects/second_robot.jpg", title: "second robot", alt: "second robot", sortOrder: 30 },
+    ]);
   });
 });

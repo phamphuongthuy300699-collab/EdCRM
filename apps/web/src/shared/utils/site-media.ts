@@ -8,6 +8,15 @@ type SiteMediaMeta = {
   alt?: string | null;
 };
 
+type SiteImageItem = {
+  path: string;
+  title: string;
+  alt: string;
+  sortOrder: number;
+};
+
+type SiteMediaMetaByPath = Record<string, SiteMediaMeta | undefined>;
+
 function mediaNameFromPath(path: string) {
   return path.split("/").pop() || path;
 }
@@ -28,4 +37,27 @@ export function buildSiteImageItem(file: SiteMediaFile, sortOrder: number, meta:
     alt,
     sortOrder,
   };
+}
+
+export function mergeSiteImageItems(
+  currentImages: SiteImageItem[],
+  files: SiteMediaFile[],
+  metaByPath: SiteMediaMetaByPath = {},
+) {
+  const merged = [...currentImages];
+
+  files.forEach((file) => {
+    const path = String(file.path || "").trim();
+    if (!path) return;
+
+    const existingIndex = merged.findIndex((item) => item.path === path);
+    if (existingIndex >= 0) {
+      merged[existingIndex] = buildSiteImageItem(file, merged[existingIndex].sortOrder, metaByPath[path]);
+      return;
+    }
+
+    merged.push(buildSiteImageItem(file, (merged.length + 1) * 10, metaByPath[path]));
+  });
+
+  return merged;
 }
