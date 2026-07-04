@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import LandingPageClient from "../app/(public)/LandingPageClient";
 
 // Mock fetch API globally
@@ -15,12 +15,17 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Public Lead Form rendering and actions", () => {
-  it("renders form fields correctly", () => {
-    render(<LandingPageClient />);
+  it("renders only the short lead capture fields", () => {
+    const { container } = render(<LandingPageClient />);
+    const leadForm = within(container.querySelector("#lead-form") as HTMLElement);
     
-    expect(screen.getByPlaceholderText("Иван Иванов")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Миша")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("+7 (999) 123-45-67")).toBeInTheDocument();
+    expect(leadForm.getByPlaceholderText("Иван Иванов")).toBeInTheDocument();
+    expect(leadForm.getByPlaceholderText("Миша")).toBeInTheDocument();
+    expect(leadForm.getByPlaceholderText("+7 (999) 123-45-67")).toBeInTheDocument();
+    expect(leadForm.queryByPlaceholderText("8")).not.toBeInTheDocument();
+    expect(leadForm.queryByText("Направление")).not.toBeInTheDocument();
+    expect(leadForm.queryByText("Удобное время для занятий")).not.toBeInTheDocument();
+    expect(leadForm.queryByText("Комментарий к заявке")).not.toBeInTheDocument();
   });
 
   it("prevents double-submitting using loading state guard", async () => {
@@ -34,19 +39,12 @@ describe("Public Lead Form rendering and actions", () => {
     const parentInput = screen.getByPlaceholderText("Иван Иванов");
     const childInput = screen.getByPlaceholderText("Миша");
     const phoneInput = screen.getByPlaceholderText("+7 (999) 123-45-67");
-    const ageInput = screen.getByPlaceholderText("8");
     const submitButton = screen.getByRole("button", { name: /записаться на бесплатное пробное занятие/i });
 
     // Fill details
     fireEvent.change(parentInput, { target: { value: "Ольга" } });
     fireEvent.change(childInput, { target: { value: "Даниил" } });
     fireEvent.change(phoneInput, { target: { value: "89991234567" } });
-    fireEvent.change(ageInput, { target: { value: "8" } });
-
-    // Fill selects
-    const selects = screen.getAllByRole("combobox");
-    fireEvent.change(selects[0], { target: { value: "4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a" } });
-    fireEvent.change(selects[1], { target: { value: "Выходные дни" } });
 
     // Double click the button
     fireEvent.click(submitButton);

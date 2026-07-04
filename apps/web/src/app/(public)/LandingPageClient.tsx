@@ -94,10 +94,7 @@ export default function LandingPageClient({
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [childName, setChildName] = useState("");
-  const [childAge, setChildAge] = useState("");
   const [courseId, setCourseId] = useState("");
-  const [convenientTime, setConvenientTime] = useState("");
-  const [message, setMessage] = useState("");
   const [consent, setConsent] = useState(true);
   
   const [loading, setLoading] = useState(false);
@@ -153,10 +150,7 @@ export default function LandingPageClient({
           parentName,
           parentPhone,
           childName,
-          childAge: childAge ? parseInt(childAge, 10) : undefined,
           courseId: courseId || undefined,
-          convenientTime: convenientTime || undefined,
-          message: message || undefined,
         }),
       });
 
@@ -1589,7 +1583,7 @@ export default function LandingPageClient({
               marginBottom: "32px",
               lineHeight: 1.5
             }}>
-              Заполните форму ниже, чтобы забронировать место. Мы свяжемся с вами в течение 15 минут для подтверждения времени.
+              Оставьте имя и телефон. Мы свяжемся с вами, ответим на вопросы и подберем удобную группу.
             </p>
 
             <div style={{ marginBottom: "32px" }}>
@@ -1630,65 +1624,6 @@ export default function LandingPageClient({
                   required 
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="form-group">
-                  <label className="form-label">Возраст ребенка</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="8" 
-                    min="3"
-                    max="18"
-                    value={childAge}
-                    onChange={(e) => setChildAge(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Направление</label>
-                  <select 
-                    className="form-input" 
-                    style={{ padding: "0 12px" }}
-                    value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
-                  >
-                    <option value="">Выберите курс</option>
-                    {coursesToRender.map((course) => (
-                      <option key={course.id} value={course.id}>{course.title}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Selection of convenient time */}
-              <div className="form-group">
-                <label className="form-label">Удобное время для занятий</label>
-                <select 
-                  className="form-input" 
-                  style={{ padding: "0 12px" }}
-                  value={convenientTime}
-                  onChange={(e) => setConvenientTime(e.target.value)}
-                >
-                  <option value="">Выберите время</option>
-                  <option value="Утро (09:00 - 12:00)">Утро (09:00 - 12:00)</option>
-                  <option value="День (12:00 - 15:00)">День (12:00 - 15:00)</option>
-                  <option value="Вечер (15:00 - 18:00)">Вечер (15:00 - 18:00)</option>
-                  <option value="Поздний вечер (18:00 - 20:00)">Поздний вечер (18:00 - 20:00)</option>
-                  <option value="Выходные дни">Выходные дни</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Комментарий к заявке</label>
-                <textarea 
-                  className="form-input" 
-                  style={{ height: "80px", padding: "12px", resize: "none" }}
-                  placeholder="Например: занимались ли раньше конструированием..." 
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
                 />
               </div>
 
