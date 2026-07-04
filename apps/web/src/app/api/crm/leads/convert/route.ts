@@ -99,6 +99,13 @@ export async function POST(request: Request) {
     );
 
     if (rpcError || !rpcResult) {
+      if (rpcError?.message?.includes("group_capacity_exceeded")) {
+        return NextResponse.json(
+          { ok: false, error: "В группе нет свободных мест" },
+          { status: 409 }
+        );
+      }
+
       console.error("RPC convert_lead_to_student error:", rpcError);
       return NextResponse.json(
         { ok: false, error: rpcError?.message || "Не удалось конвертировать лида" },

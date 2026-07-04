@@ -24,5 +24,6 @@ describe("security audit contracts", () => {
     expect(source).toContain("capacity");
     expect(source).toContain(".from(\"enrollments\")");
     expect(source).toContain("В группе нет свободных мест");
+    expect(source).toContain("group_capacity_exceeded");
   });
 });
