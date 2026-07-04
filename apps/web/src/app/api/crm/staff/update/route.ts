@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoMode } from "@/shared/utils/demo";
-import { requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
+import { postgresUuidSchema, requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
 
 export async function POST(request: Request) {
   try {
-    const parsed = staffPayloadSchema.extend({ userId: z.string().uuid() }).safeParse(await request.json());
+    const parsed = staffPayloadSchema.extend({ userId: postgresUuidSchema }).safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: "Некорректные данные сотрудника", details: parsed.error.format() }, { status: 400 });
     }

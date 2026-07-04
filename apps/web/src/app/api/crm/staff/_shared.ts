@@ -5,14 +5,22 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { isDemoMode } from "@/shared/utils/demo";
 
 export const staffRoleSchema = z.enum(["owner", "admin", "manager", "teacher", "accountant"]);
+export const postgresUuidSchema = z.string().regex(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  "Invalid UUID",
+);
 const optionalOrganizationIdSchema = z.preprocess(
   (value) => (value === "" || value === null ? undefined : value),
-  z.string().uuid().optional(),
+  postgresUuidSchema.optional(),
+);
+const optionalUserIdSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  postgresUuidSchema.optional(),
 );
 
 export const staffPayloadSchema = z.object({
   organizationId: optionalOrganizationIdSchema,
-  userId: z.string().uuid().optional(),
+  userId: optionalUserIdSchema,
   email: z.string().email(),
   fullName: z.string().min(2).max(160),
   phone: z.string().max(40).optional().nullable(),
@@ -26,8 +34,8 @@ export const staffPayloadSchema = z.object({
 });
 
 export const userIdPayloadSchema = z.object({
-  userId: z.string().uuid(),
-  organizationId: z.string().uuid().optional(),
+  userId: postgresUuidSchema,
+  organizationId: postgresUuidSchema.optional(),
 });
 
 export async function requireStaffAdmin() {

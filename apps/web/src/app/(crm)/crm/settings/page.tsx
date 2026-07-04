@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldCheck,
   Tag,
+  Upload,
   UserPlus,
   Users,
   X,
@@ -291,6 +292,7 @@ export default function CrmSettingsPage() {
   const [scheduleDraft, setScheduleDraft] = useState<any[]>([]);
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
   const [staffError, setStaffError] = useState("");
+  const [uploadingStaffAvatar, setUploadingStaffAvatar] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
 
   const supabase = createSupabaseBrowserClient();
@@ -818,6 +820,36 @@ export default function CrmSettingsPage() {
       setStaffError(err.message || "Не удалось сохранить сотрудника");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleStaffAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !staffDraft) return;
+
+    try {
+      setUploadingStaffAvatar(true);
+      setStaffError("");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "teachers");
+
+      const response = await fetch("/api/crm/media", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Не удалось загрузить фото");
+      }
+
+      setStaffDraft((current: any) => current ? { ...current, avatarUrl: payload.path } : current);
+      setNotice("Фото сотрудника загружено");
+    } catch (err: any) {
+      setStaffError(err.message || "Не удалось загрузить фото");
+    } finally {
+      setUploadingStaffAvatar(false);
     }
   }
 
@@ -1796,7 +1828,27 @@ export default function CrmSettingsPage() {
                 </SelectInput>
               </Field>
               <Field label="Специализация"><TextInput value={staffDraft.specialty} onChange={(e) => setStaffDraft({ ...staffDraft, specialty: e.target.value })} /></Field>
-              <Field label="Фото: storage path или URL"><TextInput value={staffDraft.avatarUrl} onChange={(e) => setStaffDraft({ ...staffDraft, avatarUrl: e.target.value })} placeholder="teachers/photo.jpg" /></Field>
+              <Field label="Фото: storage path или URL">
+                <div className="settings-card-list" style={{ gap: 8 }}>
+                  <TextInput value={staffDraft.avatarUrl} onChange={(e) => setStaffDraft({ ...staffDraft, avatarUrl: e.target.value })} placeholder="teachers/photo.jpg" />
+                  <input
+                    id="staff-avatar-upload"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    style={{ display: "none" }}
+                    onChange={handleStaffAvatarUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary-crm"
+                    disabled={uploadingStaffAvatar}
+                    onClick={() => document.getElementById("staff-avatar-upload")?.click()}
+                  >
+                    <Upload size={14} />
+                    {uploadingStaffAvatar ? "Загрузка..." : "Загрузить фото"}
+                  </Button>
+                </div>
+              </Field>
               <Field label="Порядок"><TextInput type="number" value={staffDraft.sortOrder} onChange={(e) => setStaffDraft({ ...staffDraft, sortOrder: e.target.value })} /></Field>
             </div>
             <Field label="Публичное описание"><TextArea value={staffDraft.publicBio} onChange={(e) => setStaffDraft({ ...staffDraft, publicBio: e.target.value })} /></Field>
