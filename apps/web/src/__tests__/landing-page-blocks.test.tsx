@@ -78,10 +78,13 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText(/4.*000/i)).toBeInTheDocument();
   });
 
-  it("uses CRM media for every contact photo slot", () => {
+  it("renders a real map with all branch addresses in the main contacts window", () => {
     const { container } = render(
       <LandingPageClient
-        initialBranches={[{ address: "ул. Тестовая, 1", work_hours: "10:00-20:00" }]}
+        initialBranches={[
+          { address: "Липецк, ул. Осканова, 3", work_hours: "10:00-20:00", is_active: true, show_on_site: true },
+          { address: "Липецк, ул. Славянова, 1", work_hours: "10:00-20:00", is_active: true, show_on_site: true },
+        ]}
         initialBlocks={[
           {
             block_key: "contacts.media",
@@ -97,13 +100,30 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
 
     const contactsSection = container.querySelector("#contacts");
     expect(contactsSection).not.toBeNull();
+    const mapFrame = contactsSection!.querySelector<HTMLIFrameElement>('iframe[title="Карта филиалов Робокс"]');
+    expect(mapFrame).not.toBeNull();
+    const searchText = new URL(mapFrame!.src).searchParams.get("text") || "";
+
+    expect(searchText).toContain("Липецк, ул. Осканова, 3");
+    expect(searchText).toContain("Липецк, ул. Славянова, 1");
+
     const styles = Array.from(contactsSection!.querySelectorAll<HTMLElement>("[style]"))
       .map((element) => element.getAttribute("style") || "")
       .join("\n");
 
-    expect(styles).toContain("contacts/map.jpg");
     expect(styles).toContain("contacts/facade.jpg");
     expect(styles).toContain("contacts/classroom.jpg");
+    expect(styles).not.toContain("contacts/map.jpg");
     expect(styles).not.toContain("images.unsplash.com");
+  });
+
+  it("renders two real fallback markers when CRM branches are unavailable", () => {
+    const { container } = render(<LandingPageClient initialBranches={[]} />);
+    const mapFrame = container.querySelector<HTMLIFrameElement>('#contacts iframe[title="Карта филиалов Робокс"]');
+    expect(mapFrame).not.toBeNull();
+
+    const searchText = new URL(mapFrame!.src).searchParams.get("text") || "";
+    expect(searchText).toContain("Липецк, ул. Осканова, 3");
+    expect(searchText).toContain("Липецк, ул. Славянова, 1");
   });
 });

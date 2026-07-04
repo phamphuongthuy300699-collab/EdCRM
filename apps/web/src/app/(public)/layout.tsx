@@ -4,7 +4,7 @@ import Script from "next/script";
 import { Button } from "@robotics-crm/ui";
 import { Phone } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
-import { buildYandexMapEmbedUrl, publicFooterMapBranches, publicMapBranches } from "@/shared/utils/public-map";
+import { publicMapBranches } from "@/shared/utils/public-map";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import Header from "./Header";
 
@@ -38,7 +38,6 @@ export default async function PublicLayout({
   let copyrightText = "© {year} Робокс Липецк. Все права защищены.";
   let socials = { vk: "", telegram: "", whatsapp: "" };
   let branches: any[] = [];
-  let mapImage = "";
 
   let brandName = "Робокс";
   let brandLogo = "branding/roboks-logo.svg";
@@ -81,7 +80,6 @@ export default async function PublicLayout({
         if (c.showLegalAddress !== undefined) showLegalAddress = c.showLegalAddress;
         if (c.copyrightText) copyrightText = c.copyrightText;
         if (c.socials) socials = { ...socials, ...c.socials };
-        if (c.mapImage) mapImage = c.mapImage;
       }
 
       // Load branding settings
@@ -137,8 +135,6 @@ export default async function PublicLayout({
 
   const resolvedCopyright = copyrightText.replace("{year}", new Date().getFullYear().toString());
   const footerBranches = publicMapBranches(branches);
-  const mapBranches = publicFooterMapBranches(branches, legalAddress, fullLegalName);
-  const mapEmbedUrl = buildYandexMapEmbedUrl(mapBranches);
 
   return (
     <>
@@ -280,21 +276,6 @@ export default async function PublicLayout({
               <p style={{ color: "#E5E7EB", fontSize: "var(--font-small)" }}>
                 {email}
               </p>
-              {(mapEmbedUrl || mapImage) && (
-                <div style={{ marginTop: "16px", borderRadius: "10px", overflow: "hidden", border: "1px solid #374151", maxWidth: "360px", background: "#111827" }}>
-                  {mapEmbedUrl ? (
-                    <iframe
-                      src={mapEmbedUrl}
-                      title="Карта филиалов Робокс"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      style={{ width: "100%", height: "220px", border: 0, display: "block" }}
-                    />
-                  ) : (
-                    <img src={getMediaUrl(mapImage)} alt="Схема проезда" style={{ width: "100%", height: "auto", display: "block" }} />
-                  )}
-                </div>
-              )}
             </div>
           </div>
 

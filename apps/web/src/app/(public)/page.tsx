@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import LandingPageClient from "./LandingPageClient";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { getMediaUrl } from "@/shared/utils/media";
+import { publicMapBranches } from "@/shared/utils/public-map";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -98,12 +99,11 @@ export default async function Page() {
         .select("*")
         .eq("organization_id", org.id)
         .eq("is_active", true)
-        .eq("show_on_site", true)
         .order("sort_order", { ascending: true });
       if (branches) {
-        initialBranches = branches;
-        if (branches[0]?.phone) orgPhone = branches[0].phone;
-        if (branches[0]?.address) orgAddress = branches[0].address;
+        initialBranches = publicMapBranches(branches);
+        if (initialBranches[0]?.phone) orgPhone = initialBranches[0].phone;
+        if (initialBranches[0]?.address) orgAddress = initialBranches[0].address;
       }
 
       const { data: teachers } = await (supabase.from("org_memberships") as any)

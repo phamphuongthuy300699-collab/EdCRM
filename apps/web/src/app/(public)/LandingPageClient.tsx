@@ -6,6 +6,7 @@ import { Button } from "@robotics-crm/ui";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import Link from "next/link";
 import { getMediaUrl } from "@/shared/utils/media";
+import { buildYandexMapEmbedUrl, publicMapBranches } from "@/shared/utils/public-map";
 import { 
   Users, 
   Layers, 
@@ -43,6 +44,11 @@ const triggerGoal = (goalName: string) => {
     console.log(`[Analytics] Triggered goal: ${goalName}`);
   }
 };
+
+const defaultContactBranches = [
+  { name: "Филиал на Осканова", address: "Липецк, ул. Осканова, 3", is_active: true, show_on_site: true },
+  { name: "Филиал на Славянова", address: "Липецк, ул. Славянова, 1", is_active: true, show_on_site: true },
+];
 
 function mediaPath(value: any) {
   return typeof value === "string" ? value : value?.path || "";
@@ -241,7 +247,12 @@ export default function LandingPageClient({
   const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
   const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
   const primaryBranch = initialBranches?.[0] || null;
-  const contactAddress = primaryBranch?.address || "Адрес филиала уточняется в CRM";
+  const contactBranchesFromCrm = publicMapBranches(initialBranches || []);
+  const contactBranches = contactBranchesFromCrm.length > 0 ? contactBranchesFromCrm : defaultContactBranches;
+  const contactMapEmbedUrl = buildYandexMapEmbedUrl(contactBranches);
+  const contactAddress = contactBranches.length > 0
+    ? contactBranches.map((branch: any) => branch.address).join("; ")
+    : primaryBranch?.address || "Адрес филиала уточняется в CRM";
   const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
   const heroLocationLabel = initialBranches && initialBranches.length > 1
     ? `${initialBranches.length} филиала в Липецке`
@@ -264,7 +275,6 @@ export default function LandingPageClient({
 
   const contactsMediaBlock = getBlock('contacts.media');
   const contactsImages = mediaItems(contactsMediaBlock?.content?.images);
-  const contactMapImage = mediaPath(contactsMediaBlock?.content?.mapImage) || mediaPath(contactsImages[0]);
   const contactFacadeImage = mediaPath(contactsMediaBlock?.content?.facadeImage) || mediaPath(contactsImages[1]);
   const contactClassroomImage = mediaPath(contactsMediaBlock?.content?.classroomImage)
     || mediaPath(contactsMediaBlock?.content?.image)
@@ -327,7 +337,6 @@ export default function LandingPageClient({
     : "/images/arduino_greenhouse.png";
 
   const resolvedHeroImage = customHeroImage ? getMediaUrl(customHeroImage) : resolvedClassroomMainImage;
-  const resolvedContactMapImage = contactMapImage ? mediaSrc(contactMapImage) : resolvedClassroomMainImage;
   const resolvedContactFacadeImage = contactFacadeImage ? mediaSrc(contactFacadeImage) : resolvedEquipmentTopImage;
   const resolvedContactClassroomImage = contactClassroomImage ? mediaSrc(contactClassroomImage) : resolvedClassroomMainImage;
 
@@ -1749,34 +1758,28 @@ export default function LandingPageClient({
           alignItems: "center"
         }}>
           <div style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
-            {/* Address map mock */}
             <div style={{
-              backgroundImage: `linear-gradient(to bottom, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.25)), url('${resolvedContactMapImage}')`,
-              backgroundPosition: "center",
-              backgroundSize: "cover",
-              backgroundRepeat: "no-repeat",
               borderRadius: "var(--radius-card-site)",
               position: "relative",
               border: "1px solid var(--color-border)",
               boxShadow: "0 10px 25px rgba(0,0,0,0.03)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "250px"
+              height: "250px",
+              overflow: "hidden",
+              background: "var(--color-primary-soft)"
             }}>
-              <div style={{
-                background: "white",
-                padding: "8px 16px",
-                borderRadius: "20px",
-                border: "2px solid var(--color-primary)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px"
-              }}>
-                <MapPin size={16} style={{ color: "var(--color-primary)" }} />
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text)" }}>{contactAddress}</span>
-              </div>
+              {contactMapEmbedUrl ? (
+                <iframe
+                  src={contactMapEmbedUrl}
+                  title="Карта филиалов Робокс"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+                />
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", padding: "24px", textAlign: "center", fontWeight: 700 }}>
+                  Адреса филиалов появятся на карте после заполнения в CRM
+                </div>
+              )}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
