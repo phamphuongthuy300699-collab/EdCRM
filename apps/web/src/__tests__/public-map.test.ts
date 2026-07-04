@@ -29,19 +29,18 @@ describe("public map helpers", () => {
     expect(new URL(markers[1].openUrl).searchParams.get("text")).toBe("Липецк, ул. Славянова, 1");
   });
 
-  it("builds a static map URL with one point per marker", () => {
+  it("builds a static map background without duplicate non-clickable point overlays", () => {
     const markers = resolveBranchMapMarkers([
       { name: "Осканова", address: "Липецк, ул. Осканова, 3" },
       { name: "Славянова", address: "Липецк, ул. Славянова, 1" },
     ]);
 
     const url = buildYandexStaticMapUrl(markers, { width: 650, height: 300 });
-    const pointText = new URL(url).searchParams.get("pt") || "";
+    const params = new URL(url).searchParams;
 
     expect(url).toContain("https://static-maps.yandex.ru/1.x/");
-    expect(pointText).toContain("39.4900857,52.596328");
-    expect(pointText).toContain("39.5048586,52.6064322");
-    expect(pointText.split("~")).toHaveLength(2);
+    expect(params.get("pt")).toBeNull();
+    expect(markers.map((marker) => marker.openUrl)).toHaveLength(2);
   });
 
   it("uses coordinates from branch map links for newly added branches", () => {

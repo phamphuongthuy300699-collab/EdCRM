@@ -129,22 +129,36 @@ export function buildYandexMapOpenUrl(marker: Pick<BranchMapMarker, "address" | 
   return `https://yandex.ru/maps/?${params.toString()}`;
 }
 
+function mapViewport(markers: Array<Pick<BranchMapMarker, "lat" | "lng">>) {
+  const avgLat = markers.reduce((sum, marker) => sum + marker.lat, 0) / markers.length;
+  const avgLng = markers.reduce((sum, marker) => sum + marker.lng, 0) / markers.length;
+  const zoom = markers.length > 1 ? 13 : 16;
+
+  return { avgLat, avgLng, zoom };
+}
+
+function mercatorPoint(lat: number, lng: number, zoom: number) {
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const worldSize = 256 * 2 ** zoom;
+
+  return {
+    x: ((lng + 180) / 360) * worldSize,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize,
+  };
+}
+
 function markerPositions(markers: Array<Omit<BranchMapMarker, "x" | "y" | "openUrl">>) {
   if (markers.length === 0) return [];
 
-  const lats = markers.map((marker) => marker.lat);
-  const lngs = markers.map((marker) => marker.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = Math.max(maxLat - minLat, 0.002);
-  const lngRange = Math.max(maxLng - minLng, 0.002);
+  const width = 650;
+  const height = 300;
+  const viewport = mapViewport(markers);
+  const center = mercatorPoint(viewport.avgLat, viewport.avgLng, viewport.zoom);
 
   return markers.map((marker) => ({
     ...marker,
-    x: 12 + ((marker.lng - minLng) / lngRange) * 76,
-    y: 12 + ((maxLat - marker.lat) / latRange) * 76,
+    x: ((width / 2 + mercatorPoint(marker.lat, marker.lng, viewport.zoom).x - center.x) / width) * 100,
+    y: ((height / 2 + mercatorPoint(marker.lat, marker.lng, viewport.zoom).y - center.y) / height) * 100,
     openUrl: buildYandexMapOpenUrl(marker),
   }));
 }
@@ -171,17 +185,12 @@ export function resolveBranchMapMarkers(branches: BranchForMap[]): BranchMapMark
 export function buildYandexStaticMapUrl(markers: BranchMapMarker[], options: { width?: number; height?: number } = {}) {
   if (markers.length === 0) return "";
 
-  const avgLat = markers.reduce((sum, marker) => sum + marker.lat, 0) / markers.length;
-  const avgLng = markers.reduce((sum, marker) => sum + marker.lng, 0) / markers.length;
-  const pointText = markers
-    .map((marker) => `${marker.lng},${marker.lat},pm2rdm`)
-    .join("~");
+  const viewport = mapViewport(markers);
   const params = new URLSearchParams({
     l: "map",
-    ll: `${avgLng},${avgLat}`,
-    z: markers.length > 1 ? "13" : "16",
+    ll: `${viewport.avgLng},${viewport.avgLat}`,
+    z: String(viewport.zoom),
     size: `${options.width || 650},${options.height || 300}`,
-    pt: pointText,
   });
 
   return `https://static-maps.yandex.ru/1.x/?${params.toString()}`;

@@ -573,7 +573,7 @@ export default function LandingPageClient({
               }} />
 
               <div style={{ zIndex: 10, position: "relative" }}>
-                <RoboAssistant context="hero" mood="idle" size="lg" />
+                <RoboAssistant context="hero" mood="idle" size="lg" interactiveAssembly />
               </div>
 
               <div className="site-hero-mentor-badge" style={{
