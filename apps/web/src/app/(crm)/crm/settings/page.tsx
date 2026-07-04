@@ -1634,7 +1634,14 @@ export default function CrmSettingsPage() {
               <Field label="Телефон"><TextInput value={branchDraft.phone || ""} onChange={(e) => setBranchDraft({ ...branchDraft, phone: e.target.value })} /></Field>
               <Field label="Email"><TextInput type="email" value={branchDraft.email || ""} onChange={(e) => setBranchDraft({ ...branchDraft, email: e.target.value })} /></Field>
               <Field label="Режим работы"><TextInput value={branchDraft.work_hours || ""} onChange={(e) => setBranchDraft({ ...branchDraft, work_hours: e.target.value })} /></Field>
-              <Field label="Ссылка на карту"><TextInput value={branchDraft.map_url || ""} onChange={(e) => setBranchDraft({ ...branchDraft, map_url: e.target.value })} /></Field>
+              <Field label="Ссылка на точку Яндекс.Карт">
+                <TextInput
+                  type="url"
+                  value={branchDraft.map_url || ""}
+                  onChange={(e) => setBranchDraft({ ...branchDraft, map_url: e.target.value })}
+                  placeholder="https://yandex.ru/maps/?ll=39.4900857%2C52.596328&z=16"
+                />
+              </Field>
             </div>
             <Field label="Описание"><TextArea value={branchDraft.description || ""} onChange={(e) => setBranchDraft({ ...branchDraft, description: e.target.value })} /></Field>
             <div className="settings-actions">

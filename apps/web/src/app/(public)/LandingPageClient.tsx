@@ -6,7 +6,7 @@ import { Button } from "@robotics-crm/ui";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import Link from "next/link";
 import { getMediaUrl } from "@/shared/utils/media";
-import { buildYandexMapEmbedUrl, publicMapBranches } from "@/shared/utils/public-map";
+import { buildYandexStaticMapUrl, publicMapBranches, resolveBranchMapMarkers } from "@/shared/utils/public-map";
 import { 
   Users, 
   Layers, 
@@ -249,10 +249,8 @@ export default function LandingPageClient({
   const primaryBranch = initialBranches?.[0] || null;
   const contactBranchesFromCrm = publicMapBranches(initialBranches || []);
   const contactBranches = contactBranchesFromCrm.length > 0 ? contactBranchesFromCrm : defaultContactBranches;
-  const contactMapEmbedUrl = buildYandexMapEmbedUrl(contactBranches);
-  const contactAddress = contactBranches.length > 0
-    ? contactBranches.map((branch: any) => branch.address).join("; ")
-    : primaryBranch?.address || "Адрес филиала уточняется в CRM";
+  const contactMapMarkers = resolveBranchMapMarkers(contactBranches);
+  const contactStaticMapUrl = buildYandexStaticMapUrl(contactMapMarkers, { width: 650, height: 300 });
   const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
   const heroLocationLabel = initialBranches && initialBranches.length > 1
     ? `${initialBranches.length} филиала в Липецке`
@@ -407,7 +405,7 @@ export default function LandingPageClient({
   });
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
+    <div className="site-landing" style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
       
       {/* 1. HERO SECTION */}
       <section className="bg-grid-blueprint" style={{
@@ -454,7 +452,7 @@ export default function LandingPageClient({
           pointerEvents: "none"
         }} />
 
-        <div className="container" style={{
+        <div className="container site-hero-grid" style={{
           display: "grid",
           gridTemplateColumns: "1.1fr 0.9fr",
           alignItems: "center",
@@ -495,7 +493,7 @@ export default function LandingPageClient({
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+              <div className="site-hero-actions" style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
                 <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
                   <Button variant="primary-site" style={{ 
                     background: "var(--roboks-gradient)", 
@@ -526,7 +524,7 @@ export default function LandingPageClient({
               </div>
               
               {/* Bullet points under Hero CTA */}
-              <div style={{
+              <div className="site-hero-bullets" style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: "12px 24px",
@@ -1751,14 +1749,14 @@ export default function LandingPageClient({
 
       {/* 13. CONTACTS SECTION */}
       <section id="contacts" style={{ padding: "100px 0", borderTop: "1px solid var(--color-border)" }}>
-        <div className="container" style={{
+        <div className="container site-contact-grid" style={{
           display: "grid",
           gridTemplateColumns: "1.2fr 1fr",
           gap: "80px",
           alignItems: "center"
         }}>
-          <div style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
-            <div style={{
+          <div className="site-contact-media-grid" style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
+            <div className="branch-map-shell" style={{
               borderRadius: "var(--radius-card-site)",
               position: "relative",
               border: "1px solid var(--color-border)",
@@ -1767,14 +1765,49 @@ export default function LandingPageClient({
               overflow: "hidden",
               background: "var(--color-primary-soft)"
             }}>
-              {contactMapEmbedUrl ? (
-                <iframe
-                  src={contactMapEmbedUrl}
-                  title="Карта филиалов Робокс"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  style={{ width: "100%", height: "100%", border: 0, display: "block" }}
-                />
+              {contactStaticMapUrl && contactMapMarkers.length > 0 ? (
+                <>
+                  <img
+                    src={contactStaticMapUrl}
+                    alt="Карта филиалов Робокс"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                  {contactMapMarkers.map((marker, index) => (
+                    <a
+                      key={`${marker.address}-${index}`}
+                      className="branch-map-marker"
+                      href={marker.openUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Открыть на картах: ${marker.address}`}
+                      title={marker.address}
+                      style={{
+                        position: "absolute",
+                        left: `${marker.x}%`,
+                        top: `${marker.y}%`,
+                        transform: "translate(-50%, -100%)",
+                        width: "34px",
+                        height: "42px",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "#fff",
+                        filter: "drop-shadow(0 6px 10px rgba(15,23,42,0.22))",
+                      }}
+                    >
+                      <MapPin size={34} fill="var(--color-accent)" stroke="white" strokeWidth={2} />
+                      <span style={{
+                        position: "absolute",
+                        top: "9px",
+                        fontSize: "11px",
+                        fontWeight: 900,
+                        color: "white",
+                        lineHeight: 1,
+                      }}>
+                        {index + 1}
+                      </span>
+                    </a>
+                  ))}
+                </>
               ) : (
                 <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", padding: "24px", textAlign: "center", fontWeight: 700 }}>
                   Адреса филиалов появятся на карте после заполнения в CRM
@@ -1782,7 +1815,7 @@ export default function LandingPageClient({
               )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <div className="site-contact-photo-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
               <div style={{
                 backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactFacadeImage}')`,
                 backgroundPosition: "center",
@@ -1822,9 +1855,23 @@ export default function LandingPageClient({
               <div style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)", padding: "10px", borderRadius: "10px" }}>
                 <MapPin size={20} />
               </div>
-              <div>
-                <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Наш адрес</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{contactAddress}</p>
+              <div style={{ display: "grid", gap: "12px", minWidth: 0 }}>
+                <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Наши адреса</h4>
+                {contactMapMarkers.map((marker, index) => (
+                  <div key={`${marker.address}-contact-${index}`} style={{ display: "grid", gap: "4px" }}>
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", margin: 0 }}>
+                      {marker.address}
+                    </p>
+                    <a
+                      href={marker.openUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: "12px", color: "var(--color-primary)", fontWeight: 800, textDecoration: "underline" }}
+                    >
+                      Открыть на картах
+                    </a>
+                  </div>
+                ))}
               </div>
             </div>
 

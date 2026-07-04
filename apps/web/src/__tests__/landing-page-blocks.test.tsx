@@ -78,7 +78,7 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText(/4.*000/i)).toBeInTheDocument();
   });
 
-  it("renders a real map with all branch addresses in the main contacts window", () => {
+  it("renders a real marker map with separate branch links in the main contacts window", () => {
     const { container } = render(
       <LandingPageClient
         initialBranches={[
@@ -100,12 +100,14 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
 
     const contactsSection = container.querySelector("#contacts");
     expect(contactsSection).not.toBeNull();
-    const mapFrame = contactsSection!.querySelector<HTMLIFrameElement>('iframe[title="Карта филиалов Робокс"]');
-    expect(mapFrame).not.toBeNull();
-    const searchText = new URL(mapFrame!.src).searchParams.get("text") || "";
+    const markers = contactsSection!.querySelectorAll(".branch-map-marker");
+    expect(markers).toHaveLength(2);
+    expect(contactsSection!.querySelector('iframe[title="Карта филиалов Робокс"]')).toBeNull();
 
-    expect(searchText).toContain("Липецк, ул. Осканова, 3");
-    expect(searchText).toContain("Липецк, ул. Славянова, 1");
+    const mapLinks = screen.getAllByRole("link", { name: "Открыть на картах" });
+    expect(mapLinks).toHaveLength(2);
+    expect(new URL(mapLinks[0].getAttribute("href") || "").searchParams.get("text")).toBe("Липецк, ул. Осканова, 3");
+    expect(new URL(mapLinks[1].getAttribute("href") || "").searchParams.get("text")).toBe("Липецк, ул. Славянова, 1");
 
     const styles = Array.from(contactsSection!.querySelectorAll<HTMLElement>("[style]"))
       .map((element) => element.getAttribute("style") || "")
@@ -119,11 +121,8 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
 
   it("renders two real fallback markers when CRM branches are unavailable", () => {
     const { container } = render(<LandingPageClient initialBranches={[]} />);
-    const mapFrame = container.querySelector<HTMLIFrameElement>('#contacts iframe[title="Карта филиалов Робокс"]');
-    expect(mapFrame).not.toBeNull();
-
-    const searchText = new URL(mapFrame!.src).searchParams.get("text") || "";
-    expect(searchText).toContain("Липецк, ул. Осканова, 3");
-    expect(searchText).toContain("Липецк, ул. Славянова, 1");
+    expect(container.querySelectorAll("#contacts .branch-map-marker")).toHaveLength(2);
+    expect(screen.getByText("Липецк, ул. Осканова, 3")).toBeInTheDocument();
+    expect(screen.getByText("Липецк, ул. Славянова, 1")).toBeInTheDocument();
   });
 });

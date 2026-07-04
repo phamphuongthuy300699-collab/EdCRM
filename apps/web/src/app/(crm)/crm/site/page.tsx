@@ -30,17 +30,10 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
+import { getLegalPageDefault, legalPageDocs } from "@/shared/utils/legal-page-defaults";
 import { mergeSiteImageItems, readableMediaTitle } from "@/shared/utils/site-media";
 
 type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
-
-const legalDocs = [
-  { key: "legal.page.legal", label: "Реквизиты", path: "/legal" },
-  { key: "legal.page.privacy", label: "Персональные данные", path: "/privacy" },
-  { key: "legal.page.offer", label: "Оферта", path: "/offer" },
-  { key: "legal.page.payment", label: "Оплата", path: "/payment" },
-  { key: "legal.page.refund", label: "Возврат", path: "/refund" },
-];
 
 const mediaFolders = [
   { id: "branding", label: "Брендинг и логотип" },
@@ -59,7 +52,7 @@ const mediaFolders = [
 const imageExtensions = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
 function selectedDoc(docKey: string) {
-  return legalDocs.find((doc) => doc.key === docKey) || legalDocs[0];
+  return legalPageDocs.find((doc) => doc.key === docKey) || legalPageDocs[0];
 }
 
 function mediaNameFromPath(path: string) {
@@ -429,11 +422,16 @@ export default function CrmSitePage() {
         .eq("block_key", docKey)
         .maybeSingle()
         .then(({ data }: any) => {
-          setDocTitle(data?.title || "");
-          setDocSubtitle(data?.subtitle || "");
-          setDocMetaTitle(data?.content?.meta_title || "");
-          setDocMetaDesc(data?.content?.meta_description || "");
-          setDocBody(data?.content?.body || "");
+          const fallback = getLegalPageDefault(docKey, {
+            email: orgEmail,
+            phone: orgPhone,
+            schoolName: brandName,
+          });
+          setDocTitle(data?.title || fallback.title);
+          setDocSubtitle(data?.subtitle || fallback.subtitle);
+          setDocMetaTitle(data?.content?.meta_title || fallback.metaTitle);
+          setDocMetaDesc(data?.content?.meta_description || fallback.metaDescription);
+          setDocBody(data?.content?.body || fallback.body);
           setDocShowInFooter(data?.content?.show_in_footer !== false);
           setLoadingDoc(false);
         })
@@ -441,7 +439,7 @@ export default function CrmSitePage() {
           setLoadingDoc(false);
         });
     }
-  }, [activeTab, selectedDocKey, orgId]);
+  }, [activeTab, selectedDocKey, orgId, orgEmail, orgPhone, brandName]);
 
   // General Block Saving Helper
   const saveBlock = async (key: string, title: string, subtitle: string, content: any) => {
@@ -632,6 +630,7 @@ export default function CrmSitePage() {
           phone: editingBranch.phone,
           email: editingBranch.email,
           work_hours: editingBranch.work_hours,
+          map_url: editingBranch.map_url || null,
           show_on_site: editingBranch.show_on_site,
           sort_order: parseInt(editingBranch.sort_order || 100, 10)
         })
@@ -733,12 +732,17 @@ export default function CrmSitePage() {
       const mergedContent = {
         ...(existing?.content || {})
       };
+      const fallback = getLegalPageDefault(selectedDocKey, {
+        email: orgEmail,
+        phone: orgPhone,
+        schoolName: brandName,
+      });
 
-      const finalTitle = docTitle || existing?.title || "";
-      const finalSubtitle = docSubtitle || existing?.subtitle || "";
-      const finalBody = docBody || existing?.content?.body || "";
-      const finalMetaTitle = docMetaTitle || existing?.content?.meta_title || "";
-      const finalMetaDesc = docMetaDesc || existing?.content?.meta_description || "";
+      const finalTitle = docTitle || existing?.title || fallback.title;
+      const finalSubtitle = docSubtitle || existing?.subtitle || fallback.subtitle;
+      const finalBody = docBody || existing?.content?.body || fallback.body;
+      const finalMetaTitle = docMetaTitle || existing?.content?.meta_title || fallback.metaTitle;
+      const finalMetaDesc = docMetaDesc || existing?.content?.meta_description || fallback.metaDescription;
 
       mergedContent.body = finalBody;
       mergedContent.meta_title = finalMetaTitle;
@@ -1680,6 +1684,19 @@ export default function CrmSitePage() {
                       <label className="form-label">Режим работы</label>
                       <input type="text" className="form-input" value={editingBranch.work_hours || ""} onChange={e => setEditingBranch({ ...editingBranch, work_hours: e.target.value })} required />
                     </div>
+                    <div className="form-group">
+                      <label className="form-label">Ссылка на точку Яндекс.Карт</label>
+                      <input
+                        type="url"
+                        className="form-input"
+                        value={editingBranch.map_url || ""}
+                        onChange={e => setEditingBranch({ ...editingBranch, map_url: e.target.value })}
+                        placeholder="https://yandex.ru/maps/?ll=39.4900857%2C52.596328&z=16"
+                      />
+                      <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                        Нужна для точного маркера на карте. Адрес на сайте останется отдельным текстом.
+                      </span>
+                    </div>
                     <div className="form-grid-2">
                       <div className="form-group">
                         <label className="form-label">Порядок сортировки</label>
@@ -1882,7 +1899,7 @@ export default function CrmSitePage() {
           {activeTab === "legal" && (
             <div className="legal-editor-layout" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr)", gap: "24px", alignItems: "start" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: 0 }}>
-                {legalDocs.map(doc => (
+                {legalPageDocs.map(doc => (
                   <button
                     key={doc.key}
                     type="button"

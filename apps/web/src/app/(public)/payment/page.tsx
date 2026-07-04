@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
 import { getDynamicPageBlock } from "../legal-data";
+import { getLegalPageDefault } from "@/shared/utils/legal-page-defaults";
 
 export const revalidate = 300;
 
@@ -10,20 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function PaymentPage() {
+  const fallback = getLegalPageDefault("legal.page.payment");
   const pageBlock = await getDynamicPageBlock(
-    "legal.page.payment",
-    "Условия оплаты",
-    "Информация о порядке оплаты занятий, валюте платежа, платёжной странице банка и отображении статуса оплаты.",
-    `### Оплата банковской картой
-Оплата банковской картой проводится через защищённую платёжную страницу банка. После выбора оплаты пользователь переходит на страницу банка, вводит данные карты и подтверждает платёж по правилам банка-эквайера.
-### Валюта платежа
-Все платежи на сайте принимаются в российских рублях.
-### Возврат на сайт
-После успешной или неуспешной оплаты пользователь возвращается на сайт. Информация о платеже обрабатывается CRM и отображается в личном кабинете родителя после подтверждения статуса оплаты.
-### Документ об оплате
-Электронный чек или иной документ об оплате предоставляется по правилам организации и требованиям действующего законодательства.
-### Статус оплаты
-Статус оплаты отображается в личном кабинете родителя. Если онлайн-оплата временно недоступна, администратор предоставит другой согласованный способ оплаты.`
+    fallback.key,
+    fallback.title,
+    fallback.subtitle,
+    fallback.body
   );
 
   return (

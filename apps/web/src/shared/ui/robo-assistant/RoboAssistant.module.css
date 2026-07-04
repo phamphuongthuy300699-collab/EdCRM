@@ -282,6 +282,40 @@
   border-color: var(--color-primary);
 }
 
+@media (max-width: 760px) {
+  .roboContainer {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .roboWrapper {
+    max-width: 150px;
+  }
+
+  .roboSVG {
+    width: min(150px, 42vw);
+    height: auto;
+    max-width: 100%;
+  }
+
+  .speechBubble {
+    width: 100%;
+    padding: 14px 16px;
+    min-height: 0;
+  }
+
+  .speechArrow {
+    display: none;
+  }
+
+  .demoMoodBar {
+    flex-wrap: wrap;
+  }
+}
+
 /* Prefers-reduced-motion compatibility */
 @media (prefers-reduced-motion: reduce) {
   .float,
