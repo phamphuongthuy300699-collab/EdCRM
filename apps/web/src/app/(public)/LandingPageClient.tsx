@@ -589,7 +589,7 @@ export default function LandingPageClient({
                 <RoboAssistant context="hero" mood="idle" size="lg" />
               </div>
 
-              <div style={{
+              <div className="site-hero-mentor-badge" style={{
                 position: "absolute",
                 bottom: "20px",
                 zIndex: 10,
@@ -822,9 +822,9 @@ export default function LandingPageClient({
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
+                  <div className="site-course-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
                     <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--color-text)" }}>{course.price}</span>
-                    <div style={{ display: "flex", gap: "12px" }}>
+                    <div className="site-course-card-actions" style={{ display: "flex", gap: "12px" }}>
                       <Link href={course.slug}>
                         <Button variant="secondary-site" style={{ height: "38px", padding: "0 16px", fontSize: "12px" }}>
                           Подробнее

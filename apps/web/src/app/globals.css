@@ -478,6 +478,10 @@ a {
   filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.28)) !important;
 }
 
+.site-course-card-actions a {
+  min-width: 0;
+}
+
 @media (max-width: 760px) {
   header .container {
     max-width: 100% !important;
@@ -561,8 +565,21 @@ a {
   }
 
   .site-landing .hero-visual-card > div:first-child {
-    height: 300px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 20px !important;
     border-radius: 18px !important;
+    gap: 14px !important;
+  }
+
+  .site-hero-mentor-badge {
+    position: static !important;
+    margin-top: -4px !important;
+    max-width: 100% !important;
+    text-align: center !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.03em !important;
+    white-space: normal !important;
   }
 
   .site-landing .floating-card-anim {
@@ -580,6 +597,29 @@ a {
     height: 280px !important;
     border-radius: 18px !important;
   }
+
+  .site-course-card-footer {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  .site-course-card-footer > span {
+    font-size: 1.45rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .site-course-card-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .site-course-card-actions a,
+  .site-course-card-actions button {
+    width: 100% !important;
+  }
 }
 
 @media (max-width: 420px) {
@@ -595,6 +635,14 @@ a {
   .site-landing .btn {
     padding-left: 16px !important;
     padding-right: 16px !important;
+  }
+
+  .site-course-card-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .site-course-card-actions button {
+    height: 44px !important;
   }
 }
 
