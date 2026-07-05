@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSiteImageItem, mergeSiteImageItems } from "../shared/utils/site-media";
+import { buildSiteImageItem, mergeSiteImageItems, normalizeSiteMediaPath } from "../shared/utils/site-media";
 
 describe("site media helpers", () => {
   it("uses editor-provided title and alt instead of technical filename", () => {
@@ -44,5 +44,17 @@ describe("site media helpers", () => {
       { path: "student-projects/new_robot.jpg", title: "new robot", alt: "new robot", sortOrder: 20 },
       { path: "student-projects/second_robot.jpg", title: "second robot", alt: "second robot", sortOrder: 30 },
     ]);
+  });
+
+  it("normalizes Supabase Storage public URLs before saving site content media", () => {
+    const fullUrl = "https://akhcnpvhivijdrvohwgd.supabase.co/storage/v1/object/public/site-assets/student-projects/%D0%A0%D0%BE%D0%B1%D0%BE%D1%82.jpg";
+
+    expect(normalizeSiteMediaPath(fullUrl)).toBe("student-projects/Робот.jpg");
+    expect(buildSiteImageItem({ url: fullUrl }, 10, { title: "Робот", alt: "Робот" })).toEqual({
+      path: "student-projects/Робот.jpg",
+      title: "Робот",
+      alt: "Робот",
+      sortOrder: 10,
+    });
   });
 });

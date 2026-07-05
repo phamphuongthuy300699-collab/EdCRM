@@ -1,7 +1,11 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET, POST } from "../app/api/crm/media/route";
 import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { getMediaUrl } from "@/shared/utils/media";
 
 vi.mock("@/shared/db/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
@@ -96,7 +100,10 @@ describe("Media API Endpoint Security", () => {
 
   it("allows the CRM to list hero media for the public first screen", async () => {
     const originalMediaDriver = process.env.MEDIA_DRIVER;
+    const originalMediaLocalDir = process.env.MEDIA_LOCAL_DIR;
+    const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-list-"));
     process.env.MEDIA_DRIVER = "local";
+    process.env.MEDIA_LOCAL_DIR = tempMediaDir;
 
     const mockSupabase = {
       auth: {
@@ -125,6 +132,82 @@ describe("Media API Endpoint Security", () => {
       } else {
         process.env.MEDIA_DRIVER = originalMediaDriver;
       }
+      if (originalMediaLocalDir === undefined) {
+        delete process.env.MEDIA_LOCAL_DIR;
+      } else {
+        process.env.MEDIA_LOCAL_DIR = originalMediaLocalDir;
+      }
+      fs.rmSync(tempMediaDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns local /media URLs and writes uploaded files to the local media root", async () => {
+    const originalMediaDriver = process.env.MEDIA_DRIVER;
+    const originalNextPublicMediaDriver = process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+    const originalMediaLocalDir = process.env.MEDIA_LOCAL_DIR;
+    const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-upload-"));
+    process.env.MEDIA_DRIVER = "local";
+    delete process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+    process.env.MEDIA_LOCAL_DIR = tempMediaDir;
+
+    const mockSupabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+      }),
+    };
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+
+    try {
+      expect(getMediaUrl("teachers/photo one.jpg")).toBe("/media/teachers/photo%20one.jpg");
+
+      const formData = {
+        get: vi.fn((key: string) => {
+          if (key === "folder") return "teachers";
+          if (key === "file") {
+            return {
+              name: "teacher photo.jpg",
+              type: "image/jpeg",
+              arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("teacher-photo")),
+            };
+          }
+          return null;
+        }),
+      };
+
+      const req = new NextRequest("http://localhost:3000/api/crm/media", { method: "POST" });
+      req.formData = vi.fn().mockResolvedValue(formData);
+
+      const response = await POST(req);
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json).toMatchObject({
+        success: true,
+        path: "teachers/teacher_photo.jpg",
+        url: "/media/teachers/teacher_photo.jpg",
+      });
+      expect(fs.existsSync(path.join(tempMediaDir, "teachers", "teacher_photo.jpg"))).toBe(true);
+    } finally {
+      if (originalMediaDriver === undefined) {
+        delete process.env.MEDIA_DRIVER;
+      } else {
+        process.env.MEDIA_DRIVER = originalMediaDriver;
+      }
+      if (originalNextPublicMediaDriver === undefined) {
+        delete process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+      } else {
+        process.env.NEXT_PUBLIC_MEDIA_DRIVER = originalNextPublicMediaDriver;
+      }
+      if (originalMediaLocalDir === undefined) {
+        delete process.env.MEDIA_LOCAL_DIR;
+      } else {
+        process.env.MEDIA_LOCAL_DIR = originalMediaLocalDir;
+      }
+      fs.rmSync(tempMediaDir, { recursive: true, force: true });
     }
   });
 });

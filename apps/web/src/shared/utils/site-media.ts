@@ -1,6 +1,8 @@
 type SiteMediaFile = {
   path?: string | null;
   name?: string | null;
+  url?: string | null;
+  publicUrl?: string | null;
 };
 
 type SiteMediaMeta = {
@@ -21,12 +23,30 @@ function mediaNameFromPath(path: string) {
   return path.split("/").pop() || path;
 }
 
+export function normalizeSiteMediaPath(value: string) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  try {
+    const url = new URL(rawValue);
+    const marker = "/storage/v1/object/public/";
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex === -1) return rawValue;
+
+    const afterPublic = url.pathname.slice(markerIndex + marker.length);
+    const [, ...pathParts] = afterPublic.split("/");
+    return decodeURIComponent(pathParts.join("/"));
+  } catch {
+    return rawValue;
+  }
+}
+
 export function readableMediaTitle(path: string) {
   return mediaNameFromPath(path).replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
 }
 
 export function buildSiteImageItem(file: SiteMediaFile, sortOrder: number, meta: SiteMediaMeta = {}) {
-  const path = String(file.path || "").trim();
+  const path = normalizeSiteMediaPath(file.path || file.url || file.publicUrl || "");
   const fallbackTitle = readableMediaTitle(path);
   const title = String(meta.title || "").trim() || fallbackTitle;
   const alt = String(meta.alt || "").trim() || title;
@@ -47,7 +67,7 @@ export function mergeSiteImageItems(
   const merged = [...currentImages];
 
   files.forEach((file) => {
-    const path = String(file.path || "").trim();
+    const path = normalizeSiteMediaPath(file.path || file.url || file.publicUrl || "");
     if (!path) return;
 
     const existingIndex = merged.findIndex((item) => item.path === path);

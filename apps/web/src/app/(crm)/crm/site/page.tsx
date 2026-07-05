@@ -31,7 +31,7 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
 import { getLegalPageDefault, legalPageDocs } from "@/shared/utils/legal-page-defaults";
-import { mergeSiteImageItems, readableMediaTitle } from "@/shared/utils/site-media";
+import { mergeSiteImageItems, normalizeSiteMediaPath, readableMediaTitle } from "@/shared/utils/site-media";
 
 type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -64,7 +64,8 @@ function mediaTitleFromPath(path: string) {
 }
 
 function mediaPath(value: any) {
-  return typeof value === "string" ? value : value?.path || "";
+  const rawPath = typeof value === "string" ? value : value?.path || value?.url || value?.publicUrl || "";
+  return normalizeSiteMediaPath(rawPath);
 }
 
 function mediaUrl(file: any) {
@@ -800,7 +801,7 @@ export default function CrmSitePage() {
         };
         mergedContent[fieldName] = mergeSiteImageItems(currentImages, filesToAssign, metaByPath);
       } else {
-        mergedContent[fieldName] = filesToAssign[0].path;
+        mergedContent[fieldName] = mediaPath(filesToAssign[0]);
       }
 
       await saveBlock(blockKey, title, subtitle, mergedContent);

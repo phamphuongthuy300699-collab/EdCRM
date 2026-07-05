@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 import { isDemoMode } from "@/shared/utils/demo";
 
-const LOCAL_MEDIA_DIR = "/opt/edcrm/media";
+const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
 const WHITELIST_FOLDERS = [
   "branding",
   "hero",
@@ -20,6 +20,10 @@ const WHITELIST_FOLDERS = [
   "documents",
   "misc",
 ];
+
+function getLocalMediaDir() {
+  return process.env.MEDIA_LOCAL_DIR || DEFAULT_LOCAL_MEDIA_DIR;
+}
 
 // Helper to authenticate and verify user role
 async function checkAuthAndRole(req: NextRequest) {
@@ -69,19 +73,9 @@ export async function GET(req: NextRequest) {
 
   try {
     if (driver === "local") {
-      const dirPath = path.join(LOCAL_MEDIA_DIR, folder);
-      
-      let resolvedDir = dirPath;
-      if (!fs.existsSync(LOCAL_MEDIA_DIR)) {
-        const fallbackRoot = path.join(process.cwd(), "public/media");
-        resolvedDir = path.join(fallbackRoot, folder);
-        if (!fs.existsSync(resolvedDir)) {
-          fs.mkdirSync(resolvedDir, { recursive: true });
-        }
-      } else {
-        if (!fs.existsSync(resolvedDir)) {
-          fs.mkdirSync(resolvedDir, { recursive: true });
-        }
+      const resolvedDir = path.join(getLocalMediaDir(), folder);
+      if (!fs.existsSync(resolvedDir)) {
+        fs.mkdirSync(resolvedDir, { recursive: true });
       }
 
       const files = fs.readdirSync(resolvedDir);
@@ -153,27 +147,9 @@ export async function POST(req: NextRequest) {
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
 
     if (driver === "local") {
-      const dirPath = path.join(LOCAL_MEDIA_DIR, folder);
-      let resolvedDir = dirPath;
-      
-      if (!fs.existsSync(LOCAL_MEDIA_DIR)) {
-        const fallbackRoot = path.join(process.cwd(), "public/media");
-        resolvedDir = path.join(fallbackRoot, folder);
-        if (!fs.existsSync(resolvedDir)) {
-          fs.mkdirSync(resolvedDir, { recursive: true });
-        }
-      } else {
-        try {
-          if (!fs.existsSync(resolvedDir)) {
-            fs.mkdirSync(resolvedDir, { recursive: true });
-          }
-        } catch (dirErr) {
-          const fallbackRoot = path.join(process.cwd(), "public/media");
-          resolvedDir = path.join(fallbackRoot, folder);
-          if (!fs.existsSync(resolvedDir)) {
-            fs.mkdirSync(resolvedDir, { recursive: true });
-          }
-        }
+      const resolvedDir = path.join(getLocalMediaDir(), folder);
+      if (!fs.existsSync(resolvedDir)) {
+        fs.mkdirSync(resolvedDir, { recursive: true });
       }
 
       fs.writeFileSync(path.join(resolvedDir, sanitizedFilename), buffer);
