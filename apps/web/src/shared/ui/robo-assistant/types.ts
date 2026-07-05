@@ -20,4 +20,5 @@ export interface RoboAssistantProps {
   message?: string;
   compact?: boolean;
   size?: "sm" | "md" | "lg";
+  interactiveAssembly?: boolean;
 }

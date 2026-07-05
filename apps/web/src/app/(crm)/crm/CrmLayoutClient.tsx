@@ -19,7 +19,8 @@ import {
   Calendar,
   ClipboardList,
   FileText,
-  Globe
+  Globe,
+  Receipt
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -42,7 +43,8 @@ export default function CrmLayout({
     { name: "Заявки (Лиды)", path: "/crm/leads", icon: Inbox },
     { name: "Ученики", path: "/crm/students", icon: Users },
     { name: "Группы", path: "/crm/groups", icon: GraduationCap },
-    { name: "Оплаты", path: "/crm/payments", icon: CreditCard },
+    { name: "Счета (Invoices)", path: "/crm/invoices", icon: CreditCard },
+    { name: "Платежи (Payments)", path: "/crm/payments", icon: Receipt },
     { name: "Учебные материалы", path: "/crm/materials", icon: BookOpen },
     { name: "Занятия", path: "/crm/lessons", icon: Calendar },
     { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },
@@ -70,23 +72,34 @@ export default function CrmLayout({
       }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
           {/* Logo */}
-          <Link href="/crm" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 8px" }}>
+          <Link href="/crm" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 8px", textDecoration: "none" }}>
+            <img 
+              src="/api/crm/media?path=branding/roboks-logo.svg" 
+              alt="Робокс" 
+              style={{ width: "32px", height: "32px", objectFit: "contain" }}
+              onError={(e) => {
+                // Fallback to stylized letter P
+                e.currentTarget.style.display = "none";
+                const fallback = e.currentTarget.nextSibling as HTMLDivElement;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
             <div style={{
               width: "32px",
               height: "32px",
               borderRadius: "8px",
-              background: "var(--color-primary)",
-              display: "flex",
+              background: "var(--roboks-gradient)",
+              display: "none",
               alignItems: "center",
               justifyContent: "center",
               color: "white",
-              fontWeight: 800,
+              fontWeight: 900,
               fontSize: "1.1rem"
             }}>
-              R
+              Р
             </div>
-            <span style={{ fontWeight: 800, fontSize: "1.15rem", fontFamily: "var(--font-geologica)" }}>
-              CRM Robotics
+            <span style={{ fontWeight: 900, fontSize: "1.2rem", fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+              Робокс<span style={{ color: "var(--roboks-pink)" }}>.</span>
             </span>
           </Link>
 

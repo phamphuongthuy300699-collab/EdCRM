@@ -2,12 +2,15 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
-import { CreditCard, ArrowLeft, Check } from "lucide-react";
+import { CreditCard, ArrowLeft, Check, Percent } from "lucide-react";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Стоимость обучения робототехнике в Липецке | Цены кружка",
-  description: "Тарифы и стоимость обучения робототехнике и программированию для детей in Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",
+  description: "Тарифы и стоимость обучения робототехнике и программированию для детей в Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/stoimost",
   },
@@ -33,9 +36,8 @@ export default async function StoimostPage() {
     ]
   };
 
-  let trialPrice = "0 ₽";
-  let monthlyPrice = "от 4 000 ₽";
-  let individualPrice = "от 1 500 ₽";
+  let displayTariffs: any[] = [];
+  let publicCourses: any[] = [];
 
   try {
     const supabase = createSupabaseAdminClient();
@@ -46,23 +48,35 @@ export default async function StoimostPage() {
       .single();
 
     if (org) {
-      const { data: pricesBlock } = await supabase
-        .from("site_content_blocks")
-        .select("content")
+      // 1. Fetch Tariffs
+      const { data: tariffsData } = await supabase
+        .from("course_tariffs")
+        .select("*")
         .eq("organization_id", org.id)
-        .eq("block_key", "home.prices")
-        .eq("status", "published")
-        .single();
-      
-      if (pricesBlock?.content) {
-        trialPrice = pricesBlock.content.trialPrice || trialPrice;
-        monthlyPrice = pricesBlock.content.monthlyPrice || monthlyPrice;
-        individualPrice = pricesBlock.content.individualPrice || individualPrice;
+        .eq("show_on_site", true)
+        .order("sort_order", { ascending: true });
+
+      if (tariffsData && tariffsData.length > 0) {
+        displayTariffs = tariffsData;
+      }
+
+      // 2. Fetch Courses
+      const { data: courses } = await (supabase.from("courses") as any)
+        .select("id, title, short_description, min_age, max_age, duration_minutes, price_monthly, sort_order")
+        .eq("organization_id", org.id)
+        .eq("is_public", true)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (courses) {
+        publicCourses = courses;
       }
     }
   } catch (e) {
     console.error("Error loading pricing page dynamic data:", e);
   }
+
+
 
   return (
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
@@ -101,54 +115,86 @@ export default async function StoimostPage() {
       </section>
 
       <section style={{ padding: "80px 0" }}>
-        <div className="container" style={{ maxWidth: "800px", display: "grid", gap: "48px" }}>
+        <div className="container" style={{ maxWidth: "960px", display: "grid", gap: "48px" }}>
           
           <div>
-            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "24px", textAlign: "center" }}>Наши тарифы</h2>
+            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "36px", textAlign: "center" }}>Наши тарифы</h2>
             
             <div style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1.1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: "24px",
               alignItems: "stretch"
             }}>
-              <div style={{ background: "white", padding: "32px", borderRadius: "16px", border: "1px solid var(--color-border)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "24px" }}>
-                <div>
-                  <span className="badge badge-blue" style={{ marginBottom: "12px" }}>Знакомство</span>
-                  <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Пробный урок</h3>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Ознакомительное занятие для ребенка длительностью 90 минут.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{trialPrice}</div>
+              {displayTariffs.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                  Данные о тарифах пока не заполнены в CRM.
                 </div>
-                <Link href="/#lead-form">
-                  <Button variant="secondary-site" style={{ width: "100%" }}>Записаться</Button>
-                </Link>
-              </div>
+              ) : (
+                displayTariffs.map((t) => {
+                  const isTrial = Number(t.price) === 0;
+                  const isPopular = t.title.toLowerCase().includes("абонемент");
+                  const badgeLabel = isTrial ? "Знакомство" : isPopular ? "Популярно" : "Углубленный";
+                  const badgeClass = isTrial ? "badge-blue" : isPopular ? "badge-green" : "badge-purple";
+                  const borderStyle = isPopular 
+                    ? { border: "2px solid var(--color-primary)", transform: "scale(1.02)", boxShadow: "0 8px 30px rgba(37,99,235,0.06)" } 
+                    : { border: "1px solid var(--color-border)" };
 
-              <div style={{ background: "white", padding: "32px", borderRadius: "16px", border: "2px solid var(--color-primary)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "24px", transform: "scale(1.02)", boxShadow: "0 8px 30px rgba(37,99,235,0.06)" }}>
-                <div>
-                  <span className="badge badge-green" style={{ marginBottom: "12px" }}>Популярно</span>
-                  <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Месячный абонемент</h3>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Регулярные занятия в мини-группе 2 раза в неделю по 90 минут.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{monthlyPrice}</div>
-                </div>
-                <Link href="/#lead-form">
-                  <Button variant="primary-site" style={{ width: "100%", background: "var(--color-primary)" }}>Купить абонемент</Button>
-                </Link>
-              </div>
-
-              <div style={{ background: "white", padding: "32px", borderRadius: "16px", border: "1px solid var(--color-border)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "24px" }}>
-                <div>
-                  <span className="badge badge-purple" style={{ marginBottom: "12px" }}>Углубленный</span>
-                  <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>Индивидуальный</h3>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "0 0 16px 0" }}>Персональный урок с наставником. Индивидуальный разбор сложных проектов.</p>
-                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{individualPrice}</div>
-                </div>
-                <Link href="/#lead-form">
-                  <Button variant="secondary-site" style={{ width: "100%" }}>Заказать разбор</Button>
-                </Link>
-              </div>
+                  return (
+                    <div 
+                      key={t.id} 
+                      style={{ 
+                        background: "white", 
+                        padding: "32px", 
+                        borderRadius: "16px", 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        justifyContent: "space-between", 
+                        gap: "24px",
+                        ...borderStyle
+                      }}
+                    >
+                      <div>
+                        <span className={`badge ${badgeClass}`} style={{ marginBottom: "12px" }}>{badgeLabel}</span>
+                        <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0" }}>{t.title}</h3>
+                        <p style={{ fontSize: "12.5px", color: "var(--color-text-muted)", margin: "0 0 16px 0", lineHeight: 1.5 }}>{t.format}</p>
+                        <div style={{ fontSize: "28px", fontWeight: 900, color: "var(--color-text)" }}>
+                          {Number(t.price) === 0 ? "0 ₽" : `${Number(t.price).toLocaleString("ru-RU")} ₽`}
+                          {!t.is_one_time && Number(t.price) > 0 && <span style={{ fontSize: "14px", fontWeight: 550, color: "var(--color-text-muted)" }}> / мес</span>}
+                        </div>
+                      </div>
+                      <Link href="/#lead-form">
+                        <Button 
+                          variant={isPopular ? "primary-site" : "secondary-site"} 
+                          style={{ width: "100%", background: isPopular ? "var(--color-primary)" : undefined }}
+                        >
+                          {isTrial ? "Записаться" : "Выбрать тариф"}
+                        </Button>
+                      </Link>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
+
+          {publicCourses.length > 0 && (
+            <div>
+              <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "24px", textAlign: "center" }}>Цены по направлениям</h2>
+              <div style={{ display: "grid", gap: "12px" }}>
+                {publicCourses.map((course) => (
+                  <div key={course.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.7fr 0.7fr", gap: "16px", alignItems: "center", background: "white", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "18px 20px" }}>
+                    <div>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 800 }}>{course.title}</h3>
+                      <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "12px" }}>{course.short_description || "Описание направления уточняется"}</p>
+                    </div>
+                    <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{course.min_age || 6}-{course.max_age || 14} лет · {course.duration_minutes || 90} мин</span>
+                    <strong style={{ textAlign: "right" }}>{course.price_monthly ? `${Number(course.price_monthly).toLocaleString("ru-RU")} ₽ / мес` : "Цена уточняется"}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ background: "rgba(37, 99, 235, 0.04)", border: "1px dashed rgba(37, 99, 235, 0.3)", borderRadius: "16px", padding: "32px", marginTop: "24px" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "16px" }}>Что входит в стоимость:</h3>

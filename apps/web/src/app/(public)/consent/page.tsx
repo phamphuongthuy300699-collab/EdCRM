@@ -1,51 +1,32 @@
 import React from "react";
 import { Metadata } from "next";
-import Link from "next/link";
+import { LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
+import { getDynamicPageBlock, getPublicLegalData } from "../legal-data";
+import { getLegalPageDefault } from "@/shared/utils/legal-page-defaults";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Согласие на обработку персональных данных | Школа Robotics Липецк",
-  description: "Согласие на обработку персональных данных для родителей и учащихся школы Robotics Липецк.",
+  title: "Согласие на обработку персональных данных | Робокс Липецк",
+  description: "Согласие на обработку персональных данных для родителей и учащихся школы Робокс Липецк.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/consent",
   },
 };
 
-export default function ConsentPage() {
+export default async function ConsentPage() {
+  const data = await getPublicLegalData();
+  const fallback = getLegalPageDefault("legal.page.consent", data);
+  const pageBlock = await getDynamicPageBlock(
+    fallback.key,
+    fallback.title,
+    fallback.subtitle,
+    fallback.body
+  );
+
   return (
-    <div className="container" style={{ padding: "80px 20px", maxWidth: "800px", fontFamily: "var(--font-inter), sans-serif", lineHeight: 1.7 }}>
-      <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "var(--color-primary)", fontWeight: 600, marginBottom: "32px", fontSize: "14px" }}>
-        ← Вернуться на главную
-      </Link>
-      
-      <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "24px" }}>
-        Согласие на обработку персональных данных
-      </h1>
-      
-      <p style={{ color: "var(--color-text-muted)", fontSize: "13px", marginBottom: "32px" }}>
-        Действует с 28 июня 2026 года
-      </p>
-
-      <div style={{ display: "grid", gap: "20px" }}>
-        <p>
-          Отправляя заявку на сайте https://robotics-lipetsk.ru (далее — Сайт), я, в соответствии с Федеральным законом РФ № 152-ФЗ «О персональных данных», свободно, своей волей и в своем интересе выражаю безусловное согласие на обработку моих персональных данных и персональных данных моего несовершеннолетнего ребенка (подопечного) школой Robotics Липецк (далее — Оператор).
-        </p>
-
-        <p>
-          <strong>Перечень персональных данных, на обработку которых дается согласие:</strong> ФИО родителя (законного представителя), контактный номер телефона, имя и возраст ребенка, выбранное направление обучения, удобное время для посещения занятий, а также сопутствующие текстовые комментарии.
-        </p>
-
-        <p>
-          <strong>Перечень действий с персональными данными:</strong> сбор, запись, систематизация, накопление, хранение, уточнение (обновление, изменение), извлечение, использование, обезличивание, блокирование, удаление, уничтожение персональных данных. Обработка данных может осуществляться как с использованием средств автоматизации (в CRM-системе Оператора), так и без них.
-        </p>
-
-        <p>
-          <strong>Цель обработки данных:</strong> организация процесса записи на пробные и регулярные занятия в школе робототехники, подбор учебных групп по возрасту, информирование о расписании и тарифах, подготовка договора об оказании образовательных услуг.
-        </p>
-
-        <p>
-          Настоящее согласие вступает в силу с момента отправки веб-формы на Сайте и действует в течение всего срока оказания услуг или до его письменного отзыва. Отзыв согласия может быть направлен в свободной форме на адрес электронной почты <strong>info@robotics-lipetsk.ru</strong>.
-        </p>
-      </div>
-    </div>
+    <LegalPageShell title={pageBlock.title} lead={pageBlock.subtitle}>
+      <DynamicLegalSections bodyText={pageBlock.body} />
+    </LegalPageShell>
   );
 }

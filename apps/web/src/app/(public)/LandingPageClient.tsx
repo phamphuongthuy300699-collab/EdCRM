@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
 import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import Link from "next/link";
+import { getMediaUrl } from "@/shared/utils/media";
+import { buildYandexStaticMapUrl, publicMapBranches, resolveBranchMapMarkers } from "@/shared/utils/public-map";
 import { 
   Users, 
   Layers, 
@@ -39,15 +41,41 @@ const triggerGoal = (goalName: string) => {
         'event_label': goalName
       });
     }
-    console.log(`[Analytics] Triggered goal: ${goalName}`);
   }
 };
+
+function mediaPath(value: any) {
+  return typeof value === "string" ? value : value?.path || "";
+}
+
+function mediaTitle(value: any, fallback: string) {
+  if (typeof value === "object" && value?.title) return value.title;
+  return fallback;
+}
+
+function mediaAlt(value: any, fallback: string) {
+  if (typeof value === "object" && value?.alt) return value.alt;
+  return mediaTitle(value, fallback);
+}
+
+function mediaItems(values: any[] | undefined) {
+  return Array.isArray(values) ? values.filter((item) => mediaPath(item)) : [];
+}
+
+function mediaSrc(value: any) {
+  const path = mediaPath(value);
+  return path ? getMediaUrl(path) : "";
+}
 
 interface LandingPageClientProps {
   initialCourses?: any[];
   initialSchedule?: any[];
   initialPrices?: any;
   initialBlocks?: any[];
+  initialTeachers?: any[];
+  initialBranches?: any[];
+  orgDetails?: any;
+  initialTariffs?: any[];
 }
 
 export default function LandingPageClient({
@@ -55,6 +83,10 @@ export default function LandingPageClient({
   initialSchedule,
   initialPrices,
   initialBlocks,
+  initialTeachers,
+  initialBranches,
+  orgDetails,
+  initialTariffs,
 }: LandingPageClientProps) {
   const router = useRouter();
   
@@ -62,10 +94,7 @@ export default function LandingPageClient({
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [childName, setChildName] = useState("");
-  const [childAge, setChildAge] = useState("");
   const [courseId, setCourseId] = useState("");
-  const [convenientTime, setConvenientTime] = useState("");
-  const [message, setMessage] = useState("");
   const [consent, setConsent] = useState(true);
   
   const [loading, setLoading] = useState(false);
@@ -75,6 +104,11 @@ export default function LandingPageClient({
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Schedule Filter State
+  const [filterAge, setFilterAge] = useState<string>("all");
+  const [filterCourse, setFilterCourse] = useState<string>("all");
+  const [filterBranch, setFilterBranch] = useState<string>("all");
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -116,10 +150,7 @@ export default function LandingPageClient({
           parentName,
           parentPhone,
           childName,
-          childAge: childAge ? parseInt(childAge, 10) : undefined,
           courseId: courseId || undefined,
-          convenientTime: convenientTime || undefined,
-          message: message || undefined,
         }),
       });
 
@@ -141,60 +172,12 @@ export default function LandingPageClient({
     }
   };
 
-  // Static Fallback Data
-  const coursesList = [
-    {
-      id: "4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a",
-      slug: "/robototekhnika-dlya-detey-lipetsk",
-      title: "Робототехника (Lego Education)",
-      age: "6–9 лет",
-      desc: "Изучение механики и основ программирования роботов через конструирование.",
-      mission: "Собрать робота-уборщика, объезжающего препятствия",
-      results: ["первый рабочий механизм", "базовые алгоритмы", "защита мини-проекта"],
-      icon: Cpu,
-      price: "4 500 ₽ / мес"
-    },
-    {
-      id: "1d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/scratch-dlya-detey-lipetsk",
-      title: "Scratch и основы программирования",
-      age: "7–11 лет",
-      desc: "Создание собственных игр, мультфильмов и интерактивных проектов.",
-      mission: "Создать 2D-платформер с физикой прыжков и врагами",
-      results: ["своя игра на Scratch", "логические ветвления", "опыт геймдизайна"],
-      icon: Gamepad2,
-      price: "4 000 ₽ / мес"
-    },
-    {
-      id: "2d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/python-dlya-detey-lipetsk",
-      title: "Программирование на Python",
-      age: "10–14 лет",
-      desc: "Освоение профессионального программирования на простых и понятных задачах.",
-      mission: "Написать ИИ-помощника для Telegram",
-      results: ["синтаксис Python", "работа с API", "деплой первого чат-бота"],
-      icon: Code,
-      price: "4 800 ₽ / мес"
-    },
-    {
-      id: "3d0d97b0-cbe6-444a-a006-2c5e533ebbbd",
-      slug: "/arduino-dlya-detey-lipetsk",
-      title: "Arduino и схемотехника",
-      age: "10–15 лет",
-      desc: "Проектирование электронных схем, умных устройств и программирование микроконтроллеров.",
-      mission: "Спроектировать систему автополива растений с датчиком влажности",
-      results: ["сборка схем без пайки", "программирование C/C++", "работа с сенсорами"],
-      icon: Lightbulb,
-      price: "5 200 ₽ / мес"
-    }
-  ];
-
   const steps = [
-    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=200" },
-    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=200" },
-    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200" },
-    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=200" },
-    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=200" }
+    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "/images/classroom_lipetsk.png" },
+    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "/images/robot_sumo.png" },
+    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "/images/arduino_greenhouse.png" },
+    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "/images/robot_sumo.png" },
+    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "/images/classroom_lipetsk.png" }
   ];
 
   const faqItems = [
@@ -219,31 +202,18 @@ export default function LandingPageClient({
   const heroSecondaryCtaText = heroBlock?.content?.secondaryCtaText || "Посмотреть проекты";
 
   const teachersBlock = getBlock('home.teachers');
+  const showTeachers = teachersBlock?.content?.showBlock !== false;
   const teachersTitle = teachersBlock?.title || "Наши преподаватели";
   const teachersSubtitle = teachersBlock?.subtitle || "Практикующие наставники, которые умеют объяснять сложное детям простым языком";
-  const teachersListToRender = teachersBlock?.content?.items || [
-    {
-      name: "Алексей Дмитриев",
-      role: "Старший наставник LEGO & Arduino",
-      text: "Помогает детям не бояться ошибок и доводить инженерные проекты до рабочего результата.",
-      imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
-      alt: "Алексей Дмитриев — преподаватель робототехники"
-    },
-    {
-      name: "Мария Соколова",
-      role: "Преподаватель Scratch и основ программирования",
-      text: "Учит мыслить алгоритмами через игры, мультфильмы и первые интерактивные проекты.",
-      imageUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
-      alt: "Мария Соколова — преподаватель программирования"
-    },
-    {
-      name: "Егор Смирнов",
-      role: "Python / Arduino наставник",
-      text: "Объясняет Python, электронику и датчики через практические задачи и мини-проекты.",
-      imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
-      alt: "Егор Смирнов — наставник Python/Arduino"
-    }
-  ];
+  const teachersListToRender = initialTeachers && initialTeachers.length > 0
+    ? initialTeachers.map((teacher: any) => ({
+        name: teacher.name,
+        role: teacher.role || "Наставник инженерной лаборатории",
+        text: teacher.text || "Помогает детям уверенно разбираться в инженерных задачах и доводить проекты до результата.",
+        imageUrl: teacher.imageUrl || "",
+        alt: teacher.alt || teacher.name,
+      }))
+    : [];
 
   const portalPreviewBlock = getBlock('home.parent_student_portal_preview');
   const portalPreviewTitle = portalPreviewBlock?.title || "Родители видят прогресс ребенка в личном кабинете";
@@ -264,66 +234,200 @@ export default function LandingPageClient({
   const trialPrice = pricesBlock?.content?.trialPrice || "0 ₽";
   const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
   const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
+  const primaryBranch = initialBranches?.[0] || null;
+  const contactBranches = publicMapBranches(initialBranches || []);
+  const contactMapMarkers = resolveBranchMapMarkers(contactBranches);
+  const contactStaticMapUrl = buildYandexStaticMapUrl(contactMapMarkers, { width: 650, height: 300 });
+  const contactHours = primaryBranch?.work_hours || primaryBranch?.hours || "Время работы уточняется в CRM";
+  const heroLocationLabel = initialBranches && initialBranches.length > 1
+    ? `${initialBranches.length} филиала в Липецке`
+    : primaryBranch?.address || "Адреса филиалов уточняются";
+
+  const homeMediaBlock = getBlock('home.media');
+  const customHeroImage = mediaPath(homeMediaBlock?.content?.heroImage);
+
+  const facilitiesBlock = getBlock('home.facilities');
+  const facilitiesImages = mediaItems(facilitiesBlock?.content?.images);
+
+  const studentProjectsBlock = getBlock('home.student_projects');
+  const studentProjectsImages = mediaItems(studentProjectsBlock?.content?.images);
+
+  const lessonProcessBlock = getBlock('home.lesson_process');
+  const lessonProcessImages = mediaItems(lessonProcessBlock?.content?.images);
+
+  const equipmentBlock = getBlock('home.equipment');
+  const equipmentImages = mediaItems(equipmentBlock?.content?.images);
+
+  const contactsMediaBlock = getBlock('contacts.media');
+  const contactsImages = mediaItems(contactsMediaBlock?.content?.images);
+  const contactFacadeImage = mediaPath(contactsMediaBlock?.content?.facadeImage) || mediaPath(contactsImages[1]);
+  const contactClassroomImage = mediaPath(contactsMediaBlock?.content?.classroomImage)
+    || mediaPath(contactsMediaBlock?.content?.image)
+    || mediaPath(contactsImages[2]);
+
+  const stepsToRender = steps.map((step, idx) => {
+    const customImg = lessonProcessImages[idx];
+    return {
+      ...step,
+      img: customImg ? mediaSrc(customImg) : step.img
+    };
+  });
+
+  const defaultProjects = [
+    {
+      img: "/images/robot_sumo.png",
+      tag: "Lego Education · 8-10 лет",
+      tagColor: "badge-amber",
+      title: "Робот для соревнований «Сумо»",
+      desc: "Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания."
+    },
+    {
+      img: "/images/arduino_greenhouse.png",
+      tag: "Arduino & C++ · 11-14 лет",
+      tagColor: "badge-purple",
+      title: "Автоматическая микро-теплица",
+      desc: "Проект Ивана (12 лет). Конструкция автоматически включает светодиодное освещение при затенении и поливает почву при срабатывании датчика влажности."
+    }
+  ];
+
+  const projectsToRender = studentProjectsImages.length > 0
+    ? studentProjectsImages.map((img: any, idx: number) => {
+        const defaultProj = defaultProjects[idx] || {
+          tag: "Инженерный проект",
+          tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
+          title: mediaTitle(img, `Роботехническая разработка ${idx + 1}`),
+          desc: "Ребенок собрал и запрограммировал действующий механизм, решающий конкретную задачу."
+        };
+        return {
+          img: mediaSrc(img),
+          tag: defaultProj.tag,
+          tagColor: defaultProj.tagColor,
+          title: mediaTitle(img, defaultProj.title),
+          alt: mediaAlt(img, defaultProj.title),
+          desc: defaultProj.desc
+        };
+      })
+    : defaultProjects;
+
+  const resolvedClassroomMainImage = facilitiesImages[0] 
+    ? mediaSrc(facilitiesImages[0])
+    : "/images/classroom_lipetsk.png";
+
+  const resolvedEquipmentTopImage = equipmentImages[0]
+    ? mediaSrc(equipmentImages[0])
+    : "/images/robot_sumo.png";
+
+  const resolvedEquipmentBottomImage = equipmentImages[1]
+    ? mediaSrc(equipmentImages[1])
+    : "/images/arduino_greenhouse.png";
+
+  const resolvedHeroImage = customHeroImage ? getMediaUrl(customHeroImage) : resolvedClassroomMainImage;
+  const resolvedContactFacadeImage = contactFacadeImage ? mediaSrc(contactFacadeImage) : resolvedEquipmentTopImage;
+  const resolvedContactClassroomImage = contactClassroomImage ? mediaSrc(contactClassroomImage) : resolvedClassroomMainImage;
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
-    ? initialCourses.map(dbCourse => {
-        const localConfig = coursesList.find(c => c.id === dbCourse.id || c.title.toLowerCase().includes(dbCourse.title.toLowerCase()));
-        return {
-          id: dbCourse.id,
-          title: dbCourse.title,
-          slug: dbCourse.slug ? `/${dbCourse.slug}` : (localConfig?.slug || "/"),
-          age: dbCourse.min_age && dbCourse.max_age ? `${dbCourse.min_age}–${dbCourse.max_age} лет` : (localConfig?.age || "6-14 лет"),
-          desc: dbCourse.short_description || dbCourse.full_description || (localConfig?.desc || ""),
-          mission: localConfig?.mission || "Собрать и запрограммировать собственный проект",
-          results: localConfig?.results || ["первые навыки", "логическое мышление"],
-          icon: localConfig?.icon || Cpu,
-          price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : (localConfig?.price || "4 000 ₽ / мес")
-        };
-      })
-    : coursesList;
+    ? initialCourses.map(dbCourse => ({
+        id: dbCourse.id,
+        title: dbCourse.title,
+        slug: dbCourse.slug ? `/${dbCourse.slug}` : "#lead-form",
+        age: dbCourse.min_age && dbCourse.max_age ? `${dbCourse.min_age}–${dbCourse.max_age} лет` : "Возраст уточняется",
+        desc: dbCourse.short_description || dbCourse.full_description || "Описание направления уточняется в CRM.",
+        mission: "",
+        results: [],
+        icon: Cpu,
+        price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : "Цена уточняется"
+      }))
+    : [];
 
-  // Dynamic Schedule Mapping
-  const scheduleToRender = (initialSchedule && initialSchedule.length > 0)
-    ? initialSchedule.map((item: any) => {
-        let spotsText = "Осталось несколько мест";
-        let badgeClass = "badge-green";
-        const spots = item.spots ?? 0;
-        if (spots <= 0) {
-          spotsText = "Группа заполнена";
-          badgeClass = "badge-red";
-        } else if (spots === 1 || spots === 2) {
-          spotsText = `Осталось ${spots} места`;
-          badgeClass = "badge-amber";
-        } else {
-          spotsText = `Осталось ${spots} мест`;
-          badgeClass = "badge-green";
-        }
-        return {
-          age: item.age,
-          course: item.course,
-          time: item.time,
-          spotsText,
-          badgeClass,
-        };
-      })
-    : [
-        { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
-        { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
-        { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
-        { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
-      ];
+  // Dynamic Schedule Mapping & Filters
+  const rawSchedule = (initialSchedule && initialSchedule.length > 0)
+    ? initialSchedule
+    : [];
+
+  const uniqueCourses = Array.from(new Set(rawSchedule.map((s: any) => s.course).filter(Boolean)));
+  const uniqueBranches = Array.from(new Set(rawSchedule.map((s: any) => s.branch).filter(Boolean)));
+
+  const scheduleToRender = rawSchedule.filter((item: any) => {
+    // Age filter
+    if (filterAge !== "all") {
+      const match = item.age.match(/(\d+)\s*[–-]\s*(\d+)/);
+      if (match) {
+        const min = parseInt(match[1]);
+        const max = parseInt(match[2]);
+        if (filterAge === "preschool" && min > 7) return false;
+        if (filterAge === "junior" && (max < 8 || min > 10)) return false;
+        if (filterAge === "senior" && max < 11) return false;
+      }
+    }
+    // Course filter
+    if (filterCourse !== "all" && item.course !== filterCourse) return false;
+    // Branch filter
+    if (filterBranch !== "all" && item.branch !== filterBranch) return false;
+
+    return true;
+  }).map((item: any) => {
+    let spotsText = "Осталось несколько мест";
+    let badgeClass = "badge-green";
+    const spots = item.spots ?? 0;
+    if (spots <= 0) {
+      spotsText = "Группа заполнена";
+      badgeClass = "badge-red";
+    } else if (spots === 1 || spots === 2) {
+      spotsText = `Мест: ${spots} (мало)`;
+      badgeClass = "badge-amber";
+    } else {
+      spotsText = `Мест: ${spots}`;
+      badgeClass = "badge-green";
+    }
+    return {
+      age: item.age,
+      course: item.course,
+      time: item.time,
+      branch: item.branch || "",
+      teacher: item.teacher || "",
+      spotsText,
+      badgeClass,
+    };
+  });
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
+    <div className="site-landing" style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)" }}>
       
       {/* 1. HERO SECTION */}
       <section className="bg-grid-blueprint" style={{
-        padding: "80px 0 120px 0",
+        padding: "100px 0 130px 0",
         borderBottom: "1px solid var(--color-border)",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
+        background: "var(--roboks-bg)"
       }}>
+        {/* Soft gradient blur spots */}
+        <div style={{
+          position: "absolute",
+          top: "10%",
+          left: "5%",
+          width: "350px",
+          height: "350px",
+          borderRadius: "50%",
+          background: "var(--roboks-cyan)",
+          opacity: 0.16,
+          filter: "blur(90px)",
+          pointerEvents: "none"
+        }} />
+        <div style={{
+          position: "absolute",
+          bottom: "10%",
+          right: "5%",
+          width: "400px",
+          height: "400px",
+          borderRadius: "50%",
+          background: "var(--roboks-pink)",
+          opacity: 0.14,
+          filter: "blur(110px)",
+          pointerEvents: "none"
+        }} />
+
         <div style={{
           position: "absolute",
           top: "-150px",
@@ -331,84 +435,95 @@ export default function LandingPageClient({
           width: "500px",
           height: "500px",
           borderRadius: "50%",
-          border: "1.5px dashed rgba(37,99,235,0.06)",
+          border: "1.5px dashed rgba(70, 62, 142, 0.08)",
           pointerEvents: "none"
         }} />
 
-        <div className="container" style={{
+        <div className="container site-hero-grid" style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1.1fr",
+          gridTemplateColumns: "1.1fr 0.9fr",
           alignItems: "center",
           gap: "64px",
           position: "relative",
-          zIndex: 10
+          zIndex: 10,
+          padding: "0 20px"
         }}>
           {/* Hero Left Content */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "var(--color-primary-soft)",
-              color: "var(--color-primary-dark)",
-              padding: "6px 12px",
-              borderRadius: "20px",
-              width: "fit-content",
-              fontWeight: 800,
-              fontSize: "var(--font-xs)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em"
-            }}>
-              {heroBadge}
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              <span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>🤖 Дошкольники и школьники</span>
+              <span className="badge badge-purple" style={{ background: "rgba(70, 62, 142, 0.08)", color: "var(--roboks-purple)", fontWeight: 800 }}>📍 2 адреса в Липецке</span>
+              <span className="badge badge-green" style={{ background: "#DCFCE7", color: "#15803D", fontWeight: 800 }}>👥 Мини-группы</span>
+              <span className="badge badge-red" style={{ background: "rgba(218, 60, 140, 0.08)", color: "var(--roboks-pink)", fontWeight: 800 }}>⚡️ 100% Практика</span>
             </div>
 
             <h1 style={{
-              fontSize: "var(--font-h1)",
+              fontSize: "clamp(2.2rem, 5.5vw, 3.4rem)",
               color: "var(--color-text)",
-              lineHeight: 1.15,
+              lineHeight: 1.12,
               fontFamily: "var(--font-geologica)",
-              maxWidth: "600px"
+              maxWidth: "640px",
+              fontWeight: 900,
+              letterSpacing: "-0.03em"
             }}>
-              {heroTitle}
+              Робототехника и программирование для детей в Липецке
             </h1>
 
             <p style={{
               fontSize: "var(--font-body-lg)",
               color: "var(--color-text-muted)",
-              maxWidth: "500px",
-              lineHeight: 1.6
+              maxWidth: "540px",
+              lineHeight: 1.65,
+              fontWeight: 500
             }}>
-              {heroSubtitle}
+              Занятия для дошкольников и школьников: LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch и первые цифровые проекты.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
-              <div style={{ display: "flex", gap: "16px" }}>
-                <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                  <Button variant="primary-site" style={{ background: "var(--color-accent)", height: "52px", padding: "0 28px" }}>
-                    {heroCtaText}
+              <div className="site-hero-actions" style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+                <a href="#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+                  <Button variant="primary-site" style={{ 
+                    background: "var(--roboks-gradient)", 
+                    height: "54px", 
+                    padding: "0 32px",
+                    fontWeight: 800,
+                    border: "none",
+                    borderRadius: "14px",
+                    boxShadow: "0 10px 25px rgba(218, 60, 140, 0.15)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}>
+                    Записаться на пробное занятие
                     <ArrowRight size={18} />
                   </Button>
-                </Link>
-                <Link href="/#projects">
-                  <Button variant="secondary-site" style={{ height: "52px", padding: "0 28px" }}>
-                    {heroSecondaryCtaText}
+                </a>
+                <a href="#schedule">
+                  <Button variant="secondary-site" style={{ 
+                    height: "54px", 
+                    padding: "0 32px",
+                    fontWeight: 750,
+                    borderRadius: "14px"
+                  }}>
+                    Посмотреть расписание
                   </Button>
-                </Link>
+                </a>
               </div>
               
               {/* Bullet points under Hero CTA */}
-              <div style={{
+              <div className="site-hero-bullets" style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: "12px 24px",
-                maxWidth: "500px",
-                background: "rgba(255, 255, 255, 0.7)",
-                padding: "16px",
-                borderRadius: "12px",
+                maxWidth: "540px",
+                background: "rgba(255, 255, 255, 0.75)",
+                backdropFilter: "blur(4px)",
+                padding: "18px",
+                borderRadius: "16px",
                 border: "1px solid var(--color-border)"
               }}>
                 {heroBullets.map((bullet: string, idx: number) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600 }}>
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: 650 }}>
                     <Check size={16} style={{ color: "var(--color-success)" }} />
                     <span>{bullet}</span>
                   </div>
@@ -439,7 +554,7 @@ export default function LandingPageClient({
                 left: 0,
                 width: "100%",
                 height: "100%",
-                backgroundImage: "linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800')",
+                backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)), url('${resolvedHeroImage}')`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 opacity: 0.15,
@@ -458,10 +573,10 @@ export default function LandingPageClient({
               }} />
 
               <div style={{ zIndex: 10, position: "relative" }}>
-                <RoboAssistant context="hero" mood="idle" size="lg" />
+                <RoboAssistant context="hero" mood="idle" size="lg" interactiveAssembly />
               </div>
 
-              <div style={{
+              <div className="site-hero-mentor-badge" style={{
                 position: "absolute",
                 bottom: "20px",
                 zIndex: 10,
@@ -525,7 +640,7 @@ export default function LandingPageClient({
             }}>
               <Cpu size={16} style={{ color: "var(--color-primary)" }} />
               <div style={{ fontWeight: 800, fontSize: "12px", color: "var(--color-text)" }}>
-                Липецк · ул. Ленина, 10
+                {heroLocationLabel}
               </div>
             </div>
           </div>
@@ -625,9 +740,14 @@ export default function LandingPageClient({
             gridTemplateColumns: "1fr 1fr",
             gap: "32px"
           }}>
-            {coursesToRender.map((course) => {
-              const IconComp = course.icon;
-              return (
+            {coursesToRender.length === 0 ? (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                Направления обучения пока не заполнены в CRM.
+              </div>
+            ) : (
+              coursesToRender.map((course) => {
+                const IconComp = course.icon;
+                return (
                 <div key={course.id} className="card-site" style={{
                   display: "flex",
                   flexDirection: "column",
@@ -654,40 +774,44 @@ export default function LandingPageClient({
                       </h3>
                     </Link>
                     
-                    <div style={{ 
-                      background: "var(--color-bg)", 
-                      padding: "12px", 
-                      borderRadius: "8px", 
-                      marginBottom: "16px",
-                      borderLeft: "3px solid var(--color-accent)" 
-                    }}>
-                      <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Миссия курса:</div>
-                      <div style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-text)" }}>{course.mission}</div>
-                    </div>
+                    {course.mission && (
+                      <div style={{ 
+                        background: "var(--color-bg)", 
+                        padding: "12px", 
+                        borderRadius: "8px", 
+                        marginBottom: "16px",
+                        borderLeft: "3px solid var(--color-accent)" 
+                      }}>
+                        <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Миссия курса:</div>
+                        <div style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-text)" }}>{course.mission}</div>
+                      </div>
+                    )}
 
                     <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "16px" }}>{course.desc}</p>
                     
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {course.results.map((res: string, i: number) => (
-                          <span key={i} style={{
-                            background: "rgba(37, 99, 235, 0.05)",
-                            color: "var(--color-primary-dark)",
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                            fontSize: "11px",
-                            fontWeight: 600
-                          }}>
-                            ✓ {res}
-                          </span>
-                        ))}
+                    {course.results.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                          {course.results.map((res: string, i: number) => (
+                            <span key={i} style={{
+                              background: "rgba(37, 99, 235, 0.05)",
+                              color: "var(--color-primary-dark)",
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: 600
+                            }}>
+                              ✓ {res}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
+                  <div className="site-course-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
                     <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--color-text)" }}>{course.price}</span>
-                    <div style={{ display: "flex", gap: "12px" }}>
+                    <div className="site-course-card-actions" style={{ display: "flex", gap: "12px" }}>
                       <Link href={course.slug}>
                         <Button variant="secondary-site" style={{ height: "38px", padding: "0 16px", fontSize: "12px" }}>
                           Подробнее
@@ -702,7 +826,8 @@ export default function LandingPageClient({
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </div>
       </section>
@@ -719,40 +844,25 @@ export default function LandingPageClient({
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-            <div className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ height: "240px", position: "relative" }}>
-                <img 
-                  src="/images/robot_sumo.png" 
-                  alt="Робот-сумоист на базе LEGO" 
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "32px" }}>
+            {projectsToRender.map((proj: any, idx: number) => (
+              <div key={idx} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ height: "240px", position: "relative" }}>
+                  <img 
+                    src={proj.img} 
+                    alt={proj.alt || proj.title}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </div>
+                <div style={{ padding: "24px" }}>
+                  <span className={`badge ${proj.tagColor}`} style={{ marginBottom: "12px" }}>{proj.tag}</span>
+                  <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>{proj.title}</h4>
+                  <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                    {proj.desc}
+                  </p>
+                </div>
               </div>
-              <div style={{ padding: "24px" }}>
-                <span className="badge badge-amber" style={{ marginBottom: "12px" }}>Lego Robotics · 8-10 лет</span>
-                <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>Робот для соревнований «Сумо»</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-                  Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания.
-                </p>
-              </div>
-            </div>
-
-            <div className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ height: "240px", position: "relative" }}>
-                <img 
-                  src="/images/arduino_greenhouse.png" 
-                  alt="Умная теплица на Arduino" 
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-              <div style={{ padding: "24px" }}>
-                <span className="badge badge-purple" style={{ marginBottom: "12px" }}>Arduino & C++ · 11-14 лет</span>
-                <h4 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>Автоматическая микро-теплица</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-                  Проект Ивана (12 лет). Конструкция автоматически включает светодиодное освещение при затенении и поливает почву при срабатывании датчика влажности.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -786,7 +896,7 @@ export default function LandingPageClient({
               pointerEvents: "none"
             }} />
 
-            {steps.map((step, idx) => (
+            {stepsToRender.map((step, idx) => (
               <div key={idx} style={{
                 position: "relative",
                 display: "flex",
@@ -855,14 +965,14 @@ export default function LandingPageClient({
           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "24px" }}>
             <div style={{ height: "400px", position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid var(--color-border)" }}>
               <img 
-                src="/images/classroom_lipetsk.png" 
+                src={resolvedClassroomMainImage} 
                 alt="Кабинет робототехники Липецк" 
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
             <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: "24px" }}>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1560785496-3c9d27877182?auto=format&fit=crop&q=80&w=400') center/cover no-repeat",
+                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentTopImage}') center/cover no-repeat`,
                 borderRadius: "20px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -871,7 +981,7 @@ export default function LandingPageClient({
                 <span style={{ position: "absolute", bottom: "16px", left: "20px", fontSize: "12px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>Оригинальное оборудование LEGO</span>
               </div>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&q=80&w=400') center/cover no-repeat",
+                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentBottomImage}') center/cover no-repeat`,
                 borderRadius: "20px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -1099,7 +1209,7 @@ export default function LandingPageClient({
 
             <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Сын увлекался играми, решили направить interest в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Robotics Липецк!»
+                «Сын увлекался играми, решили направить интерес в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Робокс!»
               </p>
               <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
                 <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-accent-dark)" }}>ДП</div>
@@ -1128,7 +1238,7 @@ export default function LandingPageClient({
 
       {/* 9. SCHEDULE */}
       <section id="schedule" style={{ padding: "100px 0" }}>
-        <div className="container">
+        <div className="container" style={{ padding: "0 20px" }}>
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
               Расписание учебных групп в Липецке
@@ -1138,139 +1248,256 @@ export default function LandingPageClient({
             </p>
           </div>
 
+          {/* Filters Bar */}
           <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+            marginBottom: "32px",
             background: "white",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-card-site)",
-            overflow: "hidden",
-            boxShadow: "0 12px 32px rgba(15, 23, 42, 0.03)"
+            padding: "20px 24px",
+            borderRadius: "16px",
+            border: "1px solid var(--color-border)"
           }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "var(--font-small)", borderBottom: "1px solid var(--color-border)" }}>
-              <span>Возраст</span>
-              <span>Курс</span>
-              <span>Время занятий</span>
-              <span>Наличие мест</span>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Возраст ребенка</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterAge} onChange={e => setFilterAge(e.target.value)}>
+                <option value="all">Все возрасты</option>
+                <option value="preschool">Дошкольники (5–7 лет)</option>
+                <option value="junior">Младшая школа (8–10 лет)</option>
+                <option value="senior">Средняя/старшая школа (11–15 лет)</option>
+              </select>
             </div>
-            
-            {scheduleToRender.map((sched: any, idx: number) => (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center" }}>
-                <span style={{ fontWeight: 700 }}>{sched.age}</span>
-                <span>{sched.course}</span>
-                <span>{sched.time}</span>
-                <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Направление</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
+                <option value="all">Все направления</option>
+                {uniqueCourses.map((c: any) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-muted)", display: "block", marginBottom: "6px" }}>Адрес / Филиал</label>
+              <select className="form-input" style={{ width: "100%", height: "44px", borderRadius: "10px", border: "1px solid var(--color-border)", background: "white", padding: "0 12px" }} value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
+                <option value="all">Все филиалы</option>
+                {uniqueBranches.map((b: any) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Schedule list container */}
+          <div style={{ display: "grid", gap: "16px" }}>
+            {scheduleToRender.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px", color: "var(--color-text-muted)", background: "white", borderRadius: "var(--radius-card-site)", border: "1px solid var(--color-border)" }}>
+                Нет подходящих групп. Попробуйте сбросить фильтры или оставьте заявку, мы подберем группу индивидуально!
               </div>
-            ))}
+            ) : (
+              scheduleToRender.map((sched: any, idx: number) => (
+                <div key={idx} className="card-site" style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "24px 32px",
+                  gap: "24px",
+                  flexWrap: "wrap",
+                  background: "white"
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "12px", color: "var(--roboks-pink)", fontWeight: 800 }}>Возраст: {sched.age}</span>
+                    <h4 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "var(--color-text)" }}>{sched.course}</h4>
+                  </div>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Расписание</span>
+                    <span style={{ fontWeight: 650, fontSize: "14px" }}>{sched.time}</span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Филиал & Преподаватель</span>
+                    <span style={{ fontSize: "13.5px", fontWeight: 600 }}>{sched.branch || "Школа Робокс"} {sched.teacher ? `• ${sched.teacher}` : ""}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "0 0 auto", flexWrap: "wrap" }}>
+                    <span className={`badge ${sched.badgeClass}`} style={{ fontWeight: 800, padding: "8px 14px", borderRadius: "20px" }}>{sched.spotsText}</span>
+                    <a href="#lead-form">
+                      <Button variant="secondary-site" style={{ height: "40px", fontSize: "12px", borderRadius: "10px", padding: "0 16px" }}>Записаться</Button>
+                    </a>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
       {/* 10. PRICES SECTION */}
       <section id="prices" style={{ padding: "100px 0", background: "var(--color-bg)" }}>
-        <div className="container">
+        <div className="container" style={{ padding: "0 20px" }}>
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
               Стоимость занятий
             </h2>
-          </div>
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "32px"
-          }}>
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px" }}>
-              <div>
-                <span className="badge badge-blue" style={{ marginBottom: "16px" }}>Знакомство</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Пробное занятие</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  Ознакомительное занятие 90 минут. Ребенок соберет первого робота.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {trialPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="secondary-site" style={{ width: "100%" }}>Записаться бесплатно</Button>
-              </Link>
-            </div>
-
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px", border: "2px solid var(--color-primary)" }}>
-              <div>
-                <span className="badge badge-green" style={{ marginBottom: "16px" }}>Популярно</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Месячный абонемент</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  4 занятия по 90 минут. Все учебные материалы и LEGO включены.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {monthlyPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="primary-site" style={{ width: "100%" }}>Купить абонемент</Button>
-              </Link>
-            </div>
-
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "32px" }}>
-              <div>
-                <span className="badge badge-purple" style={{ marginBottom: "16px" }}>Углубленный</span>
-                <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px" }}>Индивидуальный</h3>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px" }}>
-                  Персональный урок с наставником. Индивидуальный разбор сложных проектов.
-                </p>
-                <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)" }}>
-                  {individualPrice}
-                </div>
-              </div>
-              <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
-                <Button variant="secondary-site" style={{ width: "100%" }}>Заказать разбор</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TEACHERS SECTION */}
-      <section id="teachers" style={{ padding: "100px 0" }}>
-        <div className="container">
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
-            <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              {teachersTitle}
-            </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              {teachersSubtitle}
+              Выбирайте удобный формат посещения занятий в нашей школе
             </p>
           </div>
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "32px"
           }}>
-            {teachersListToRender.map((teacher: any, idx: number) => (
-              <div key={idx} className="card-site" style={{ textAlign: "center" }}>
-                <div style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  margin: "0 auto 20px auto",
-                  border: "3px solid var(--color-primary-soft)",
-                  boxShadow: "0 8px 16px rgba(0,0,0,0.06)",
+            {(() => {
+              const tariffsList = (initialTariffs && initialTariffs.length > 0)
+                ? initialTariffs
+                : [];
+
+              if (tariffsList.length === 0) {
+                return (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                    Тарифы обучения пока не заполнены в CRM.
+                  </div>
+                );
+              }
+
+              return tariffsList.map((t: any) => {
+                const isTrial = Number(t.price) === 0 || t.title.toLowerCase().includes("пробн") || t.audience?.toLowerCase().includes("дошкол");
+                const isMonthly = t.title.toLowerCase().includes("абонемент") || t.audience?.toLowerCase().includes("школ");
+                
+                const cardStyle: React.CSSProperties = {
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "28px",
                   position: "relative"
-                }}>
-                  <img src={teacher.imageUrl} alt={teacher.alt || teacher.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
-                </div>
-                <h4 style={{ fontSize: "1.25rem", marginBottom: "4px" }}>{teacher.name}</h4>
-                <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--color-primary)", fontWeight: 700, marginBottom: "16px" }}>{teacher.role}</p>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-                  «{teacher.text}»
-                </p>
-              </div>
-            ))}
+                };
+
+                let badgeClass = "badge-gray";
+                let badgeText = "Разовый";
+                
+                if (isTrial) {
+                  cardStyle.border = "2.5px solid var(--roboks-cyan)";
+                  cardStyle.background = "rgba(142, 208, 221, 0.04)";
+                  badgeClass = "badge-blue";
+                  badgeText = "Знакомство";
+                } else if (isMonthly) {
+                  cardStyle.border = "2.5px solid var(--roboks-purple)";
+                  cardStyle.boxShadow = "0 16px 40px rgba(70, 62, 142, 0.08)";
+                  badgeClass = "badge-purple";
+                  badgeText = "Популярно";
+                } else {
+                  cardStyle.border = "1px solid var(--color-border)";
+                  badgeClass = "badge-gray";
+                  badgeText = "Персональный";
+                }
+
+                return (
+                  <div key={t.id} className="card-site" style={cardStyle}>
+                    <div>
+                      <span className={`badge ${badgeClass}`} style={{ marginBottom: "16px", fontWeight: 800 }}>{badgeText}</span>
+                      <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "8px", fontFamily: "var(--font-geologica)" }}>{t.title}</h3>
+                      <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "24px", lineHeight: 1.5 }}>
+                        {t.format || t.audience}
+                      </p>
+                      <div style={{ fontSize: "2rem", fontWeight: 900, fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+                        {Number(t.price) === 0 ? "Бесплатно" : `${Number(t.price).toLocaleString("ru-RU")} ₽`}
+                        {!t.is_one_time && Number(t.price) > 0 && <span style={{ fontSize: "14px", fontWeight: 650, color: "var(--color-text-muted)" }}> / мес</span>}
+                      </div>
+                    </div>
+                    <Link href="/#lead-form" onClick={() => triggerGoal("cta_button_clicked")}>
+                      <Button 
+                        variant={isMonthly ? "primary-site" : "secondary-site"} 
+                        style={{ 
+                          width: "100%", 
+                          background: isMonthly ? "var(--roboks-gradient)" : undefined,
+                          border: isMonthly ? "none" : undefined,
+                          color: isMonthly ? "white" : undefined,
+                          fontWeight: 750
+                        }}
+                      >
+                        {isTrial ? "Записаться бесплатно" : isMonthly ? "Купить абонемент" : "Записаться"}
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       </section>
+
+      {/* TEACHERS SECTION */}
+      {showTeachers && (
+        <section id="teachers" style={{ padding: "100px 0" }}>
+          <div className="container">
+            <div style={{ textAlign: "center", marginBottom: "64px" }}>
+              <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
+                {teachersTitle}
+              </h2>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
+                {teachersSubtitle}
+              </p>
+            </div>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "32px"
+            }}>
+              {teachersListToRender.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "48px 0", color: "var(--color-text-muted)", background: "white", borderRadius: "16px", border: "1px dashed var(--color-border)" }}>
+                  Преподаватели пока не заполнены в CRM.
+                </div>
+              ) : (
+                teachersListToRender.map((teacher: any, idx: number) => {
+                  const initials = teacher.name 
+                    ? teacher.name.split(" ").filter(Boolean).map((n: string) => n[0]).join("") 
+                    : "Р";
+                  return (
+                  <div key={idx} className="card-site" style={{ textAlign: "center" }}>
+                    <div style={{
+                      width: "120px",
+                      height: "120px",
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      margin: "0 auto 20px auto",
+                      border: "3px solid var(--color-primary-soft)",
+                      boxShadow: "0 8px 24px rgba(70, 62, 142, 0.1)",
+                      position: "relative"
+                    }}>
+                      {teacher.imageUrl ? (
+                        <img src={teacher.imageUrl} alt={teacher.alt || teacher.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{
+                          width: "100%",
+                          height: "100%",
+                          background: "var(--roboks-gradient)",
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 900,
+                          fontSize: "2rem",
+                          fontFamily: "var(--font-geologica)"
+                        }}>
+                          {initials}
+                        </div>
+                      )}
+                      <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
+                    </div>
+                    <h4 style={{ fontSize: "1.25rem", marginBottom: "4px", fontFamily: "var(--font-geologica)", fontWeight: 800 }}>{teacher.name}</h4>
+                    <p style={{ fontSize: "var(--font-xs)", textTransform: "uppercase", color: "var(--roboks-pink)", fontWeight: 800, marginBottom: "16px" }}>{teacher.role}</p>
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+                      «{teacher.text}»
+                    </p>
+                  </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 11. FAQ */}
       <section id="faq" style={{ padding: "100px 0", background: "var(--color-bg)" }}>
@@ -1356,7 +1583,7 @@ export default function LandingPageClient({
               marginBottom: "32px",
               lineHeight: 1.5
             }}>
-              Заполните форму ниже, чтобы забронировать место. Мы свяжемся с вами в течение 15 минут для подтверждения времени.
+              Оставьте имя и телефон. Мы свяжемся с вами, ответим на вопросы и подберем удобную группу.
             </p>
 
             <div style={{ marginBottom: "32px" }}>
@@ -1400,65 +1627,6 @@ export default function LandingPageClient({
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="form-group">
-                  <label className="form-label">Возраст ребенка</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="8" 
-                    min="3"
-                    max="18"
-                    value={childAge}
-                    onChange={(e) => setChildAge(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Направление</label>
-                  <select 
-                    className="form-input" 
-                    style={{ padding: "0 12px" }}
-                    value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
-                  >
-                    <option value="">Выберите курс</option>
-                    {coursesToRender.map((course) => (
-                      <option key={course.id} value={course.id}>{course.title}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Selection of convenient time */}
-              <div className="form-group">
-                <label className="form-label">Удобное время для занятий</label>
-                <select 
-                  className="form-input" 
-                  style={{ padding: "0 12px" }}
-                  value={convenientTime}
-                  onChange={(e) => setConvenientTime(e.target.value)}
-                >
-                  <option value="">Выберите время</option>
-                  <option value="Утро (09:00 - 12:00)">Утро (09:00 - 12:00)</option>
-                  <option value="День (12:00 - 15:00)">День (12:00 - 15:00)</option>
-                  <option value="Вечер (15:00 - 18:00)">Вечер (15:00 - 18:00)</option>
-                  <option value="Поздний вечер (18:00 - 20:00)">Поздний вечер (18:00 - 20:00)</option>
-                  <option value="Выходные дни">Выходные дни</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Комментарий к заявке</label>
-                <textarea 
-                  className="form-input" 
-                  style={{ height: "80px", padding: "12px", resize: "none" }}
-                  placeholder="Например: занимались ли раньше конструированием..." 
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                />
-              </div>
-
               {/* Consent checkbox */}
               <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginTop: "12px" }}>
                 <input 
@@ -1469,13 +1637,13 @@ export default function LandingPageClient({
                   style={{ marginTop: "4px", cursor: "pointer" }}
                 />
                 <label htmlFor="consent" style={{ fontSize: "11px", color: "var(--color-text-muted)", cursor: "pointer", lineHeight: 1.4 }}>
-                  Я согласен на обработку моих персональных данных и персональных данных ребенка в соответствии с{" "}
-                  <Link href="/privacy-policy" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
-                    Политикой конфиденциальности
+                  Нажимая кнопку, вы соглашаетесь с{" "}
+                  <Link href="/privacy" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
+                    политикой обработки персональных данных
                   </Link>{" "}
-                  и{" "}
+                  и подтверждаете{" "}
                   <Link href="/consent" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
-                    Согласием на обработку персональных данных
+                    согласие на обработку персональных данных
                   </Link>.
                 </label>
               </div>
@@ -1509,43 +1677,78 @@ export default function LandingPageClient({
 
       {/* 13. CONTACTS SECTION */}
       <section id="contacts" style={{ padding: "100px 0", borderTop: "1px solid var(--color-border)" }}>
-        <div className="container" style={{
+        <div className="container site-contact-grid" style={{
           display: "grid",
           gridTemplateColumns: "1.2fr 1fr",
           gap: "80px",
           alignItems: "center"
         }}>
-          <div style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
-            {/* Address map mock */}
-            <div style={{
-              background: "linear-gradient(to bottom, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.25)), url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=600') center/cover no-repeat",
+          <div className="site-contact-media-grid" style={{ display: "grid", gridTemplateRows: "250px 130px", gap: "20px" }}>
+            <div className="branch-map-shell" style={{
               borderRadius: "var(--radius-card-site)",
               position: "relative",
               border: "1px solid var(--color-border)",
               boxShadow: "0 10px 25px rgba(0,0,0,0.03)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "250px"
+              height: "250px",
+              overflow: "hidden",
+              background: "var(--color-primary-soft)"
             }}>
-              <div style={{
-                background: "white",
-                padding: "8px 16px",
-                borderRadius: "20px",
-                border: "2px solid var(--color-primary)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px"
-              }}>
-                <MapPin size={16} style={{ color: "var(--color-primary)" }} />
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text)" }}>ул. Ленина, д. 10</span>
-              </div>
+              {contactStaticMapUrl && contactMapMarkers.length > 0 ? (
+                <>
+                  <img
+                    src={contactStaticMapUrl}
+                    alt="Карта филиалов Робокс"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                  {contactMapMarkers.map((marker, index) => (
+                    <a
+                      key={`${marker.address}-${index}`}
+                      className="branch-map-marker"
+                      href={marker.openUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Открыть на картах: ${marker.address}`}
+                      title={marker.address}
+                      style={{
+                        position: "absolute",
+                        left: `${marker.x}%`,
+                        top: `${marker.y}%`,
+                        transform: "translate(-50%, -100%)",
+                        width: "34px",
+                        height: "42px",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "#fff",
+                        filter: "drop-shadow(0 6px 10px rgba(15,23,42,0.22))",
+                      }}
+                    >
+                      <MapPin size={34} fill="var(--color-accent)" stroke="white" strokeWidth={2} />
+                      <span style={{
+                        position: "absolute",
+                        top: "9px",
+                        fontSize: "11px",
+                        fontWeight: 900,
+                        color: "white",
+                        lineHeight: 1,
+                      }}>
+                        {index + 1}
+                      </span>
+                    </a>
+                  ))}
+                </>
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", padding: "24px", textAlign: "center", fontWeight: 700 }}>
+                  Адреса филиалов появятся на карте после заполнения в CRM
+                </div>
+              )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <div className="site-contact-photo-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=300') center/cover no-repeat",
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactFacadeImage}')`,
+                backgroundPosition: "center",
+                backgroundSize: "cover",
+                backgroundRepeat: "no-repeat",
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -1554,7 +1757,10 @@ export default function LandingPageClient({
                 <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Фасад школы</span>
               </div>
               <div style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('/images/classroom_lipetsk.png') center/cover no-repeat",
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactClassroomImage}')`,
+                backgroundPosition: "center",
+                backgroundSize: "cover",
+                backgroundRepeat: "no-repeat",
                 borderRadius: "12px",
                 border: "1px solid var(--color-border)",
                 position: "relative",
@@ -1577,9 +1783,23 @@ export default function LandingPageClient({
               <div style={{ background: "var(--color-primary-soft)", color: "var(--color-primary)", padding: "10px", borderRadius: "10px" }}>
                 <MapPin size={20} />
               </div>
-              <div>
-                <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Наш адрес</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>г. Липецк, ул. Ленина, д. 10</p>
+              <div style={{ display: "grid", gap: "12px", minWidth: 0 }}>
+                <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Наши адреса</h4>
+                {contactMapMarkers.map((marker, index) => (
+                  <div key={`${marker.address}-contact-${index}`} style={{ display: "grid", gap: "4px" }}>
+                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", margin: 0 }}>
+                      {marker.address}
+                    </p>
+                    <a
+                      href={marker.openUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: "12px", color: "var(--color-primary)", fontWeight: 800, textDecoration: "underline" }}
+                    >
+                      Открыть на картах
+                    </a>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1589,7 +1809,7 @@ export default function LandingPageClient({
               </div>
               <div>
                 <h4 style={{ fontWeight: 700, fontSize: "1rem" }}>Режим работы</h4>
-                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>Понедельник — Суббота: 09:00 - 20:00</p>
+                <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>{contactHours}</p>
               </div>
             </div>
 
@@ -1602,9 +1822,8 @@ export default function LandingPageClient({
               lineHeight: 1.5
             }}>
               <div style={{ fontWeight: 700, marginBottom: "4px" }}>Юридическая информация:</div>
-              <div>ИП Куратор Липецк Роботикс</div>
-              <div>ОГРНИП: 326482100099999 · ИНН: 482609999999</div>
-              <div>Лицензия на образовательную деятельность № 48-Л01-9999</div>
+              <div>{orgDetails?.full_legal_name || orgDetails?.short_legal_name || "Юлдашев Рустам Хакимович (ИП)"}</div>
+              <div>ИНН: {orgDetails?.inn || "482426310695"}{orgDetails?.ogrn ? ` · ОГРНИП: ${orgDetails.ogrn}` : ""}</div>
             </div>
           </div>
         </div>

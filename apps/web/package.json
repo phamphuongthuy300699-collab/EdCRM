@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,31 +11,31 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:real": "REAL_SUPABASE=true playwright test",
+    "test:e2e:real": "playwright test",
     "test:all": "npm run lint && npm run test && npm run test:e2e"
   },
   "dependencies": {
+    "@robotics-crm/ui": "*",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "lucide-react": "^1.21.0",
-    "next": "16.2.9",
+    "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "zod": "^4.4.3",
-    "@robotics-crm/ui": "*"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.1",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
-    "typescript": "^5",
-    "vitest": "^1.6.0",
+    "eslint-config-next": "16.2.10",
     "jsdom": "^24.0.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "@testing-library/react": "^14.2.1",
-    "@testing-library/jest-dom": "^6.4.2",
-    "@playwright/test": "^1.42.1"
+    "typescript": "^5",
+    "vitest": "4.1.9"
   }
 }

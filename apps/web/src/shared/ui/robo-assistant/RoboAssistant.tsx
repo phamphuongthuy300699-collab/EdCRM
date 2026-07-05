@@ -10,10 +10,12 @@ export function RoboAssistant({
   context = "lead-form",
   message,
   compact = false,
-  size = "md"
+  size = "md",
+  interactiveAssembly = false
 }: RoboAssistantProps) {
   // Sync prop mood with local state for testing/interactive selector
   const [currentMood, setCurrentMood] = useState<RoboMood>(mood);
+  const [isAssembled, setIsAssembled] = useState(true);
 
   useEffect(() => {
     setCurrentMood(mood);
@@ -29,6 +31,21 @@ export function RoboAssistant({
     lg: { width: 180, height: 200 }
   };
   const dims = sizeDims[size] || sizeDims.md;
+  const assemblyState = isAssembled ? "assembled" : "disassembled";
+  const robotWrapperClassName = [
+    styles.roboWrapper,
+    styles.float,
+    interactiveAssembly ? styles.roboWrapperInteractive : "",
+    interactiveAssembly ? (isAssembled ? styles.roboAssembled : styles.roboDisassembled) : "",
+  ].filter(Boolean).join(" ");
+
+  function toggleAssembly() {
+    setIsAssembled((current) => {
+      const next = !current;
+      setCurrentMood(next ? "happy" : "thinking");
+      return next;
+    });
+  }
 
   // Determine colors and glows based on current mood
   const getGlowColor = () => {
@@ -190,7 +207,7 @@ export function RoboAssistant({
     if (currentMood === "success") {
       // Wave gesture (Waving animation applied via waveArm CSS class)
       return (
-        <g className={styles.waveArm}>
+        <g className={`${styles.rightArm} ${styles.waveArm}`}>
           <path
             d="M 118,115 Q 138,103 134,80"
             fill="none"
@@ -212,7 +229,7 @@ export function RoboAssistant({
 
     // Default friendly relaxed arm
     return (
-      <g>
+      <g className={styles.rightArm}>
         <path
           d="M 118,115 Q 132,126 134,142"
           fill="none"
@@ -235,7 +252,95 @@ export function RoboAssistant({
   return (
     <div className={`${styles.roboContainer} ${compact || size === "sm" ? styles.roboContainerCompact : ""}`}>
       {/* Robot SVG Wrapper */}
-      <div className={`${styles.roboWrapper} ${styles.float}`}>
+      {interactiveAssembly ? (
+        <button
+          type="button"
+          className={styles.roboAssemblyButton}
+          onClick={toggleAssembly}
+          aria-label={isAssembled ? "Разобрать робота" : "Собрать робота"}
+          aria-pressed={!isAssembled}
+          data-assembly-state={assemblyState}
+          title={isAssembled ? "Разобрать робота" : "Собрать робота"}
+        >
+          <RobotSvg
+            dims={dims}
+            robotWrapperClassName={robotWrapperClassName}
+            currentMood={currentMood}
+            getGlowColor={getGlowColor}
+            renderEyes={renderEyes}
+            renderMouth={renderMouth}
+            renderRightArm={renderRightArm}
+          />
+          <span className={styles.assemblyHint}>
+            {isAssembled ? "Нажмите, чтобы разобрать" : "Нажмите, чтобы собрать"}
+          </span>
+        </button>
+      ) : (
+        <RobotSvg
+          dims={dims}
+          robotWrapperClassName={robotWrapperClassName}
+          currentMood={currentMood}
+          getGlowColor={getGlowColor}
+          renderEyes={renderEyes}
+          renderMouth={renderMouth}
+          renderRightArm={renderRightArm}
+        />
+      )}
+
+      {/* Speech Bubble */}
+      {!compact && size !== "sm" && (
+        <div className={styles.speechBubble}>
+          <div className={styles.speechArrow} />
+          <span className={styles.speechTitle}>
+            {currentMood === "success" ? "Успех! 🎉" : currentMood === "warning" ? "Подсказка ⚠️" : "Робо-помощник"}
+          </span>
+          <span className={styles.speechText}>{speechText}</span>
+
+          {/* Interactive Demo Mood Selector (Only shown in Development mode) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className={styles.demoMoodBar}>
+              <span style={{ fontSize: "9px", color: "var(--color-text-muted)", marginRight: "4px" }}>
+                тест:
+              </span>
+              {(["idle", "thinking", "happy", "success", "warning", "sleepy"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentMood(m);
+                  }}
+                  className={`${styles.demoMoodBtn} ${currentMood === m ? styles.demoMoodBtnActive : ""}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RobotSvg({
+  dims,
+  robotWrapperClassName,
+  currentMood,
+  getGlowColor,
+  renderEyes,
+  renderMouth,
+  renderRightArm,
+}: {
+  dims: { width: number; height: number };
+  robotWrapperClassName: string;
+  currentMood: RoboMood;
+  getGlowColor: () => string;
+  renderEyes: () => React.ReactNode;
+  renderMouth: () => React.ReactNode;
+  renderRightArm: () => React.ReactNode;
+}) {
+  return (
+      <div className={robotWrapperClassName}>
         <svg
           width={dims.width}
           height={dims.height}
@@ -290,7 +395,7 @@ export function RoboAssistant({
           </defs>
 
           {/* Under-shadow */}
-          <ellipse cx="80" cy="168" rx="34" ry="5.5" fill="rgba(17, 24, 39, 0.1)" />
+          <ellipse className={styles.shadowBase} cx="80" cy="168" rx="34" ry="5.5" fill="rgba(17, 24, 39, 0.1)" />
 
           {/* Antenna */}
           <g className={styles.antenna}>
@@ -308,7 +413,7 @@ export function RoboAssistant({
           </g>
 
           {/* Left Arm manipulator */}
-          <g>
+          <g className={styles.leftArm}>
             {/* Shoulder */}
             <circle cx="40" cy="115" r="4.5" fill="#475569" />
             {/* Arm segment */}
@@ -333,7 +438,7 @@ export function RoboAssistant({
           {renderRightArm()}
 
           {/* Neck connector */}
-          <rect x="68" y="38" width="24" height="8" rx="2" fill="#475569" stroke="#334155" strokeWidth="1" />
+          <rect className={styles.neckConnector} x="68" y="38" width="24" height="8" rx="2" fill="#475569" stroke="#334155" strokeWidth="1" />
 
           {/* Head Capsule */}
           <g className={styles.roboHead} filter="url(#shadow-2.5d)">
@@ -375,7 +480,7 @@ export function RoboAssistant({
           </g>
 
           {/* Ball Roller Wheel Base */}
-          <g>
+          <g className={styles.wheelBase}>
             <ellipse cx="80" cy="154" rx="20" ry="11" fill="#1E293B" stroke="#0F172A" strokeWidth="2" />
             <ellipse cx="64" cy="153" rx="6" ry="8.5" fill="#475569" />
             <ellipse cx="96" cy="153" rx="6" ry="8.5" fill="#475569" />
@@ -423,38 +528,5 @@ export function RoboAssistant({
           )}
         </svg>
       </div>
-
-      {/* Speech Bubble */}
-      {!compact && size !== "sm" && (
-        <div className={styles.speechBubble}>
-          <div className={styles.speechArrow} />
-          <span className={styles.speechTitle}>
-            {currentMood === "success" ? "Успех! 🎉" : currentMood === "warning" ? "Подсказка ⚠️" : "Робо-помощник"}
-          </span>
-          <span className={styles.speechText}>{speechText}</span>
-
-          {/* Interactive Demo Mood Selector (Only shown in Development mode) */}
-          {process.env.NODE_ENV === "development" && (
-            <div className={styles.demoMoodBar}>
-              <span style={{ fontSize: "9px", color: "var(--color-text-muted)", marginRight: "4px" }}>
-                тест:
-              </span>
-              {(["idle", "thinking", "happy", "success", "warning", "sleepy"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentMood(m);
-                  }}
-                  className={`${styles.demoMoodBtn} ${currentMood === m ? styles.demoMoodBtnActive : ""}`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }

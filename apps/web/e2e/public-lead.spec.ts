@@ -5,7 +5,7 @@ test.describe("Public Lead Registration Form", () => {
 
   test("should register a new lead and redirect to thanks page", async ({ page }) => {
     // Navigate to landing page
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     
     // Fill the lead form
     await page.fill('input[placeholder="Иван Иванов"]', "Иван Петров");
@@ -16,7 +16,7 @@ test.describe("Public Lead Registration Form", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to /thanks page
-    await page.waitForURL("**/thanks");
+    await expect(page).toHaveURL(/\/thanks$/);
     await expect(page.locator("h1")).toBeVisible();
   });
 });

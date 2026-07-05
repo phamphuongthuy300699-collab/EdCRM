@@ -1,8 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+const hasRealSupabaseEnv = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+);
+
 test.describe("Real Supabase E2E Smoke Test", () => {
   // Skip if not explicitly running against real Supabase
   test.skip(process.env.REAL_SUPABASE !== "true", "Skipping real Supabase test in Demo Mode");
+  test.skip(process.env.REAL_SUPABASE === "true" && !hasRealSupabaseEnv, "Skipping real Supabase test without Supabase env");
 
   test("CRM and Portal flows against real Supabase database", async ({ page, context }) => {
     // Increase timeout for this complex multi-step test
@@ -15,7 +22,7 @@ test.describe("Real Supabase E2E Smoke Test", () => {
 
     // 1. Submit a public lead
     console.log("Step 1: Submitting a new public lead...");
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.fill('input[placeholder="Иван Иванов"]', parentName);
     await page.fill('input[placeholder="Миша"]', childName);
     await page.fill('input[placeholder="+7 (999) 123-45-67"]', parentPhone);
@@ -23,7 +30,7 @@ test.describe("Real Supabase E2E Smoke Test", () => {
     await page.click('button[type="submit"]');
 
     // Expect redirect to thanks page
-    await page.waitForURL("**/thanks");
+    await expect(page).toHaveURL(/\/thanks$/);
     await expect(page.locator("h1")).toContainText("Спасибо за заявку");
     console.log("  ✓ Lead submitted, redirected to /thanks");
 

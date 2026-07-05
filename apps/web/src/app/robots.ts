@@ -19,6 +19,6 @@ export default function robots(): MetadataRoute.Robots {
         "/api/",
       ],
     },
-    sitemap: "https://robotics-lipetsk.ru/sitemap.xml",
+    sitemap: "https://робокс48.рф/sitemap.xml",
   };
 }

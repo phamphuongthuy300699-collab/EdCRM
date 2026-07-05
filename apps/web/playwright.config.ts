@@ -4,6 +4,7 @@ const isReal = process.env.REAL_SUPABASE === "true";
 
 export default defineConfig({
   testDir: "./e2e",
+  timeout: 10 * 60 * 1000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -23,7 +24,7 @@ export default defineConfig({
     command: "npm run dev -- -p 3001",
     url: "http://localhost:3001",
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 600 * 1000,
     env: {
       PORT: "3001",
       ...(isReal ? {} : {

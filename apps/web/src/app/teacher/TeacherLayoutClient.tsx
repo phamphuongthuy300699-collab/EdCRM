@@ -40,23 +40,33 @@ export default function TeacherLayout({
           padding: "0 20px"
         }}>
           {/* Logo */}
-          <Link href="/teacher" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Link href="/teacher" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+            <img 
+              src="/api/crm/media?path=branding/roboks-logo.svg" 
+              alt="Робокс" 
+              style={{ width: "32px", height: "32px", objectFit: "contain" }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const fallback = e.currentTarget.nextSibling as HTMLDivElement;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
             <div style={{
               width: "32px",
               height: "32px",
               borderRadius: "8px",
-              background: "var(--color-primary)",
-              display: "flex",
+              background: "var(--roboks-gradient)",
+              display: "none",
               alignItems: "center",
               justifyContent: "center",
               color: "white",
-              fontWeight: 800,
+              fontWeight: 900,
               fontSize: "1.1rem"
             }}>
-              T
+              Р
             </div>
-            <span style={{ fontWeight: 800, fontSize: "1.15rem", fontFamily: "var(--font-geologica)" }}>
-              Личный кабинет Преподавателя
+            <span style={{ fontWeight: 900, fontSize: "1.2rem", fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+              Робокс <span style={{ fontWeight: 500, color: "var(--color-text-muted)", fontSize: "0.95rem" }}>Наставникам</span>
             </span>
           </Link>
 

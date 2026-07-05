@@ -297,22 +297,32 @@ export default function StudentPortal() {
         zIndex: 30
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <img 
+            src="/api/crm/media?path=branding/roboks-logo.svg" 
+            alt="Робокс" 
+            style={{ width: "32px", height: "32px", objectFit: "contain" }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+              const fallback = e.currentTarget.nextSibling as HTMLDivElement;
+              if (fallback) fallback.style.display = "flex";
+            }}
+          />
           <div style={{
             width: "32px",
             height: "32px",
             borderRadius: "8px",
-            background: "var(--color-primary)",
-            display: "flex",
+            background: "var(--roboks-gradient)",
+            display: "none",
             alignItems: "center",
             justifyContent: "center",
             color: "white",
-            fontWeight: 800,
+            fontWeight: 900,
             fontSize: "1.1rem"
           }}>
-            R
+            Р
           </div>
-          <span style={{ fontWeight: 800, fontSize: "1.1rem", fontFamily: "var(--font-geologica)" }}>
-            EdCRM · Кабинет Ученика
+          <span style={{ fontWeight: 900, fontSize: "1.2rem", fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+            Робокс <span style={{ fontWeight: 500, color: "var(--color-text-muted)", fontSize: "0.95rem" }}>Кабинет Ученика</span>
           </span>
         </div>
 

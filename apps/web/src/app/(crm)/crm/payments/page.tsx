@@ -1,35 +1,73 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
-import { CreditCard, Plus, Search, CheckCircle, Clock, AlertCircle, Sparkles } from "lucide-react";
+import { 
+  Receipt, 
+  Search, 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  XCircle, 
+  Eye, 
+  CornerDownLeft, 
+  ChevronRight 
+} from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 
 export default function CrmPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "paid" | "issued" | "overdue">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "paid" | "pending" | "redirected" | "failed" | "refunded">("all");
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  
+  // Inspector Modal State
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
 
-  // Form State
-  const [newStudentId, setNewStudentId] = useState("");
-  const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
-  const [newAmount, setNewAmount] = useState("4500");
-  const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-
-  const [students, setStudents] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
-  const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
 
-  const initialInvoices = [
-    { id: "i1", studentName: "Игорь Петров", parentName: "Анна Петрова", groupName: "LEGO Start 1", amount: 4500, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" },
-    { id: "i2", studentName: "Данил Соловьев", parentName: "Михаил С.", groupName: "LEGO Start 1", amount: 4500, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" },
-    { id: "i3", studentName: "Алиса Волкова", parentName: "Сергей Волков", groupName: "Scratch Basic", amount: 4000, dueDate: "28.06.2026", status: "issued", title: "Абонемент на Июнь" },
-    { id: "i4", studentName: "Кирилл Семенов", parentName: "Ольга Семенова", groupName: "LEGO Start 2", amount: 4500, dueDate: "15.06.2026", status: "overdue", title: "Абонемент на Июнь" },
-    { id: "i5", studentName: "Даша Смирнова", parentName: "Елена Смирнова", groupName: "Scratch Basic", amount: 4000, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" }
+  const initialPayments = [
+    {
+      id: "p1",
+      studentName: "Игорь Петров",
+      parentName: "Анна Петрова",
+      amount: 4500,
+      provider: "alfabank",
+      status: "paid",
+      createdAt: "20.06.2026 15:32",
+      paidAt: "20.06.2026 15:40",
+      invoiceTitle: "Абонемент на Июнь (LEGO Start 1)",
+      rawRequest: { invoiceId: "i1", requestedBy: "u1", mode: "test" },
+      rawResponse: { orderStatus: 2, amount: 450000, actionCode: 0, actionCodeDescription: "Success" }
+    },
+    {
+      id: "p2",
+      studentName: "Данил Соловьев",
+      parentName: "Михаил С.",
+      amount: 4500,
+      provider: "manual",
+      status: "paid",
+      createdAt: "22.06.2026 11:15",
+      paidAt: "22.06.2026 11:15",
+      invoiceTitle: "Абонемент на Июнь (LEGO Start 1)",
+      rawRequest: { manualPay: true },
+      rawResponse: { type: "cash" }
+    },
+    {
+      id: "p3",
+      studentName: "Кирилл Семенов",
+      parentName: "Ольга Семенова",
+      amount: 4500,
+      provider: "alfabank",
+      status: "failed",
+      createdAt: "15.06.2026 18:22",
+      paidAt: "-",
+      invoiceTitle: "Абонемент на Июнь (LEGO Start 2)",
+      rawRequest: { invoiceId: "i4", requestedBy: "u1", mode: "test" },
+      rawResponse: { orderStatus: 6, errorCode: "1", errorMessage: "Declined by issuer" }
+    }
   ];
 
   useEffect(() => {
@@ -37,34 +75,44 @@ export default function CrmPaymentsPage() {
       try {
         setLoading(true);
 
-        // Fetch students for dropdown selection
-        const { data: studentsData } = await supabase
-          .from("students")
-          .select("id, full_name");
-        if (studentsData) setStudents(studentsData);
+        // Fetch user and role
+        if (isDemoMode()) {
+          setUserRole("admin");
+        } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const { data: membership } = await supabase
+              .from("org_memberships")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("is_active", true)
+              .maybeSingle() as any;
+            if (membership) {
+              setUserRole(membership.role);
+            }
+          }
+        }
 
-        // Fetch invoices
-        const { data: invoicesData, error } = await supabase
-          .from("invoices")
+        // Fetch payments registry
+        const { data: paymentsData, error } = await supabase
+          .from("payments")
           .select(`
             id,
-            title,
             amount,
+            provider,
             status,
-            due_date,
-            enrollments (
-              groups (
-                title
-              )
+            created_at,
+            paid_at,
+            raw_request,
+            raw_response,
+            invoices (
+              id,
+              number,
+              title
             ),
             students (
               id,
               full_name,
-              enrollments (
-                groups (
-                  title
-                )
-              ),
               student_guardians (
                 guardians (
                   full_name
@@ -72,42 +120,41 @@ export default function CrmPaymentsPage() {
               )
             )
           `)
-          .order("due_date", { ascending: false });
+          .order("created_at", { ascending: false });
 
         if (error) throw error;
 
-        const demo = isDemoMode();
-
-        if (demo) {
-          setInvoices(initialInvoices);
+        if (isDemoMode()) {
+          setPayments(initialPayments);
         } else {
-          if (invoicesData && invoicesData.length > 0) {
-            const formatted = invoicesData.map((inv: any) => {
-              const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
-              const activeEnroll = inv.students?.enrollments?.find((e: any) => e.groups) || null;
-              const groupTitle = inv.enrollments?.groups?.title || activeEnroll?.groups?.title || "Без группы";
+          if (paymentsData && paymentsData.length > 0) {
+            const formatted = paymentsData.map((pay: any) => {
+              const firstGuardian = pay.students?.student_guardians?.[0]?.guardians;
               return {
-                id: inv.id,
-                studentName: inv.students?.full_name || "Неизвестно",
+                id: pay.id,
+                studentName: pay.students?.full_name || "Неизвестно",
                 parentName: firstGuardian?.full_name || "Не указан",
-                groupName: groupTitle,
-                amount: parseFloat(inv.amount),
-                dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
-                status: inv.status,
-                title: inv.title
+                amount: parseFloat(pay.amount),
+                provider: pay.provider,
+                status: pay.status,
+                createdAt: pay.created_at ? new Date(pay.created_at).toLocaleString("ru-RU") : "-",
+                paidAt: pay.paid_at ? new Date(pay.paid_at).toLocaleString("ru-RU") : "-",
+                invoiceTitle: pay.invoices?.title || pay.invoices?.number || "Без счета",
+                rawRequest: pay.raw_request,
+                rawResponse: pay.raw_response
               };
             });
-            setInvoices(formatted);
+            setPayments(formatted);
           } else {
-            setInvoices([]);
+            setPayments([]);
           }
         }
       } catch (err) {
-        console.error("Error loading payments:", err);
+        console.error("Error loading payments registry:", err);
         if (isDemoMode()) {
-          setInvoices(initialInvoices);
+          setPayments(initialPayments);
         } else {
-          setInvoices([]);
+          setPayments([]);
         }
       } finally {
         setLoading(false);
@@ -123,22 +170,42 @@ export default function CrmPaymentsPage() {
         return (
           <span className="badge badge-green" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
             <CheckCircle size={12} />
-            Оплачено
+            Оплачен
           </span>
         );
-      case "issued":
-      case "draft":
+      case "pending":
+        return (
+          <span className="badge badge-gray" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <Clock size={12} />
+            Создан
+          </span>
+        );
+      case "redirected":
         return (
           <span className="badge badge-blue" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-            <Clock size={12} />
-            Ожидает
+            <ChevronRight size={12} />
+            Перенаправлен
           </span>
         );
-      case "overdue":
+      case "failed":
         return (
           <span className="badge badge-red" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
             <AlertCircle size={12} />
-            Просрочен
+            Ошибка
+          </span>
+        );
+      case "cancelled":
+        return (
+          <span className="badge badge-gray" style={{ display: "inline-flex", alignItems: "center", gap: "4px", opacity: 0.6 }}>
+            <XCircle size={12} />
+            Отменен
+          </span>
+        );
+      case "refunded":
+        return (
+          <span className="badge badge-yellow" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+            <CornerDownLeft size={12} />
+            Возвращен
           </span>
         );
       default:
@@ -146,194 +213,72 @@ export default function CrmPaymentsPage() {
     }
   };
 
-  const handleMarkAsPaid = async (id: any) => {
-    if (processingMap.current[id]) return;
-    processingMap.current[id] = true;
-    if (payingInvoiceId) {
-      processingMap.current[id] = false;
-      return;
-    }
-    try {
-      setPayingInvoiceId(id);
-
-      const demo = isDemoMode();
-      const isMockId = typeof id === "string" && (id.startsWith("i") || id.startsWith("mock-"));
-
-      if (demo || isMockId) {
-        setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
-        alert("Счет успешно отмечен как оплаченный! (Демо-режим)");
-        processingMap.current[id] = false;
-        return;
+  // Helper to redact confidential keys (e.g. passwords, tokens) before showing to admins
+  const redactSecrets = (obj: any): any => {
+    if (!obj || typeof obj !== "object") return obj;
+    const copy = JSON.parse(JSON.stringify(obj));
+    const secrets = ["password", "token", "secret", "api_password_secret", "apiPassword"];
+    
+    const recurse = (current: any) => {
+      for (const key in current) {
+        if (secrets.some(s => key.toLowerCase().includes(s))) {
+          current[key] = "[redacted]";
+        } else if (typeof current[key] === "object" && current[key] !== null) {
+          recurse(current[key]);
+        }
       }
-
-      // Fetch invoice details
-      const { data: inv, error: fetchErr } = await (supabase
-        .from("invoices") as any)
-        .select("student_id, amount, organization_id")
-        .eq("id", id)
-        .single();
-
-      if (fetchErr || !inv) {
-        throw new Error("Счет не найден в базе данных");
-      }
-
-      // Create payment transaction
-      const { error: paymentErr } = await (supabase
-        .from("payments") as any)
-        .insert({
-          organization_id: inv.organization_id,
-          student_id: inv.student_id,
-          invoice_id: id,
-          amount: parseFloat(inv.amount),
-          provider: "cash",
-          status: "succeeded",
-          paid_at: new Date().toISOString()
-        });
-
-      if (paymentErr) throw paymentErr;
-
-      // Update invoice status
-      const { error } = await (supabase
-        .from("invoices") as any)
-        .update({ status: "paid", paid_at: new Date().toISOString() })
-        .eq("id", id);
-      
-      if (error) throw error;
-
-      setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
-      alert("Счет успешно отмечен как оплаченный!");
-    } catch (err: any) {
-      console.error(err);
-      alert("Не удалось изменить статус оплаты: " + err.message);
-    } finally {
-      setPayingInvoiceId(null);
-      processingMap.current[id] = false;
-    }
+    };
+    
+    recurse(copy);
+    return copy;
   };
 
-  const handleCreateInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const demo = isDemoMode();
-      const selStudent = students.find(s => s.id === newStudentId);
+  // Guard access for teacher
+  if (userRole === "teacher") {
+    return (
+      <div style={{ display: "grid", gap: "16px", maxWidth: "720px" }}>
+        <h1 style={{ margin: 0, fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)" }}>
+          Реестр платежей
+        </h1>
+        <div style={{ border: "1px solid var(--color-border)", borderRadius: 12, background: "#fff", padding: 24 }}>
+          <h2 style={{ marginTop: 0 }}>Доступ ограничен</h2>
+          <p style={{ color: "var(--color-text-muted)", lineHeight: 1.6 }}>
+            Реестр транзакций доступен только владельцу, администратору и бухгалтерскому составу.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-      if (demo) {
-        const newInvObj = {
-          id: "i-mock-" + Date.now(),
-          studentName: selStudent?.full_name || "Неизвестно",
-          parentName: "Анна Петрова",
-          groupName: "LEGO Start 1",
-          amount: parseFloat(newAmount),
-          dueDate: new Date(newDueDate).toLocaleDateString("ru-RU"),
-          status: "issued",
-          title: newTitle
-        };
-        setInvoices([newInvObj, ...invoices]);
-        setShowAddModal(false);
-        setNewStudentId("");
-        setNewTitle("Абонемент на 8 занятий");
-        setNewAmount("4500");
-        alert("Счет выставлен (Демо-режим)!");
-        return;
-      }
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+        <p style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Загрузка платежей...</p>
+      </div>
+    );
+  }
 
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Org not found");
-
-      // Fetch primary guardian and active enrollment for the selected student
-      const { data: studentInfo } = await supabase
-        .from("students")
-        .select(`
-          enrollments (
-            id,
-            status,
-            groups (
-              title
-            )
-          ),
-          student_guardians (
-            guardian_id,
-            is_primary,
-            guardians (
-              full_name
-            )
-          )
-        `)
-        .eq("id", newStudentId)
-        .single() as any;
-
-      const activeEnrollment = studentInfo?.enrollments?.find((e: any) => e.status === "active");
-      const primaryGuardianLink = studentInfo?.student_guardians?.find((sg: any) => sg.is_primary) || studentInfo?.student_guardians?.[0];
-      
-      const parentName = primaryGuardianLink?.guardians?.full_name || "Не указан";
-      const groupTitle = activeEnrollment?.groups?.title || "Без группы";
-
-      const insertData = {
-        organization_id: orgRes.data.id,
-        student_id: newStudentId,
-        guardian_id: primaryGuardianLink?.guardian_id || null,
-        enrollment_id: activeEnrollment?.id || null,
-        title: newTitle,
-        amount: parseFloat(newAmount),
-        currency: "RUB",
-        status: "issued" as const,
-        due_date: newDueDate,
-        issued_at: new Date().toISOString()
-      };
-
-      const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single() as any;
-      if (error) throw error;
-
-      const newInvObj = {
-        id: data.id,
-        studentName: selStudent?.full_name || "Неизвестно",
-        parentName: parentName,
-        groupName: groupTitle,
-        amount: data.amount,
-        dueDate: new Date(data.due_date).toLocaleDateString("ru-RU"),
-        status: data.status,
-        title: data.title
-      };
-
-      setInvoices([newInvObj, ...invoices]);
-      setShowAddModal(false);
-      
-      // Reset form
-      setNewStudentId("");
-      setNewTitle("Абонемент на 8 занятий");
-      setNewAmount("4500");
-      alert("Счет успешно выставлен!");
-    } catch (err: any) {
-      console.error(err);
-      alert("Не удалось создать счет: " + err.message);
-    }
-  };
-
-  const filteredInvoices = invoices.filter(inv => {
-    const matchesTab = activeTab === "all" || inv.status === activeTab;
+  const filteredPayments = payments.filter(pay => {
+    const matchesTab = activeTab === "all" || pay.status === activeTab;
     const matchesSearch = 
-      inv.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      inv.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.title.toLowerCase().includes(searchQuery.toLowerCase());
+      pay.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      pay.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pay.invoiceTitle.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
+
+  const isOwnerOrAdmin = ["owner", "admin"].includes(userRole || "");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px" }}>
-            Счета и Оплаты
-          </h1>
-          <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-            Общая сумма выставленных счетов: {invoices.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()} ₽
-          </p>
-        </div>
-        <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Plus size={16} />
-          <span>Выставить счет</span>
-        </Button>
+      <div>
+        <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px", margin: 0 }}>
+          Платежи (Payments Registry)
+        </h1>
+        <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", margin: 0 }}>
+          Сводный реестр всех транзакций в системе
+        </p>
       </div>
 
       {/* Tabs & Search */}
@@ -343,14 +288,17 @@ export default function CrmPaymentsPage() {
         alignItems: "center",
         borderBottom: "1px solid var(--color-border)",
         paddingBottom: "12px",
+        flexWrap: "wrap",
         gap: "24px"
       }}>
-        <div style={{ display: "flex", gap: "8px", overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: "4px", overflowX: "auto", paddingBottom: "4px" }}>
           {[
-            { id: "all", label: "Все счета" },
+            { id: "all", label: "Все транзакции" },
             { id: "paid", label: "Оплаченные" },
-            { id: "issued", label: "Ожидают" },
-            { id: "overdue", label: "Просроченные" }
+            { id: "pending", label: "Созданные" },
+            { id: "redirected", label: "Ожидают" },
+            { id: "failed", label: "Ошибки" },
+            { id: "refunded", label: "Возвраты" }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -364,7 +312,8 @@ export default function CrmPaymentsPage() {
                 cursor: "pointer",
                 background: activeTab === tab.id ? "var(--color-primary-soft)" : "transparent",
                 color: activeTab === tab.id ? "var(--color-primary-dark)" : "var(--color-text-muted)",
-                transition: "all 0.2s"
+                transition: "all 0.2s",
+                whiteSpace: "nowrap"
               }}
             >
               {tab.label}
@@ -372,7 +321,7 @@ export default function CrmPaymentsPage() {
           ))}
         </div>
 
-        <div style={{ position: "relative", width: "240px" }}>
+        <div style={{ position: "relative", width: "260px" }}>
           <Search size={16} style={{
             position: "absolute",
             left: "12px",
@@ -382,7 +331,7 @@ export default function CrmPaymentsPage() {
           <input 
             type="text" 
             className="form-input" 
-            style={{ height: "40px", borderRadius: "8px", paddingLeft: "36px", fontSize: "var(--font-small)" }}
+            style={{ height: "40px", borderRadius: "8px", paddingLeft: "36px", fontSize: "var(--font-small)", marginBottom: 0 }}
             placeholder="Поиск по ученику, родителю..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -390,13 +339,14 @@ export default function CrmPaymentsPage() {
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="card-crm" style={{ padding: 0, overflow: "hidden", background: "white" }}>
+      {/* Table container */}
+      <div className="card-crm" style={{ padding: 0, overflowX: "auto", background: "white" }}>
         <table style={{
           width: "100%",
           borderCollapse: "collapse",
           textAlign: "left",
-          fontSize: "var(--font-small)"
+          fontSize: "var(--font-small)",
+          minWidth: "900px"
         }}>
           <thead>
             <tr style={{
@@ -409,57 +359,77 @@ export default function CrmPaymentsPage() {
               <th style={{ padding: "0 24px" }}>Ученик / Назначение</th>
               <th>Родитель</th>
               <th>Сумма</th>
-              <th>Срок оплаты</th>
+              <th>Провайдер</th>
               <th>Статус</th>
-              <th style={{ padding: "0 24px", textAlign: "right" }}>Действия</th>
+              <th>Создан / Оплачен</th>
+              {isOwnerOrAdmin && <th style={{ padding: "0 24px", textAlign: "right" }}>Логи</th>}
             </tr>
           </thead>
           <tbody>
-            {filteredInvoices.map((inv) => (
-              <tr key={inv.id} style={{
-                borderBottom: "1px solid var(--color-border)",
-                height: "64px",
-                transition: "background 0.2s"
-              }} className="table-row">
-                <td style={{ padding: "0 24px" }}>
-                  <div style={{ fontWeight: 700 }}>{inv.studentName}</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{inv.title}</div>
-                </td>
-                <td>{inv.parentName}</td>
-                <td style={{ fontWeight: 700 }}>{inv.amount.toLocaleString()} ₽</td>
-                <td>{inv.dueDate}</td>
-                <td>{getStatusBadge(inv.status)}</td>
-                <td style={{ padding: "0 24px", textAlign: "right" }}>
-                  {inv.status !== "paid" ? (
-                    <button 
-                      onClick={() => handleMarkAsPaid(inv.id)}
-                      disabled={payingInvoiceId === inv.id}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        border: "none",
-                        background: "var(--color-success-soft)",
-                        color: "var(--color-success)",
-                        fontWeight: 700,
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        opacity: payingInvoiceId === inv.id ? 0.6 : 1
-                      }}
-                    >
-                      {payingInvoiceId === inv.id ? "Обработка..." : "Отметить оплаченным"}
-                    </button>
-                  ) : (
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 600 }}>Проведено</span>
-                  )}
+            {filteredPayments.length === 0 ? (
+              <tr>
+                <td colSpan={isOwnerOrAdmin ? 7 : 6} style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+                  Транзакции не найдены.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredPayments.map((pay) => (
+                <tr key={pay.id} style={{
+                  borderBottom: "1px solid var(--color-border)",
+                  height: "64px",
+                  transition: "background 0.2s"
+                }} className="table-row">
+                  <td style={{ padding: "0 24px" }}>
+                    <div style={{ fontWeight: 700 }}>{pay.studentName}</div>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{pay.invoiceTitle}</div>
+                  </td>
+                  <td>{pay.parentName}</td>
+                  <td style={{ fontWeight: 700 }}>{pay.amount.toLocaleString()} ₽</td>
+                  <td>
+                    <span className="badge badge-gray">
+                      {pay.provider === "alfabank" ? "Альфа-Банк эквайринг" : "Ручное проведение"}
+                    </span>
+                  </td>
+                  <td>{getStatusBadge(pay.status)}</td>
+                  <td>
+                    <div style={{ fontSize: "12px", fontWeight: 500 }}>{pay.createdAt}</div>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                      {pay.status === "paid" ? `Оплачен: ${pay.paidAt}` : "Не оплачен"}
+                    </div>
+                  </td>
+                  {isOwnerOrAdmin && (
+                    <td style={{ padding: "0 24px", textAlign: "right" }}>
+                      <button
+                        onClick={() => setSelectedPayment(pay)}
+                        title="Посмотреть логи шлюза"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-border)",
+                          background: "white",
+                          color: "var(--color-text-muted)",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "11px",
+                          fontWeight: 600
+                        }}
+                      >
+                        <Eye size={12} />
+                        <span>Инспектор</span>
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Add Invoice Modal */}
-      {showAddModal && (
+      {/* Raw Event Inspector Modal */}
+      {selectedPayment && (
         <div style={{
           position: "fixed",
           inset: 0,
@@ -476,86 +446,79 @@ export default function CrmPaymentsPage() {
             borderRadius: "var(--radius-card-site)",
             border: "1px solid var(--color-border)",
             width: "100%",
-            maxWidth: "440px",
+            maxWidth: "600px",
             padding: "32px",
             boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
             display: "flex",
             flexDirection: "column",
-            gap: "24px"
+            gap: "20px",
+            maxHeight: "85vh"
           }}>
-            <div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Выписать счет</h3>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Создание нового платежного требования</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "4px" }}>
+                  Инспектор транзакции {selectedPayment.id.slice(0, 8)}...
+                </h3>
+                <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
+                  Сырые логи запросов и ответов банка (конфиденциальные данные вырезаны)
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedPayment(null)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", fontWeight: 600, color: "var(--color-text-muted)" }}
+              >
+                &times;
+              </button>
             </div>
 
-            <form onSubmit={handleCreateInvoice} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Ученик *</label>
-                <select 
-                  className="form-input" 
-                  required 
-                  value={newStudentId}
-                  onChange={(e) => setNewStudentId(e.target.value)}
-                >
-                  <option value="">Выберите ученика</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.full_name}</option>
-                  ))}
-                </select>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", flex: 1, paddingRight: "8px" }}>
+              <div>
+                <h4 style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px", color: "var(--color-primary-dark)" }}>
+                  Запрос к шлюзу (Request)
+                </h4>
+                <pre style={{
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                  overflowX: "auto",
+                  margin: 0
+                }}>
+                  {JSON.stringify(redactSecrets(selectedPayment.rawRequest), null, 2)}
+                </pre>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Назначение платежа *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  required 
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                />
+              <div>
+                <h4 style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px", color: "var(--color-success)" }}>
+                  Ответ от шлюза (Response)
+                </h4>
+                <pre style={{
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                  overflowX: "auto",
+                  margin: 0
+                }}>
+                  {JSON.stringify(redactSecrets(selectedPayment.rawResponse), null, 2)}
+                </pre>
               </div>
+            </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Сумма (₽) *</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    required 
-                    value={newAmount}
-                    onChange={(e) => setNewAmount(e.target.value)}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Срок оплаты *</label>
-                  <input 
-                    type="date" 
-                    className="form-input" 
-                    required 
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
-                <Button 
-                  type="button" 
-                  variant="secondary-site" 
-                  style={{ flex: 1 }}
-                  onClick={() => setShowAddModal(false)}
-                >
-                  Отмена
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="primary-crm" 
-                  style={{ flex: 1 }}
-                >
-                  Создать
-                </Button>
-              </div>
-            </form>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button 
+                type="button" 
+                variant="secondary-site" 
+                onClick={() => setSelectedPayment(null)}
+                style={{ width: "120px" }}
+              >
+                Закрыть
+              </Button>
+            </div>
           </div>
         </div>
       )}

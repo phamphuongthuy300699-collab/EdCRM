@@ -46,28 +46,60 @@ export default function ParentLayout({
           padding: "0 20px"
         }}>
           {/* Logo */}
-          <Link href="/parent" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Link href="/parent" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+            <img 
+              src="/api/crm/media?path=branding/roboks-logo.svg" 
+              alt="Робокс" 
+              style={{ width: "32px", height: "32px", objectFit: "contain" }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const fallback = e.currentTarget.nextSibling as HTMLDivElement;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
             <div style={{
               width: "32px",
               height: "32px",
               borderRadius: "8px",
-              background: "var(--color-accent)",
-              display: "flex",
+              background: "var(--roboks-gradient)",
+              display: "none",
               alignItems: "center",
               justifyContent: "center",
               color: "white",
-              fontWeight: 800,
+              fontWeight: 900,
               fontSize: "1.1rem"
             }}>
-              R
+              Р
             </div>
-            <span style={{ fontWeight: 800, fontSize: "1.15rem", fontFamily: "var(--font-geologica)" }}>
-              Личный кабинет Родителя
+            <span style={{ fontWeight: 900, fontSize: "1.2rem", fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
+              Робокс <span style={{ fontWeight: 500, color: "var(--color-text-muted)", fontSize: "0.95rem" }}>Родителям</span>
             </span>
           </Link>
 
           {/* Navigation / Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <Link href="/parent" style={{
+              fontSize: "var(--font-small)",
+              color: pathname === "/parent" ? "var(--color-primary)" : "var(--color-text-muted)",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}>
+              <span>Главная</span>
+            </Link>
+
+            <Link href="/parent/payments" style={{
+              fontSize: "var(--font-small)",
+              color: pathname.startsWith("/parent/payments") ? "var(--color-primary)" : "var(--color-text-muted)",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}>
+              <span>Оплаты и счета</span>
+            </Link>
+
             <Link href="/" style={{
               fontSize: "var(--font-small)",
               color: "var(--color-text-muted)",

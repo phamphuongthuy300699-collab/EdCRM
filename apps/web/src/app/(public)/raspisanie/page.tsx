@@ -5,6 +5,9 @@ import { Button } from "@robotics-crm/ui";
 import { Calendar, ArrowLeft } from "lucide-react";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Расписание занятий по робототехнике в Липецке",
   description: "Расписание учебных групп школы робототехники и программирования Robotics Липецк. Группы по возрастам для детей от 6 до 15 лет.",
@@ -54,12 +57,16 @@ export default async function RaspisaniePage() {
           capacity,
           show_on_site,
           course:courses(title),
+          branch:branches(name, address, is_active, show_on_site),
+          room:rooms(name),
+          teacher:profiles(full_name),
           schedule_rules:group_schedule_rules(weekday, starts_at),
           enrollments(id, status)
         `)
         .eq("organization_id", org.id)
         .eq("show_on_site", true)
-        .eq("status", "active");
+        .eq("status", "active")
+        .order("sort_order", { ascending: true });
 
       if (groups && groups.length > 0) {
         const daysMap: Record<number, string> = {
@@ -69,7 +76,12 @@ export default async function RaspisaniePage() {
           1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
         };
 
-        scheduleToRender = groups.map(g => {
+        scheduleToRender = groups
+        .filter((g: any) => {
+          const branch = Array.isArray(g.branch) ? g.branch[0] : g.branch;
+          return !branch || (branch.is_active !== false && branch.show_on_site !== false);
+        })
+        .map(g => {
           const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
           const spots = g.capacity - activeEnrollments;
 
@@ -99,6 +111,10 @@ export default async function RaspisaniePage() {
             age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
             course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
             time: timeStr,
+            branch: (Array.isArray(g.branch) ? g.branch[0]?.name : (g.branch as any)?.name) || "",
+            address: (Array.isArray(g.branch) ? g.branch[0]?.address : (g.branch as any)?.address) || "",
+            room: (Array.isArray(g.room) ? g.room[0]?.name : (g.room as any)?.name) || "",
+            teacher: (Array.isArray(g.teacher) ? g.teacher[0]?.full_name : (g.teacher as any)?.full_name) || "",
             spotsText,
             badgeClass
           };
@@ -107,16 +123,6 @@ export default async function RaspisaniePage() {
     }
   } catch (e) {
     console.error("Error loading schedule page from database:", e);
-  }
-
-  // Fallback if DB empty or error
-  if (scheduleToRender.length === 0) {
-    scheduleToRender = [
-      { age: "6–8 лет", course: "Робототехника Lego (Старт)", time: "Вторник / Четверг 17:00", spotsText: "Осталось 2 места", badgeClass: "badge-amber" },
-      { age: "8–10 лет", course: "Программирование Scratch", time: "Среда / Пятница 18:00", spotsText: "Осталось 3 места", badgeClass: "badge-green" },
-      { age: "10–14 лет", course: "Разработка на Python", time: "Суббота 12:00", spotsText: "Группа заполнена", badgeClass: "badge-red" },
-      { age: "10–15 лет", course: "Схемотехника и Arduino", time: "Суббота 15:00", spotsText: "Осталось 4 места", badgeClass: "badge-green" }
-    ];
   }
 
   return (
@@ -170,21 +176,31 @@ export default async function RaspisaniePage() {
               display: "grid",
               gap: "0"
             }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "14px", borderBottom: "1px solid var(--color-border)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "20px 32px", background: "var(--color-bg)", fontWeight: 700, fontSize: "14px", borderBottom: "1px solid var(--color-border)", gap: "12px" }}>
                 <span>Возраст</span>
                 <span>Курс</span>
                 <span>Время занятий</span>
+                <span>Филиал</span>
+                <span>Преподаватель</span>
                 <span>Наличие мест</span>
               </div>
               
-              {scheduleToRender.map((sched, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1.2fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px" }}>
-                  <span style={{ fontWeight: 700 }}>{sched.age}</span>
-                  <span>{sched.course}</span>
-                  <span>{sched.time}</span>
-                  <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+              {scheduleToRender.length === 0 ? (
+                <div style={{ padding: "40px 32px", textAlign: "center", color: "var(--color-text-muted)", borderTop: "1px solid var(--color-border)" }}>
+                  Расписание пока не заполнено в CRM.
                 </div>
-              ))}
+              ) : (
+                scheduleToRender.map((sched, idx) => (
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px", gap: "12px" }}>
+                    <span style={{ fontWeight: 700 }}>{sched.age}</span>
+                    <span>{sched.course}</span>
+                    <span>{sched.time}</span>
+                    <span>{sched.branch || sched.address || "Адрес уточняется"}{sched.room ? ` · ${sched.room}` : ""}</span>
+                    <span>{sched.teacher || "Наставник назначается"}</span>
+                    <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

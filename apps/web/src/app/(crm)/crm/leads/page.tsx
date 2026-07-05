@@ -61,6 +61,7 @@ export default function CrmLeadsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "new" | "contacted" | "trial_scheduled" | "converted" | "lost">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [orgId, setOrgId] = useState<string>("");
 
   const initialLeads: Lead[] = [
@@ -113,6 +114,7 @@ export default function CrmLeadsPage() {
   async function loadData() {
     try {
       setLoading(true);
+      setLoadError("");
       // Get org
       const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
       if (!orgRes.data) throw new Error("Organization not found");
@@ -175,9 +177,13 @@ export default function CrmLeadsPage() {
           setLeads([]);
         }
       }
-    } catch (err) {
-      console.error("Error loading leads:", err);
-      setLeads(initialLeads);
+    } catch {
+      if (isDemoMode()) {
+        setLeads(initialLeads);
+      } else {
+        setLeads([]);
+        setLoadError("Не удалось загрузить заявки из базы данных. Проверьте подключение и права доступа.");
+      }
     } finally {
       setLoading(false);
     }
@@ -295,7 +301,10 @@ export default function CrmLeadsPage() {
         throw new Error(data.error || "Не удалось зачислить ученика");
       }
 
-      alert(`Ученик успешно зачислен!\nСоздан логин для родителя: ${data.parentEmail || "уже существует"}\nПароль: demo`);
+      const parentAccessText = data.parentTemporaryPassword
+        ? `Создан логин для родителя: ${data.parentEmail}\nВременный пароль: ${data.parentTemporaryPassword}`
+        : `Логин родителя: ${data.parentEmail || "уже существовал"}`;
+      alert(`Ученик успешно зачислен!\n${parentAccessText}`);
       
       setLeads(prev => prev.map(lead => 
         lead.id === leadId 
@@ -494,6 +503,19 @@ export default function CrmLeadsPage() {
             <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
               Всего заявок в системе: {leads.length}
             </p>
+            {loadError && (
+              <div style={{
+                marginTop: "10px",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                background: "var(--color-danger-soft)",
+                color: "var(--color-danger)",
+                fontSize: "13px",
+                fontWeight: 700
+              }}>
+                {loadError}
+              </div>
+            )}
           </div>
           <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Plus size={16} />

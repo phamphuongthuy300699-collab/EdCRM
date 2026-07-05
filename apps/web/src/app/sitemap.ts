@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://robotics-lipetsk.ru";
+  const baseUrl = "https://робокс48.рф";
   
   const routes = [
     "",
@@ -13,6 +13,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/probnoe-zanyatie",
     "/raspisanie",
     "/stoimost",
+    "/contacts",
+    "/legal",
+    "/privacy",
+    "/offer",
+    "/payment",
+    "/refund",
   ];
 
   return routes.map((route) => ({
