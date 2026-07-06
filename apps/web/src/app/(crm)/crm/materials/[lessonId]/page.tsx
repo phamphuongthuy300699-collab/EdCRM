@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface LessonTemplate {
   id: string;
@@ -48,6 +49,7 @@ interface LessonMaterial {
 }
 
 export default function LessonDetailsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const router = useRouter();
   const params = useParams();
   const lessonId = params.lessonId as string;
@@ -269,7 +271,15 @@ export default function LessonDetailsPage() {
   };
 
   const handleDeleteMaterial = async (matId: string) => {
-    if (!confirm("Удалить этот методический материал?")) return;
+    const allowed = await askAction({
+      title: "Удалить материал",
+      description: "Методический материал будет удален из шаблона урока.",
+      dangerLevel: "danger",
+      confirmText: "Удалить",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -852,6 +862,7 @@ export default function LessonDetailsPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }

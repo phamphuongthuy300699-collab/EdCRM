@@ -18,10 +18,14 @@ import {
   AlertTriangle,
   HelpCircle,
   Hash,
+  Archive,
+  RotateCcw,
+  Trash2,
   X
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface Lead {
   id: string | number;
@@ -36,6 +40,7 @@ interface Lead {
   source: string;
   convertedStudentId?: string | null;
   convertedGuardianId?: string | null;
+  archivedAt?: string | null;
   message?: string | null;
 }
 
@@ -58,8 +63,10 @@ interface Objection {
 }
 
 export default function CrmLeadsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [activeTab, setActiveTab] = useState<"all" | "new" | "contacted" | "trial_scheduled" | "converted" | "lost">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [orgId, setOrgId] = useState<string>("");
@@ -170,6 +177,7 @@ export default function CrmLeadsPage() {
             source: l.source === "site_form" ? "Форма на сайте" : (l.source === "manual" ? "Вручную" : (l.source || "Другое")),
             convertedStudentId: l.converted_student_id,
             convertedGuardianId: l.converted_guardian_id,
+            archivedAt: l.archived_at,
             message: l.message
           }));
           setLeads(formatted);
@@ -455,7 +463,41 @@ export default function CrmLeadsPage() {
     }
   };
 
+  const handleLeadLifecycle = async (lead: Lead, action: "archive" | "restore" | "delete") => {
+    const isDelete = action === "delete";
+    const allowed = await askAction({
+      title: action === "archive" ? "Архивировать лид" : action === "restore" ? "Восстановить лид" : "Удалить лид",
+      description: isDelete
+        ? `Лид "${lead.parentName}" будет удален только если это не ломает связи с учеником или родителем. Введите УДАЛИТЬ для подтверждения.`
+        : `Лид "${lead.parentName}" ${action === "archive" ? "будет скрыт из списка по умолчанию." : "вернется в рабочий список."}`,
+      dangerLevel: isDelete ? "danger" : action === "archive" ? "warning" : "safe",
+      confirmText: action === "archive" ? "Архивировать" : action === "restore" ? "Восстановить" : "Удалить",
+      requireTypedConfirmation: isDelete,
+      expectedText: isDelete ? "УДАЛИТЬ" : undefined,
+    });
+    if (!allowed) return;
+    try {
+      if (isDemoMode()) {
+        setLeads((prev) => action === "delete"
+          ? prev.filter((item) => item.id !== lead.id)
+          : prev.map((item) => item.id === lead.id ? { ...item, archivedAt: action === "archive" ? new Date().toISOString() : null } : item));
+        return;
+      }
+      const response = await fetch(`/api/crm/entities/leads/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, organizationId: orgId, expectedText: isDelete ? "УДАЛИТЬ" : undefined }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Не удалось выполнить действие с лидом");
+    }
+  };
+
   const filteredLeads = leads.filter(lead => {
+    if (!showArchived && lead.archivedAt) return false;
     const matchesTab = activeTab === "all" || lead.status === activeTab;
     const matchesSearch = 
       lead.parentName.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -560,6 +602,21 @@ export default function CrmLeadsPage() {
                 {tab.label}
               </button>
             ))}
+            <button
+              onClick={() => setShowArchived((value) => !value)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "20px",
+                fontSize: "var(--font-small)",
+                fontWeight: showArchived ? 700 : 500,
+                border: "1px solid var(--color-border)",
+                cursor: "pointer",
+                background: showArchived ? "var(--color-primary-soft)" : "transparent",
+                color: showArchived ? "var(--color-primary-dark)" : "var(--color-text-muted)"
+              }}
+            >
+              Показать архив
+            </button>
           </div>
 
           {/* Search input */}
@@ -628,7 +685,12 @@ export default function CrmLeadsPage() {
                     <td>{lead.phone}</td>
                     <td>{lead.childName ? `${lead.childName} (${lead.childAge} лет)` : "—"}</td>
                     <td>{lead.course}</td>
-                    <td>{getStatusBadge(lead.status)}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                        {getStatusBadge(lead.status)}
+                        {lead.archivedAt && <span className="badge badge-gray">Архив</span>}
+                      </div>
+                    </td>
                     <td>{lead.date}</td>
                     <td style={{ color: "var(--color-text-muted)" }}>{lead.source}</td>
                     <td style={{ padding: "0 24px", textAlign: "right" }}>
@@ -751,6 +813,30 @@ export default function CrmLeadsPage() {
                             )}
                           </>
                         )}
+                        {lead.archivedAt ? (
+                          <button
+                            onClick={() => handleLeadLifecycle(lead, "restore")}
+                            title="Восстановить"
+                            style={{ width: "30px", height: "30px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "white", color: "var(--color-text)", cursor: "pointer" }}
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleLeadLifecycle(lead, "archive")}
+                            title="Архивировать"
+                            style={{ width: "30px", height: "30px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "white", color: "var(--color-text)", cursor: "pointer" }}
+                          >
+                            <Archive size={13} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleLeadLifecycle(lead, "delete")}
+                          title="Удалить"
+                          style={{ width: "30px", height: "30px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "white", color: "#DC2626", cursor: "pointer" }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -970,6 +1056,7 @@ export default function CrmLeadsPage() {
           </div>
         </aside>
       )}
+      {actionModal}
       {/* Add Lead Modal */}
       {showAddModal && (
         <div style={{

@@ -19,6 +19,16 @@ export default async function LegalPage() {
     fallback.subtitle,
     fallback.body
   );
+  const bankItems = data.showBankRequisites
+    ? [
+        { label: "Банк", value: data.bankName },
+        { label: "ИНН банка", value: data.bankInn },
+        { label: "БИК", value: data.bik },
+        { label: "Номер счета", value: data.accountNumber },
+        { label: "Корреспондентский счет", value: data.correspondentAccount },
+        { label: "Адрес банка", value: data.bankAddress },
+      ]
+    : [];
 
   return (
     <LegalPageShell
@@ -35,7 +45,7 @@ export default async function LegalPage() {
           { label: "Фактический адрес", value: data.actualAddress },
           { label: "Телефон", value: data.phone },
           { label: "Email", value: data.email },
-          { label: "Банковские реквизиты", value: data.bankDetails },
+          ...bankItems,
         ]}
       />
       <DynamicLegalSections bodyText={pageBlock.body} />

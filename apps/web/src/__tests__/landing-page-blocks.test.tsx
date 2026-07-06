@@ -126,4 +126,92 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.queryByText("Липецк, ул. Осканова, 3")).not.toBeInTheDocument();
     expect(screen.queryByText("Липецк, ул. Славянова, 1")).not.toBeInTheDocument();
   });
+
+  it("does not render testimonials, student projects, or lesson steps without enabled CRM blocks", () => {
+    render(<LandingPageClient initialBlocks={[]} />);
+
+    expect(screen.queryByText("Отзывы родителей")).not.toBeInTheDocument();
+    expect(screen.queryByText("Проекты наших учеников")).not.toBeInTheDocument();
+    expect(screen.queryByText("Как проходит занятие: 5 этапов урока")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ольга Николаева")).not.toBeInTheDocument();
+    expect(screen.queryByText("Робот для соревнований «Сумо»")).not.toBeInTheDocument();
+  });
+
+  it("renders editable homepage blocks from site_content_blocks content", () => {
+    render(
+      <LandingPageClient
+        initialBlocks={[
+          {
+            block_key: "home.student_projects",
+            content: {
+              enabled: true,
+              title: "Проекты из CRM",
+              subtitle: "Редактируемые карточки",
+              items: [
+                {
+                  id: "project-crm",
+                  title: "Марсоход из CRM",
+                  badge: "Scratch",
+                  description: "Описание проекта из базы",
+                  image: "student-projects/mars.jpg",
+                  alt: "Марсоход",
+                  isActive: true,
+                  sortOrder: 20,
+                },
+              ],
+            },
+          },
+          {
+            block_key: "home.lesson_process",
+            content: {
+              enabled: true,
+              title: "Этапы из CRM",
+              subtitle: "Порядок занятия редактируется",
+              steps: [
+                {
+                  id: "step-crm",
+                  number: "01",
+                  title: "Стартуем с CRM",
+                  description: "Описание этапа из базы",
+                  image: "lesson-process/start.jpg",
+                  alt: "Старт",
+                  isActive: true,
+                  sortOrder: 10,
+                },
+              ],
+            },
+          },
+          {
+            block_key: "home.testimonials",
+            content: {
+              enabled: true,
+              title: "Отзывы из CRM",
+              subtitle: "Реальные отзывы управляются редактором",
+              items: [
+                {
+                  id: "review-crm",
+                  author: "Анна из CRM",
+                  caption: "мама ученика",
+                  initials: "АЦ",
+                  text: "Отзыв из базы данных",
+                  rating: 5,
+                  isActive: true,
+                  sortOrder: 10,
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Проекты из CRM")).toBeInTheDocument();
+    expect(screen.getByText("Марсоход из CRM")).toBeInTheDocument();
+    expect(screen.getByText("Этапы из CRM")).toBeInTheDocument();
+    expect(screen.getByText("Стартуем с CRM")).toBeInTheDocument();
+    expect(screen.getByText("Отзывы из CRM")).toBeInTheDocument();
+    expect(screen.getByText("Анна из CRM")).toBeInTheDocument();
+    expect(screen.queryByText("Ольга Николаева")).not.toBeInTheDocument();
+    expect(screen.queryByText("Робот для соревнований «Сумо»")).not.toBeInTheDocument();
+  });
 });

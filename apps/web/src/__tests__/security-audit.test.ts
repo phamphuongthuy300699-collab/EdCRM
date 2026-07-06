@@ -26,4 +26,23 @@ describe("security audit contracts", () => {
     expect(source).toContain("В группе нет свободных мест");
     expect(source).toContain("group_capacity_exceeded");
   });
+
+  it("uses ConfirmActionModal instead of browser confirm dialogs in CRM screens", () => {
+    const crmDir = path.join(process.cwd(), "src/app/(crm)");
+    const files: string[] = [];
+
+    function collect(dir: string) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) collect(fullPath);
+        if (entry.isFile() && /\.(tsx|ts)$/.test(entry.name)) files.push(fullPath);
+      }
+    }
+
+    collect(crmDir);
+    const source = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+
+    expect(source).not.toMatch(/window\.confirm|\bconfirm\(/);
+    expect(source).toContain("useActionConfirmation");
+  });
 });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { InfoGrid, LegalPageShell, LegalSection, PlaceholderNotice } from "../LegalPageShell";
 import { getPublicLegalData } from "../legal-data";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
@@ -35,6 +36,7 @@ function uniqueMediaItems(values: any[]) {
 
 export default async function ContactsPage() {
   const data = await getPublicLegalData();
+  const page = data.contactsPage;
 
   let contactImages: any[] = [];
   try {
@@ -68,13 +70,23 @@ export default async function ContactsPage() {
 
   return (
     <LegalPageShell
-      title="Контакты"
-      lead="Информация для родителей, партнёров и платёжного банка: адреса проведения занятий, телефоны, режим работы и реквизиты школы."
+      title={page.title || "Контакты"}
+      lead={page.subtitle || "Свяжитесь с нами, выберите удобный филиал или запишитесь на пробное занятие."}
     >
-      <PlaceholderNotice>{data.placeholderNotice}</PlaceholderNotice>
+      {page.notice && <PlaceholderNotice>{page.notice}</PlaceholderNotice>}
+
+      <LegalSection title="Связаться со школой">
+        <InfoGrid
+          items={[
+            { label: "Телефон", value: data.phone },
+            { label: "Email", value: data.email },
+          ]}
+        />
+      </LegalSection>
 
       {/* Branches Section */}
-      <LegalSection title="Адреса проведения занятий (Филиалы)">
+      {page.showBranches !== false && (
+      <LegalSection title="Филиалы">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginTop: "16px" }}>
           {data.branches && data.branches.length > 0 ? (
             data.branches.map((b: any, idx: number) => (
@@ -112,6 +124,11 @@ export default async function ContactsPage() {
                     <Clock size={16} style={{ color: "var(--color-primary)", marginTop: "2px", flexShrink: 0 }} />
                     <span>{b.work_hours || "Понедельник — Суббота: 09:00 - 20:00"}</span>
                   </div>
+                  {page.showMapLinks !== false && b.map_url && (
+                    <a href={b.map_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-primary)", fontSize: "12px", fontWeight: 800 }}>
+                      Открыть на карте
+                    </a>
+                  )}
                 </div>
               </div>
             ))
@@ -120,6 +137,7 @@ export default async function ContactsPage() {
           )}
         </div>
       </LegalSection>
+      )}
 
       {/* Classroom/Contacts Images Section */}
       {contactImages.length > 0 && (
@@ -147,27 +165,30 @@ export default async function ContactsPage() {
         </LegalSection>
       )}
 
-      <LegalSection title="Юридические реквизиты">
-        <p style={{ margin: "0 0 16px 0" }}>
-          Официальные реквизиты индивидуального предпринимателя Юлдашева Рустама Хакимовича для заключения договоров-оферт и безналичных расчетов.
-        </p>
+      {page.showLegalSummary !== false && (
+      <LegalSection title="Юридическая информация">
         <InfoGrid
           items={[
             { label: "Сокращенное наименование", value: data.legalName },
-            { label: "Полное наименование", value: data.fullName },
             { label: "ИНН", value: data.inn },
             { label: "ОГРН/ОГРНИП", value: data.ogrn },
-            { label: "Юридический адрес", value: data.legalAddress },
             { label: "Телефон", value: data.phone },
             { label: "Email", value: data.email },
-            { label: "Банк", value: data.bankName },
-            { label: "ИНН Банка", value: data.bankInn },
-            { label: "БИК", value: data.bik },
-            { label: "Номер счета (Р/с)", value: data.accountNumber },
-            { label: "Корреспондентский счет", value: data.correspondentAccount },
-            { label: "Адрес банка", value: data.bankAddress },
           ]}
         />
+        <p style={{ margin: "16px 0 0 0", fontSize: "13px" }}>
+          Полные реквизиты доступны на странице <Link href="/legal" style={{ color: "var(--color-primary)", fontWeight: 800 }}>Реквизиты</Link>.
+        </p>
+      </LegalSection>
+      )}
+
+      <LegalSection title={page.ctaTitle || "Записаться на пробное занятие"}>
+        <div style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "20px", background: "#F9FAFB", display: "grid", gap: "12px" }}>
+          <p style={{ margin: 0 }}>{page.ctaText || "Оставьте заявку, и администратор подберет удобную группу и филиал."}</p>
+          <Link href={page.ctaHref || "/#lead-form"} style={{ color: "var(--color-primary)", fontWeight: 800 }}>
+            Записаться
+          </Link>
+        </div>
       </LegalSection>
     </LegalPageShell>
   );

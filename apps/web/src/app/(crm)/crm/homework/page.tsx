@@ -17,6 +17,7 @@ import {
   Pencil
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface HomeworkTemplate {
   id: string;
@@ -38,6 +39,7 @@ interface HomeworkAssignment {
 }
 
 export default function HomeworkPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [activeTab, setActiveTab] = useState<"templates" | "assignments">("templates");
   const [templates, setTemplates] = useState<HomeworkTemplate[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
@@ -199,7 +201,15 @@ export default function HomeworkPage() {
   };
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите удалить этот шаблон? Все выданные задания по нему останутся в базе, но шаблон исчезнет.")) return;
+    const allowed = await askAction({
+      title: "Удалить шаблон ДЗ",
+      description: "Выданные задания останутся в базе, но шаблон исчезнет из справочника.",
+      dangerLevel: "danger",
+      confirmText: "Удалить",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -233,7 +243,13 @@ export default function HomeworkPage() {
   };
 
   const handleDeleteAssignment = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите удалить или отменить это назначение домашнего задания?")) return;
+    const allowed = await askAction({
+      title: "Удалить назначение ДЗ",
+      description: "Назначение домашнего задания будет удалено или отменено.",
+      dangerLevel: "warning",
+      confirmText: "Удалить назначение",
+    });
+    if (!allowed) return;
     try {
       const { error } = await (supabase
         .from("homework_assignments") as any)
@@ -771,6 +787,7 @@ export default function HomeworkPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }

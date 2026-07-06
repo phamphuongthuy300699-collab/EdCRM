@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface LessonSession {
   id: string;
@@ -73,6 +74,7 @@ interface HomeworkAssignment {
 }
 
 export default function LessonConductPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const router = useRouter();
   const params = useParams();
   const sessionId = params.sessionId as string;
@@ -309,7 +311,13 @@ export default function LessonConductPage() {
 
   const handleCloseSession = async () => {
     if (!session || closingSession || session.status === "completed") return;
-    if (!confirm("Вы уверены, что хотите завершить это занятие? Статус сменится на 'Проведено', и оно будет отмечено как завершенное.")) return;
+    const allowed = await askAction({
+      title: "Завершить занятие",
+      description: "Статус сменится на «Проведено», посещаемость будет сохранена.",
+      dangerLevel: "warning",
+      confirmText: "Завершить",
+    });
+    if (!allowed) return;
 
     try {
       setClosingSession(true);
@@ -642,6 +650,7 @@ export default function LessonConductPage() {
         </div>
 
       </div>
+      {actionModal}
     </div>
   );
 }

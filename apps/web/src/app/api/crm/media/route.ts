@@ -40,7 +40,7 @@ async function checkAuthAndRole(req: NextRequest) {
     }
 
     const { data: membership } = await (supabase.from("org_memberships") as any)
-      .select("role")
+      .select("organization_id, role")
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle();
@@ -49,11 +49,19 @@ async function checkAuthAndRole(req: NextRequest) {
       return { ok: false, status: 403, error: "Forbidden - Insufficient permissions" };
     }
 
-    return { ok: true, user, role: membership.role };
+    return { ok: true, user, role: membership.role, organizationId: membership.organization_id };
   } catch (err: any) {
     console.error("Auth check error in media API:", err);
     return { ok: false, status: 500, error: "Internal authentication check error" };
   }
+}
+
+function normalizeRequestedMediaPath(value: string) {
+  const normalized = value.replace(/^\/+/, "");
+  if (normalized.includes("..")) return "";
+  const [folder] = normalized.split("/");
+  if (!WHITELIST_FOLDERS.includes(folder)) return "";
+  return normalized;
 }
 
 export async function GET(req: NextRequest) {
@@ -184,5 +192,73 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("Upload error:", err);
     return NextResponse.json({ error: err.message || "Failed to upload file" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await checkAuthAndRole(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const mediaPath = normalizeRequestedMediaPath(searchParams.get("path") || "");
+  if (!mediaPath) {
+    return NextResponse.json({ error: "Некорректный путь файла" }, { status: 400 });
+  }
+
+  const admin = createSupabaseAdminClient();
+  const organizationId = (auth as any).organizationId;
+  const usages: string[] = [];
+
+  const { data: blocks } = await (admin.from("site_content_blocks") as any)
+    .select("block_key, title, content")
+    .eq("organization_id", organizationId);
+  (blocks || [])
+    .filter((block: any) => JSON.stringify(block.content || {}).includes(mediaPath))
+    .forEach((block: any) => usages.push(`Блок сайта: ${block.title || block.block_key}`));
+
+  const { data: profiles } = await (admin.from("profiles") as any)
+    .select("full_name")
+    .eq("avatar_url", mediaPath);
+  (profiles || []).forEach((profile: any) => usages.push(`Фото сотрудника: ${profile.full_name || "без имени"}`));
+
+  if (usages.length > 0) {
+    return NextResponse.json({
+      ok: false,
+      error: "Файл используется и не может быть удален.",
+      usages,
+    }, { status: 409 });
+  }
+
+  const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
+  try {
+    if (driver === "local") {
+      const absolutePath = path.join(getLocalMediaDir(), mediaPath);
+      const baseDir = path.resolve(getLocalMediaDir());
+      const resolvedPath = path.resolve(absolutePath);
+      if (!resolvedPath.startsWith(baseDir)) {
+        return NextResponse.json({ error: "Некорректный путь файла" }, { status: 400 });
+      }
+      if (fs.existsSync(resolvedPath)) fs.unlinkSync(resolvedPath);
+    } else {
+      const bucketName = process.env.NEXT_PUBLIC_MEDIA_BUCKET || "site-assets";
+      const { error } = await admin.storage.from(bucketName).remove([mediaPath]);
+      if (error) throw error;
+    }
+
+    await admin.from("crm_audit_log").insert({
+      organization_id: organizationId,
+      actor_id: (auth as any).user?.id || null,
+      action: "delete_media",
+      entity_table: "media_files",
+      entity_id: null,
+      entity_title: mediaPath,
+      metadata: { path: mediaPath },
+    });
+
+    return NextResponse.json({ ok: true, path: mediaPath });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Не удалось удалить файл" }, { status: 500 });
   }
 }

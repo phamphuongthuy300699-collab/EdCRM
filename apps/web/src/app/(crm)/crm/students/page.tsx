@@ -13,10 +13,15 @@ import {
   MoreVertical,
   Activity,
   Award,
-  CheckCircle2
+  CheckCircle2,
+  Archive,
+  RotateCcw,
+  ShieldCheck,
+  Trash2
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface Student {
   id: string | number;
@@ -35,11 +40,13 @@ interface Student {
 }
 
 export default function CrmStudentsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "archived">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState("");
 
   // Manual Add Student Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -101,6 +108,7 @@ export default function CrmStudentsPage() {
         // Get org
         const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
         if (!orgRes.data) throw new Error("Organization not found");
+        setOrgId(orgRes.data.id);
 
         // Fetch groups
         const { data: groupsData } = await supabase
@@ -373,8 +381,51 @@ export default function CrmStudentsPage() {
     }
   };
 
+  const handleStudentLifecycle = async (student: Student, action: "archive" | "restore" | "delete" | "anonymize") => {
+    const destructive = action === "delete" || action === "anonymize";
+    const allowed = await askAction({
+      title: action === "archive"
+        ? "Архивировать ученика"
+        : action === "restore"
+          ? "Восстановить ученика"
+          : action === "anonymize"
+            ? "Анонимизировать ПДн"
+            : "Удалить ученика",
+      description: action === "delete"
+        ? `Ученик "${student.name}" будет удален только если нет учебной и финансовой истории. Введите УДАЛИТЬ для подтверждения.`
+        : action === "anonymize"
+          ? `Персональные данные ученика "${student.name}" будут очищены, история обучения и оплат сохранится. Введите УДАЛИТЬ для подтверждения.`
+          : `Ученик "${student.name}" ${action === "archive" ? "перейдет в архив." : "вернется в активную базу."}`,
+      dangerLevel: destructive ? "danger" : action === "archive" ? "warning" : "safe",
+      confirmText: action === "archive" ? "Архивировать" : action === "restore" ? "Восстановить" : action === "anonymize" ? "Очистить данные" : "Удалить",
+      requireTypedConfirmation: destructive,
+      expectedText: destructive ? "УДАЛИТЬ" : undefined,
+    });
+    if (!allowed) return;
+    try {
+      if (isDemoMode()) {
+        setStudents((prev) => action === "delete"
+          ? prev.filter((item) => item.id !== student.id)
+          : prev.map((item) => item.id === student.id ? { ...item, status: action === "restore" ? "active" : "archived" } : item));
+        return;
+      }
+      const response = await fetch(`/api/crm/entities/students/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: student.id, organizationId: orgId, expectedText: destructive ? "УДАЛИТЬ" : undefined }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
+      setStudents((prev) => action === "delete"
+        ? prev.filter((item) => item.id !== student.id)
+        : prev.map((item) => item.id === student.id ? { ...item, status: action === "restore" ? "active" : "archived" } : item));
+    } catch (err: any) {
+      alert(err.message || "Не удалось выполнить действие с учеником");
+    }
+  };
+
   const filteredStudents = students.filter(student => {
-    const matchesStatus = statusFilter === "all" || student.status === statusFilter;
+    const matchesStatus = statusFilter === "all" ? student.status !== "archived" : student.status === statusFilter;
     const matchesSearch = 
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       student.parent.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -606,6 +657,65 @@ export default function CrmStudentsPage() {
                         }}>
                           <MoreVertical size={14} />
                         </button>
+                        {student.status === "archived" ? (
+                          <button onClick={() => handleStudentLifecycle(student, "restore")} title="Восстановить" style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--color-border)",
+                            background: "white",
+                            color: "var(--color-text)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer"
+                          }}>
+                            <RotateCcw size={14} />
+                          </button>
+                        ) : (
+                          <button onClick={() => handleStudentLifecycle(student, "archive")} title="Архивировать" style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--color-border)",
+                            background: "white",
+                            color: "var(--color-text)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer"
+                          }}>
+                            <Archive size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => handleStudentLifecycle(student, "anonymize")} title="Анонимизировать ПДн" style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-border)",
+                          background: "white",
+                          color: "#B45309",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer"
+                        }}>
+                          <ShieldCheck size={14} />
+                        </button>
+                        <button onClick={() => handleStudentLifecycle(student, "delete")} title="Удалить" style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-border)",
+                          background: "white",
+                          color: "#DC2626",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer"
+                        }}>
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -615,6 +725,7 @@ export default function CrmStudentsPage() {
           </table>
         )}
       </div>
+      {actionModal}
       {/* Add Student Modal */}
       {showAddModal && (
         <div style={{

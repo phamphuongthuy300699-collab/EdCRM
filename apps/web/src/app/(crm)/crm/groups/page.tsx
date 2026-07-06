@@ -5,6 +5,7 @@ import { Button } from "@robotics-crm/ui";
 import { GraduationCap, Plus, Search, Users, Calendar, Clock, Sparkles } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -67,6 +68,10 @@ export default function CrmGroupsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [groupActionId, setGroupActionId] = useState<string | null>(null);
+  const { askAction, modal: actionModal } = useActionConfirmation();
 
   // Form State
   const [newTitle, setNewTitle] = useState("");
@@ -181,6 +186,8 @@ export default function CrmGroupsPage() {
           age_from,
           age_to,
           status,
+          show_on_site,
+          archived_at,
           courses (title),
           profiles (full_name),
           group_schedule_rules (weekday, starts_at, ends_at)
@@ -219,6 +226,9 @@ export default function CrmGroupsPage() {
             capacity: g.capacity || 8,
             enrolled: enrollCountMap.get(g.id) || 0,
             status: g.status
+            ,
+            showOnSite: g.show_on_site,
+            archivedAt: g.archived_at
           }));
           setGroups(formatted);
         } else {
@@ -500,8 +510,13 @@ export default function CrmGroupsPage() {
   };
 
   const handleRemoveStudent = async (studentId: string) => {
-    const confirmRemove = window.confirm("Вы уверены, что хотите исключить ученика из группы?");
-    if (!confirmRemove) return;
+    const allowed = await askAction({
+      title: "Исключить ученика из группы",
+      description: "Активное зачисление будет закрыто, история ученика и группы останется в CRM.",
+      dangerLevel: "warning",
+      confirmText: "Исключить",
+    });
+    if (!allowed) return;
 
     try {
       const demo = isDemoMode();
@@ -536,7 +551,50 @@ export default function CrmGroupsPage() {
     }
   };
 
+  const handleGroupLifecycle = async (group: any, action: "archive" | "restore" | "delete") => {
+    const isDelete = action === "delete";
+    const allowed = await askAction({
+      title: action === "archive" ? "Архивировать группу" : action === "restore" ? "Восстановить группу" : "Удалить группу",
+      description: action === "archive"
+        ? `Группа "${group.title}" будет скрыта из сайта и рабочих списков, но останется в истории.`
+        : action === "restore"
+          ? `Группа "${group.title}" вернется в рабочие списки.`
+          : `Удаление доступно только для черновиков без учеников, занятий, счетов и домашних заданий. Для подтверждения введите УДАЛИТЬ.`,
+      dangerLevel: isDelete ? "danger" : "warning",
+      confirmText: action === "archive" ? "Архивировать" : action === "restore" ? "Восстановить" : "Удалить",
+      requireTypedConfirmation: isDelete,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
+
+    try {
+      setGroupActionId(group.id);
+      setActionError("");
+
+      if (isDemoMode() || String(group.id).startsWith("g")) {
+        if (action === "delete") setGroups(prev => prev.filter(item => item.id !== group.id));
+        else setGroups(prev => prev.map(item => item.id === group.id ? { ...item, archivedAt: action === "archive" ? new Date().toISOString() : null, showOnSite: action !== "archive" } : item));
+        return;
+      }
+
+      const response = await fetch(`/api/crm/entities/groups/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: group.id, expectedText: isDelete ? "УДАЛИТЬ" : undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие");
+      await loadData();
+      if (selectedGroup?.id === group.id) setSelectedGroup(null);
+    } catch (err: any) {
+      setActionError(err.message || "Не удалось выполнить действие");
+    } finally {
+      setGroupActionId(null);
+    }
+  };
+
   const filteredGroups = groups.filter(g => {
+    if (!showArchive && g.archivedAt) return false;
     const query = searchQuery.toLowerCase();
     return g.title.toLowerCase().includes(query) ||
            g.courseName.toLowerCase().includes(query) ||
@@ -552,7 +610,7 @@ export default function CrmGroupsPage() {
             Группы обучения
           </h1>
           <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-            Активных групп в филиале: {groups.length}
+            Активных групп в филиале: {groups.filter(group => !group.archivedAt).length}
           </p>
         </div>
         <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -562,6 +620,11 @@ export default function CrmGroupsPage() {
       </div>
 
       {/* Search & Filters */}
+      {actionError && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 700 }}>
+          {actionError}
+        </div>
+      )}
       <div style={{
         display: "flex",
         justifyContent: "space-between",
@@ -574,6 +637,10 @@ export default function CrmGroupsPage() {
           <span style={{ fontSize: "var(--font-small)", fontWeight: 700, color: "var(--color-primary)" }} className="badge badge-blue">
             Все курсы
           </span>
+          <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)" }}>
+            <input type="checkbox" checked={showArchive} onChange={(event) => setShowArchive(event.target.checked)} />
+            Показать архив
+          </label>
         </div>
 
         <div style={{ position: "relative", width: "260px" }}>
@@ -609,8 +676,8 @@ export default function CrmGroupsPage() {
                 </h3>
                 <span className="badge badge-gray" style={{ fontSize: "11px" }}>{group.courseName}</span>
               </div>
-              <span className={`badge ${group.status === "active" ? "badge-green" : "badge-amber"}`}>
-                {group.status === "active" ? "Активна" : "Черновик"}
+              <span className={`badge ${group.archivedAt ? "badge-gray" : group.status === "active" ? "badge-green" : "badge-amber"}`}>
+                {group.archivedAt ? "Архив" : group.status === "active" ? "Активна" : group.status === "closed" ? "Закрыта" : "Черновик"}
               </span>
             </div>
 
@@ -648,6 +715,22 @@ export default function CrmGroupsPage() {
               </Button>
               <Button onClick={() => handleOpenEditModal(group)} variant="primary-crm" style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}>
                 Редактировать
+              </Button>
+              <Button
+                onClick={() => handleGroupLifecycle(group, group.archivedAt ? "restore" : "archive")}
+                variant="secondary-crm"
+                disabled={groupActionId === group.id}
+                style={{ height: "36px", fontSize: "12px", borderRadius: "8px" }}
+              >
+                {group.archivedAt ? "Восстановить" : "Архивировать"}
+              </Button>
+              <Button
+                onClick={() => handleGroupLifecycle(group, "delete")}
+                variant="secondary-crm"
+                disabled={groupActionId === group.id}
+                style={{ height: "36px", fontSize: "12px", borderRadius: "8px", color: "#DC2626" }}
+              >
+                Удалить
               </Button>
             </div>
           </div>
@@ -813,8 +896,8 @@ export default function CrmGroupsPage() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
                 <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>{selectedGroup.title}</h3>
-                <span className={`badge ${selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>
-                  {selectedGroup.status === "active" ? "Активна" : "Черновик"}
+                <span className={`badge ${selectedGroup.archivedAt ? "badge-gray" : selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>
+                  {selectedGroup.archivedAt ? "Архив" : selectedGroup.status === "active" ? "Активна" : selectedGroup.status === "closed" ? "Закрыта" : "Черновик"}
                 </span>
               </div>
               <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
@@ -909,6 +992,7 @@ export default function CrmGroupsPage() {
           </div>
         </div>
       )}
+      {actionModal}
 
       {/* Edit Modal */}
       {showEditModal && (

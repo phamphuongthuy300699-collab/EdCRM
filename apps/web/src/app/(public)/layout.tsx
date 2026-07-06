@@ -37,6 +37,15 @@ export default async function PublicLayout({
   let showLegalAddress = false;
   let copyrightText = "© {year} Робокс Липецк. Все права защищены.";
   let socials = { vk: "", telegram: "", whatsapp: "" };
+  let documentLinks = [
+    { title: "Реквизиты", href: "/legal", enabled: true, sortOrder: 10 },
+    { title: "Политика обработки данных", href: "/privacy", enabled: true, sortOrder: 20 },
+    { title: "Публичная оферта", href: "/offer", enabled: true, sortOrder: 30 },
+    { title: "Условия оплаты", href: "/payment", enabled: true, sortOrder: 40 },
+    { title: "Условия возврата", href: "/refund", enabled: true, sortOrder: 50 },
+    { title: "Конфиденциальность", href: "/privacy-policy", enabled: true, sortOrder: 60 },
+    { title: "Согласие на ОПД", href: "/consent", enabled: true, sortOrder: 70 },
+  ];
   let branches: any[] = [];
 
   let brandName = "Робокс";
@@ -80,6 +89,11 @@ export default async function PublicLayout({
         if (c.showLegalAddress !== undefined) showLegalAddress = c.showLegalAddress;
         if (c.copyrightText) copyrightText = c.copyrightText;
         if (c.socials) socials = { ...socials, ...c.socials };
+        if (Array.isArray(c.documentLinks)) {
+          documentLinks = c.documentLinks
+            .filter((link: any) => link?.title && link?.href && link.enabled !== false)
+            .sort((a: any, b: any) => Number(a.sortOrder ?? 100) - Number(b.sortOrder ?? 100));
+        }
       }
 
       // Load branding settings
@@ -215,20 +229,16 @@ export default async function PublicLayout({
                 <li><Link href="/raspisanie" style={{ color: "#E5E7EB" }}>Расписание</Link></li>
                 <li><Link href="/stoimost" style={{ color: "#E5E7EB" }}>Стоимость</Link></li>
                 <li><Link href="/teachers" style={{ color: "#E5E7EB" }}>Преподаватели</Link></li>
+                <li><Link href="/contacts" style={{ color: "#E5E7EB" }}>Контакты</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Документы</h4>
               <ul style={{ listStyle: "none", display: "grid", gap: "12px", fontSize: "var(--font-small)" }}>
-                <li><Link href="/contacts" style={{ color: "#E5E7EB" }}>Контакты</Link></li>
-                <li><Link href="/legal" style={{ color: "#E5E7EB" }}>Реквизиты</Link></li>
-                <li><Link href="/privacy" style={{ color: "#E5E7EB" }}>Политика обработки данных</Link></li>
-                <li><Link href="/offer" style={{ color: "#E5E7EB" }}>Публичная оферта</Link></li>
-                <li><Link href="/payment" style={{ color: "#E5E7EB" }}>Условия оплаты</Link></li>
-                <li><Link href="/refund" style={{ color: "#E5E7EB" }}>Условия возврата</Link></li>
-                <li><Link href="/privacy-policy" style={{ color: "#E5E7EB" }}>Конфиденциальность</Link></li>
-                <li><Link href="/consent" style={{ color: "#E5E7EB" }}>Согласие на ОПД</Link></li>
+                {documentLinks.map((link: any, idx: number) => (
+                  <li key={`${link.href}-${idx}`}><Link href={link.href} style={{ color: "#E5E7EB" }}>{link.title}</Link></li>
+                ))}
               </ul>
             </div>
 

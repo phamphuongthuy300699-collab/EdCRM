@@ -17,10 +17,12 @@ import {
   Link as LinkIcon,
   Percent,
   Plus,
+  RotateCcw,
   Save,
   Settings,
   ShieldCheck,
   Tag,
+  Trash2,
   Upload,
   UserPlus,
   Users,
@@ -28,6 +30,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
@@ -256,12 +259,14 @@ function Modal({
 }
 
 export default function CrmSettingsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [activeTab, setActiveTab] = useState<TabId>("organization");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [org, setOrg] = useState<any>(demoOrg);
+  const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
@@ -302,6 +307,10 @@ export default function CrmSettingsPage() {
   const activeRooms = useMemo(() => rooms.filter((room) => room.is_active), [rooms]);
   const activeCourses = useMemo(() => courses.filter((course) => course.is_active), [courses]);
   const teacherStaff = useMemo(() => staff.filter((item) => item.role === "teacher" && item.is_active), [staff]);
+  const visibleGroups = useMemo(
+    () => showArchivedGroups ? groups : groups.filter((group) => !group.archived_at),
+    [groups, showArchivedGroups],
+  );
 
   function setTab(tab: TabId) {
     if (tab === "payments" && typeof window !== "undefined") {
@@ -486,6 +495,51 @@ export default function CrmSettingsPage() {
     loadData();
   }, []);
 
+  async function runEntityAction(entity: string, action: "archive" | "restore" | "delete" | "anonymize", id: string, expectedText?: string) {
+    const response = await fetch(`/api/crm/entities/${entity}/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, organizationId: org.id, expectedText }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
+    await loadData();
+  }
+
+  async function runConfirmedEntityAction(input: {
+    entity: string;
+    action: "archive" | "restore" | "delete" | "anonymize";
+    id: string;
+    name: string;
+    title: string;
+    description: string;
+    confirmText: string;
+    dangerLevel: "safe" | "warning" | "danger";
+    demoUpdate?: () => void;
+  }) {
+    const needsTypedConfirmation = input.action === "delete" || input.action === "anonymize";
+    const allowed = await askAction({
+      title: input.title,
+      description: input.description,
+      dangerLevel: input.dangerLevel,
+      confirmText: input.confirmText,
+      requireTypedConfirmation: needsTypedConfirmation,
+      expectedText: needsTypedConfirmation ? "УДАЛИТЬ" : undefined,
+    });
+    if (!allowed) return;
+    if (demo && input.demoUpdate) {
+      input.demoUpdate();
+      setNotice(`${input.name}: действие выполнено`);
+      return;
+    }
+    try {
+      await runEntityAction(input.entity, input.action, input.id, needsTypedConfirmation ? "УДАЛИТЬ" : undefined);
+      setNotice(`${input.name}: действие выполнено`);
+    } catch (err: any) {
+      setError(err.message || "Не удалось выполнить действие");
+    }
+  }
+
   async function saveOrganization(event: React.FormEvent) {
     event.preventDefault();
     try {
@@ -554,16 +608,22 @@ export default function CrmSettingsPage() {
   }
 
   async function archiveBranch(branch: any) {
-    if (!window.confirm(`Архивировать филиал "${branch.name}"? Он исчезнет из выбора новых групп.`)) return;
+    const allowed = await askAction({
+      title: "Архивировать филиал",
+      description: `Филиал "${branch.name}" исчезнет из выбора новых групп и публичного сайта.`,
+      dangerLevel: "warning",
+      confirmText: "Архивировать",
+    });
+    if (!allowed) return;
     if (demo) {
       setBranches((prev) => prev.map((item) => item.id === branch.id ? { ...item, is_active: false, show_on_site: false } : item));
       return;
     }
-    const { error: archiveError } = await (supabase.from("branches") as any)
-      .update({ is_active: false, show_on_site: false, updated_at: new Date().toISOString() })
-      .eq("id", branch.id);
-    if (archiveError) setError(archiveError.message);
-    else await loadData();
+    try {
+      await runEntityAction("branches", "archive", branch.id);
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   async function saveRoom(event: React.FormEvent) {
@@ -602,16 +662,22 @@ export default function CrmSettingsPage() {
   }
 
   async function archiveRoom(room: any) {
-    if (!window.confirm(`Архивировать кабинет "${room.name}"?`)) return;
+    const allowed = await askAction({
+      title: "Архивировать кабинет",
+      description: `Кабинет "${room.name}" будет скрыт из рабочих списков.`,
+      dangerLevel: "warning",
+      confirmText: "Архивировать",
+    });
+    if (!allowed) return;
     if (demo) {
       setRooms((prev) => prev.map((item) => item.id === room.id ? { ...item, is_active: false } : item));
       return;
     }
-    const { error: archiveError } = await (supabase.from("rooms") as any)
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("id", room.id);
-    if (archiveError) setError(archiveError.message);
-    else await loadData();
+    try {
+      await runEntityAction("rooms", "archive", room.id);
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   async function saveCourse(event: React.FormEvent) {
@@ -657,16 +723,148 @@ export default function CrmSettingsPage() {
   }
 
   async function archiveCourse(course: any) {
-    if (!window.confirm(`Архивировать направление "${course.title}"? Связанные группы и лиды сохранятся.`)) return;
+    const allowed = await askAction({
+      title: "Архивировать направление",
+      description: `Направление "${course.title}" будет скрыто с сайта и из выбора новых групп. Связанные группы и лиды сохранятся.`,
+      dangerLevel: "warning",
+      confirmText: "Архивировать",
+    });
+    if (!allowed) return;
     if (demo) {
       setCourses((prev) => prev.map((item) => item.id === course.id ? { ...item, is_active: false, is_public: false } : item));
       return;
     }
-    const { error: archiveError } = await (supabase.from("courses") as any)
-      .update({ is_active: false, is_public: false, updated_at: new Date().toISOString() })
-      .eq("id", course.id);
-    if (archiveError) setError(archiveError.message);
-    else await loadData();
+    try {
+      await runEntityAction("courses", "archive", course.id);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
+  async function restoreBranch(branch: any) {
+    await runConfirmedEntityAction({
+      entity: "branches",
+      action: "restore",
+      id: branch.id,
+      name: branch.name,
+      title: "Восстановить филиал",
+      description: `Филиал "${branch.name}" снова появится в рабочих списках.`,
+      confirmText: "Восстановить",
+      dangerLevel: "safe",
+      demoUpdate: () => setBranches((prev) => prev.map((item) => item.id === branch.id ? { ...item, is_active: true } : item)),
+    });
+  }
+
+  async function deleteBranch(branch: any) {
+    await runConfirmedEntityAction({
+      entity: "branches",
+      action: "delete",
+      id: branch.id,
+      name: branch.name,
+      title: "Удалить филиал",
+      description: `Филиал "${branch.name}" будет удален только если нет связанных групп, кабинетов и заявок. Введите УДАЛИТЬ для подтверждения.`,
+      confirmText: "Удалить",
+      dangerLevel: "danger",
+      demoUpdate: () => setBranches((prev) => prev.filter((item) => item.id !== branch.id)),
+    });
+  }
+
+  async function restoreRoom(room: any) {
+    await runConfirmedEntityAction({
+      entity: "rooms",
+      action: "restore",
+      id: room.id,
+      name: room.name,
+      title: "Восстановить кабинет",
+      description: `Кабинет "${room.name}" снова появится в рабочих списках.`,
+      confirmText: "Восстановить",
+      dangerLevel: "safe",
+      demoUpdate: () => setRooms((prev) => prev.map((item) => item.id === room.id ? { ...item, is_active: true } : item)),
+    });
+  }
+
+  async function deleteRoom(room: any) {
+    await runConfirmedEntityAction({
+      entity: "rooms",
+      action: "delete",
+      id: room.id,
+      name: room.name,
+      title: "Удалить кабинет",
+      description: `Кабинет "${room.name}" будет удален только если нет связанных групп и занятий. Введите УДАЛИТЬ для подтверждения.`,
+      confirmText: "Удалить",
+      dangerLevel: "danger",
+      demoUpdate: () => setRooms((prev) => prev.filter((item) => item.id !== room.id)),
+    });
+  }
+
+  async function restoreCourse(course: any) {
+    await runConfirmedEntityAction({
+      entity: "courses",
+      action: "restore",
+      id: course.id,
+      name: course.title,
+      title: "Восстановить направление",
+      description: `Направление "${course.title}" снова станет доступно для новых групп.`,
+      confirmText: "Восстановить",
+      dangerLevel: "safe",
+      demoUpdate: () => setCourses((prev) => prev.map((item) => item.id === course.id ? { ...item, is_active: true } : item)),
+    });
+  }
+
+  async function deleteCourse(course: any) {
+    await runConfirmedEntityAction({
+      entity: "courses",
+      action: "delete",
+      id: course.id,
+      name: course.title,
+      title: "Удалить направление",
+      description: `Направление "${course.title}" будет удалено только если нет групп, заявок, тарифов и финансовой истории. Введите УДАЛИТЬ для подтверждения.`,
+      confirmText: "Удалить",
+      dangerLevel: "danger",
+      demoUpdate: () => setCourses((prev) => prev.filter((item) => item.id !== course.id)),
+    });
+  }
+
+  async function archiveGroup(group: any) {
+    await runConfirmedEntityAction({
+      entity: "groups",
+      action: "archive",
+      id: group.id,
+      name: group.title,
+      title: "Архивировать группу",
+      description: `Группа "${group.title}" будет скрыта из рабочих списков по умолчанию и с сайта, но история сохранится.`,
+      confirmText: "Архивировать",
+      dangerLevel: "warning",
+      demoUpdate: () => setGroups((prev) => prev.map((item) => item.id === group.id ? { ...item, archived_at: new Date().toISOString(), show_on_site: false } : item)),
+    });
+  }
+
+  async function restoreGroup(group: any) {
+    await runConfirmedEntityAction({
+      entity: "groups",
+      action: "restore",
+      id: group.id,
+      name: group.title,
+      title: "Восстановить группу",
+      description: `Группа "${group.title}" снова появится в рабочих списках.`,
+      confirmText: "Восстановить",
+      dangerLevel: "safe",
+      demoUpdate: () => setGroups((prev) => prev.map((item) => item.id === group.id ? { ...item, archived_at: null, show_on_site: true } : item)),
+    });
+  }
+
+  async function deleteGroup(group: any) {
+    await runConfirmedEntityAction({
+      entity: "groups",
+      action: "delete",
+      id: group.id,
+      name: group.title,
+      title: "Удалить группу",
+      description: `Группа "${group.title}" будет удалена только если это черновик без учеников, занятий, счетов, посещаемости и домашней работы. Введите УДАЛИТЬ для подтверждения.`,
+      confirmText: "Удалить",
+      dangerLevel: "danger",
+      demoUpdate: () => setGroups((prev) => prev.filter((item) => item.id !== group.id)),
+    });
   }
 
   function openGroupModal(group?: any) {
@@ -767,7 +965,13 @@ export default function CrmSettingsPage() {
   }
 
   async function closeGroup(group: any) {
-    if (!window.confirm(`Закрыть набор в группу "${group.title}"?`)) return;
+    const allowed = await askAction({
+      title: "Закрыть набор",
+      description: `Группа "${group.title}" останется в истории, но набор и показ на сайте будут закрыты.`,
+      dangerLevel: "warning",
+      confirmText: "Закрыть набор",
+    });
+    if (!allowed) return;
     if (demo) {
       setGroups((prev) => prev.map((item) => item.id === group.id ? { ...item, status: "closed", show_on_site: false } : item));
       return;
@@ -870,7 +1074,13 @@ export default function CrmSettingsPage() {
   }
 
   async function deactivateStaff(person: any) {
-    if (!window.confirm(`Деактивировать доступ сотрудника "${person.full_name || person.email}"?`)) return;
+    const allowed = await askAction({
+      title: "Деактивировать доступ",
+      description: `Сотрудник "${person.full_name || person.email}" потеряет доступ к CRM и будет скрыт с сайта.`,
+      dangerLevel: "danger",
+      confirmText: "Деактивировать",
+    });
+    if (!allowed) return;
     try {
       const response = await fetch("/api/crm/staff/deactivate", {
         method: "POST",
@@ -988,7 +1198,13 @@ export default function CrmSettingsPage() {
   }
 
   async function rejectDiscountAssignment(assignment: any) {
-    if (!window.confirm(`Отклонить скидку "${assignment.discount_type?.title || ""}" ?`)) return;
+    const allowed = await askAction({
+      title: "Отклонить скидку",
+      description: `Скидка "${assignment.discount_type?.title || ""}" будет отклонена.`,
+      dangerLevel: "warning",
+      confirmText: "Отклонить",
+    });
+    if (!allowed) return;
     try {
       setSaving(true);
       if (demo) {
@@ -1193,7 +1409,12 @@ export default function CrmSettingsPage() {
                       <div className="settings-actions">
                         <Button type="button" variant="secondary-crm" onClick={() => setBranchDraft({ ...emptyBranch, ...branch, work_hours: branch.work_hours || branch.hours || "" })}>Редактировать филиал</Button>
                         <Button type="button" variant="secondary-crm" onClick={() => setRoomDraft({ ...emptyRoom, branch_id: branch.id })}>Добавить кабинет</Button>
-                        <Button type="button" variant="secondary-crm" onClick={() => archiveBranch(branch)}><Archive size={14} /> Архивировать</Button>
+                        {branch.is_active ? (
+                          <Button type="button" variant="secondary-crm" onClick={() => archiveBranch(branch)}><Archive size={14} /> Архивировать</Button>
+                        ) : (
+                          <Button type="button" variant="secondary-crm" onClick={() => restoreBranch(branch)}><RotateCcw size={14} /> Восстановить</Button>
+                        )}
+                        <Button type="button" variant="secondary-crm" onClick={() => deleteBranch(branch)}><Trash2 size={14} /> Удалить</Button>
                       </div>
                       <div className="settings-mini-table">
                         {branchRooms.map((room) => (
@@ -1206,7 +1427,12 @@ export default function CrmSettingsPage() {
                               <div className="settings-actions">
                                 <span className={`badge ${room.is_active ? "badge-green" : "badge-gray"}`}>{room.is_active ? "Активен" : "Архив"}</span>
                                 <Button type="button" variant="secondary-crm" onClick={() => setRoomDraft({ ...emptyRoom, ...room })}>Редактировать</Button>
-                                <Button type="button" variant="secondary-crm" onClick={() => archiveRoom(room)}>Архивировать</Button>
+                                {room.is_active ? (
+                                  <Button type="button" variant="secondary-crm" onClick={() => archiveRoom(room)}>Архивировать</Button>
+                                ) : (
+                                  <Button type="button" variant="secondary-crm" onClick={() => restoreRoom(room)}>Восстановить</Button>
+                                )}
+                                <Button type="button" variant="secondary-crm" onClick={() => deleteRoom(room)}>Удалить</Button>
                               </div>
                             </div>
                           </div>
@@ -1253,7 +1479,12 @@ export default function CrmSettingsPage() {
                     <div className="settings-actions">
                       <Button type="button" variant="secondary-crm" onClick={() => setCourseDraft({ ...emptyCourse, ...course })}>Редактировать</Button>
                       <Button type="button" variant="secondary-crm" onClick={() => setCourseDraft({ ...emptyCourse, ...course, is_public: false })}><EyeOff size={14} /> Скрыть с сайта</Button>
-                      <Button type="button" variant="secondary-crm" onClick={() => archiveCourse(course)}><Archive size={14} /> Архивировать</Button>
+                      {course.is_active ? (
+                        <Button type="button" variant="secondary-crm" onClick={() => archiveCourse(course)}><Archive size={14} /> Архивировать</Button>
+                      ) : (
+                        <Button type="button" variant="secondary-crm" onClick={() => restoreCourse(course)}><RotateCcw size={14} /> Восстановить</Button>
+                      )}
+                      <Button type="button" variant="secondary-crm" onClick={() => deleteCourse(course)}><Trash2 size={14} /> Удалить</Button>
                     </div>
                   </div>
                 ))}
@@ -1272,10 +1503,14 @@ export default function CrmSettingsPage() {
                   <Plus size={16} /> Создать группу
                 </Button>
               </div>
+              <div className="settings-actions" style={{ justifyContent: "flex-start", marginBottom: 12 }}>
+                <Toggle checked={showArchivedGroups} onChange={setShowArchivedGroups} label="Показать архив" />
+              </div>
               <div className="settings-card-list">
-                {groups.map((group) => {
+                {visibleGroups.map((group) => {
                   const activeEnrollments = group.enrollments?.filter((enrollment: any) => enrollment.status === "active").length || 0;
                   const freePlaces = Math.max(0, Number(group.capacity || 0) - activeEnrollments);
+                  const isArchived = Boolean(group.archived_at);
                   return (
                     <div key={group.id} className="settings-card">
                       <div className="settings-card-head">
@@ -1284,7 +1519,7 @@ export default function CrmSettingsPage() {
                           <p>{group.course?.title || "Курс не выбран"} · {group.branch?.name || "филиал не выбран"} · {group.room?.name || "кабинет не выбран"}</p>
                         </div>
                         <div className="settings-actions">
-                          <span className={`badge ${group.status === "active" ? "badge-green" : group.status === "closed" ? "badge-red" : "badge-gray"}`}>{group.status}</span>
+                          <span className={`badge ${isArchived ? "badge-gray" : group.status === "active" ? "badge-green" : group.status === "closed" ? "badge-red" : "badge-gray"}`}>{isArchived ? "Архив" : group.status}</span>
                           <span className={`badge ${group.show_on_site ? "badge-blue" : "badge-gray"}`}>{group.show_on_site ? "На сайте" : "Скрыта"}</span>
                         </div>
                       </div>
@@ -1300,6 +1535,12 @@ export default function CrmSettingsPage() {
                       <div className="settings-actions">
                         <Button type="button" variant="secondary-crm" onClick={() => openGroupModal(group)}>Редактировать</Button>
                         <Button type="button" variant="secondary-crm" onClick={() => closeGroup(group)}>Закрыть набор</Button>
+                        {isArchived ? (
+                          <Button type="button" variant="secondary-crm" onClick={() => restoreGroup(group)}><RotateCcw size={14} /> Восстановить</Button>
+                        ) : (
+                          <Button type="button" variant="secondary-crm" onClick={() => archiveGroup(group)}><Archive size={14} /> Архивировать</Button>
+                        )}
+                        <Button type="button" variant="secondary-crm" onClick={() => deleteGroup(group)}><Trash2 size={14} /> Удалить</Button>
                         <Button type="button" variant="secondary-crm" onClick={() => window.location.href = `/crm/groups?open=${group.id}`}><Users size={14} /> Ученики</Button>
                       </div>
                     </div>
@@ -1797,7 +2038,24 @@ export default function CrmSettingsPage() {
                   </Field>
                   <Field label="Начало"><TextInput type="time" value={rule.starts_at} onChange={(e) => setScheduleDraft(scheduleDraft.map((item, idx) => idx === index ? { ...item, starts_at: e.target.value } : item))} /></Field>
                   <Field label="Окончание"><TextInput type="time" value={rule.ends_at} onChange={(e) => setScheduleDraft(scheduleDraft.map((item, idx) => idx === index ? { ...item, ends_at: e.target.value } : item))} /></Field>
-                  <Button type="button" variant="secondary-crm" onClick={() => setScheduleDraft(scheduleDraft.filter((_, idx) => idx !== index))}>Удалить</Button>
+                  <Button
+                    type="button"
+                    variant="secondary-crm"
+                    onClick={async () => {
+                      if (rule.id) {
+                        const allowed = await askAction({
+                          title: "Удалить правило расписания",
+                          description: "Это изменит расписание группы после сохранения формы.",
+                          dangerLevel: "warning",
+                          confirmText: "Удалить правило",
+                        });
+                        if (!allowed) return;
+                      }
+                      setScheduleDraft(scheduleDraft.filter((_, idx) => idx !== index));
+                    }}
+                  >
+                    Удалить
+                  </Button>
                 </div>
               ))}
             </div>
@@ -1858,6 +2116,7 @@ export default function CrmSettingsPage() {
           </form>
         </Modal>
       )}
+      {actionModal}
     </div>
   );
 }

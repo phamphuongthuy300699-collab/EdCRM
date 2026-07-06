@@ -18,8 +18,10 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { calculateDiscountedInvoiceAmount } from "@/shared/utils/payments";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 export default function CrmInvoicesPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "draft" | "issued" | "paid" | "cancelled" | "overdue">("all");
   const [startDate, setStartDate] = useState("");
@@ -318,7 +320,13 @@ export default function CrmInvoicesPage() {
   };
 
   const handleCancelInvoice = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите отменить этот счет?")) return;
+    const allowed = await askAction({
+      title: "Отменить счет",
+      description: "Счет будет помечен как отмененный. Оплаченные платежи и события не удаляются.",
+      dangerLevel: "warning",
+      confirmText: "Отменить счет",
+    });
+    if (!allowed) return;
     try {
       if (isDemoMode() || id.startsWith("i-mock-") || id.length < 10) {
         setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "cancelled" } : inv));
@@ -969,6 +977,7 @@ export default function CrmInvoicesPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }
