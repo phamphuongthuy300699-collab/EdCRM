@@ -5,6 +5,7 @@ import { alfaErrorMessage, AlfaBankError } from "@/lib/payments/alfabank/errors"
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
+import { shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
@@ -12,23 +13,53 @@ const bodySchema = z.object({
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
 const reusablePaymentStatuses = ["pending", "redirected", "authorized"];
-const reusablePaymentTtlMs = 30 * 60 * 1000;
 
 function jsonError(message: string, status = 400, code = "PAYMENT_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
 }
 
-function absoluteUrl(pathOrUrl: string | null | undefined, request: NextRequest, invoiceId: string, paymentId: string) {
-  const origin = request.nextUrl.origin;
+const blockedProductionHosts = new Set(["0.0.0.0", "localhost", "127.0.0.1"]);
+
+export function buildPaymentReturnUrl(pathOrUrl: string | null | undefined, input: {
+  requestOrigin: string;
+  invoiceId: string;
+  paymentId: string;
+  publicAppUrl?: string;
+  appUrl?: string;
+  nodeEnv?: string;
+}) {
+  const configuredOrigin = input.publicAppUrl?.trim() || input.appUrl?.trim() || "";
+  const origin = configuredOrigin || input.requestOrigin;
+  const originUrl = new URL(origin);
+  const assertPublicProductionUrl = (url: URL) => {
+    if (input.nodeEnv === "production" && blockedProductionHosts.has(url.hostname)) {
+      throw new AlfaBankError("Для онлайн-оплаты в production задайте NEXT_PUBLIC_APP_URL или APP_URL с публичным доменом", {
+        code: "PUBLIC_APP_URL_NOT_CONFIGURED",
+      });
+    }
+  };
+  assertPublicProductionUrl(originUrl);
   const fallbackPath = "/payments/success";
   const raw = pathOrUrl?.trim() || fallbackPath;
   const url = raw.startsWith("http://") || raw.startsWith("https://")
     ? new URL(raw)
-    : new URL(raw.startsWith("/") ? raw : `/${raw}`, origin);
+    : new URL(raw.startsWith("/") ? raw : `/${raw}`, originUrl);
+  assertPublicProductionUrl(url);
 
-  url.searchParams.set("invoiceId", invoiceId);
-  url.searchParams.set("paymentId", paymentId);
+  url.searchParams.set("invoiceId", input.invoiceId);
+  url.searchParams.set("paymentId", input.paymentId);
   return url.toString();
+}
+
+function absoluteUrl(pathOrUrl: string | null | undefined, request: NextRequest, invoiceId: string, paymentId: string) {
+  return buildPaymentReturnUrl(pathOrUrl, {
+    requestOrigin: request.nextUrl.origin,
+    invoiceId,
+    paymentId,
+    publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+    appUrl: process.env.APP_URL,
+    nodeEnv: process.env.NODE_ENV,
+  });
 }
 
 function parseAmount(value: unknown) {
@@ -134,16 +165,12 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    if (
-      existingPayment?.payment_url &&
-      existingPayment.created_at &&
-      Date.now() - new Date(existingPayment.created_at).getTime() < reusablePaymentTtlMs
-    ) {
+    if (shouldReuseAlfabankPaymentUrl(existingPayment)) {
       return NextResponse.json({ ok: true, paymentUrl: existingPayment.payment_url, reused: true });
     }
 
     const { data: settings, error: settingsError } = await (admin.from("payment_provider_settings") as any)
-      .select("is_enabled, mode, api_login, api_password_secret, test_gateway_url, production_gateway_url, success_path, fail_path, payment_stage, settings")
+      .select("is_enabled, mode, api_login, api_password_secret, test_gateway_url, production_gateway_url, callback_path, success_path, fail_path, payment_stage, settings")
       .eq("organization_id", invoice.organization_id)
       .eq("provider", "alfabank")
       .maybeSingle();
@@ -164,6 +191,11 @@ export async function POST(request: NextRequest) {
     const gatewayUrl = mode === "production" ? settings.production_gateway_url : settings.test_gateway_url;
     const registerEndpoint =
       typeof settings.settings?.registerEndpoint === "string" ? settings.settings.registerEndpoint : undefined;
+    const currencyCode =
+      typeof settings.settings?.alfabankCurrencyCode === "string" ? settings.settings.alfabankCurrencyCode :
+      typeof settings.settings?.currencyCode === "string" ? settings.settings.currencyCode :
+      undefined;
+    const useDynamicCallback = settings.settings?.dynamicCallbackEnabled === true;
 
     const { data: payment, error: paymentError } = await (admin.from("payments") as any)
       .insert({
@@ -188,7 +220,7 @@ export async function POST(request: NextRequest) {
       if (paymentError?.code === "23505") {
         // Unique key constraint violation: fetch the existing active payment
         const { data: activePay } = await (admin.from("payments") as any)
-          .select("id, payment_url")
+          .select("id, payment_url, status, created_at")
           .eq("invoice_id", invoice.id)
           .eq("provider", "alfabank")
           .in("status", reusablePaymentStatuses)
@@ -197,7 +229,7 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle();
         
-        if (activePay?.payment_url) {
+        if (shouldReuseAlfabankPaymentUrl(activePay)) {
           return NextResponse.json({ ok: true, paymentUrl: activePay.payment_url, reused: true });
         }
       }
@@ -213,10 +245,14 @@ export async function POST(request: NextRequest) {
           invoiceId: invoice.id,
           amount,
           currency: "RUB",
+          currencyCode,
           description,
           orderNumber,
           returnUrl: absoluteUrl(settings.success_path || "/payments/success", request, invoice.id, payment.id),
           failUrl: absoluteUrl(settings.fail_path || "/payments/fail", request, invoice.id, payment.id),
+          dynamicCallbackUrl: useDynamicCallback
+            ? absoluteUrl(settings.callback_path || "/api/payments/alfabank/callback", request, invoice.id, payment.id)
+            : undefined,
         },
         {
           mode,
@@ -224,6 +260,7 @@ export async function POST(request: NextRequest) {
           registerEndpoint,
           apiLogin: settings.api_login,
           apiPassword: settings.api_password_secret,
+          currencyCode,
           paymentStage: settings.payment_stage === "two_step" ? "two_step" : "one_step",
         },
       );

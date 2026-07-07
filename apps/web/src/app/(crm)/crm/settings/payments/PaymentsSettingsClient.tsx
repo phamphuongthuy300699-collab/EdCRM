@@ -30,7 +30,7 @@ const defaultSettings: Settings = {
   is_enabled: false,
   mode: "test",
   api_login: "",
-  test_gateway_url: "https://web.rbsuat.com/ab/rest/",
+  test_gateway_url: "https://alfa.rbsuat.com/payment/rest/",
   production_gateway_url: "https://engine.paymentgate.ru/payment/rest/",
   callback_path: "/api/payments/alfabank/callback",
   success_path: "/payments/success",
@@ -110,6 +110,8 @@ export default function PaymentsSettingsClient() {
           successPath: settings.success_path,
           failPath: settings.fail_path,
           currency: settings.currency,
+          alfabankCurrencyCode: settings.settings?.alfabankCurrencyCode || "",
+          dynamicCallbackEnabled: settings.settings?.dynamicCallbackEnabled === true,
           paymentStage: settings.payment_stage,
           sbpEnabled: settings.sbp_enabled,
           fiscalizationEnabled: settings.fiscalization_enabled,
@@ -251,13 +253,13 @@ export default function PaymentsSettingsClient() {
             </div>
 
             <div className="payment-grid-3">
-              <Field label="Success URL / path">
+              <Field label="Success URL / path" hint="Если указан относительный path, в production абсолютный URL строится от NEXT_PUBLIC_APP_URL или APP_URL.">
                 <input className="payment-input" value={settings.success_path} onChange={(event) => setSettings({ ...settings, success_path: event.target.value })} />
               </Field>
-              <Field label="Fail URL / path">
+              <Field label="Fail URL / path" hint="Например: https://робокс48.рф/payments/fail или /payments/fail при заданном NEXT_PUBLIC_APP_URL.">
                 <input className="payment-input" value={settings.fail_path} onChange={(event) => setSettings({ ...settings, fail_path: event.target.value })} />
               </Field>
-              <Field label="Callback URL / path">
+              <Field label="Callback URL / path" hint="Callback не обязателен для MVP: success/fail страницы сами проверяют статус. Dynamic callback требует разрешения в Альфа-Банке.">
                 <input className="payment-input" value={settings.callback_path} onChange={(event) => setSettings({ ...settings, callback_path: event.target.value })} />
               </Field>
             </div>
@@ -265,6 +267,16 @@ export default function PaymentsSettingsClient() {
             <div className="payment-grid-3">
               <Field label="Валюта">
                 <input className="payment-input" value="RUB" disabled />
+              </Field>
+              <Field label="Код валюты Альфа-Банка" hint="По умолчанию параметр currency не отправляется. Для тестового мерчанта используйте 810 только если это явно требуется.">
+                <select
+                  className="payment-select"
+                  value={settings.settings?.alfabankCurrencyCode || ""}
+                  onChange={(event) => setSettings({ ...settings, settings: { ...settings.settings, alfabankCurrencyCode: event.target.value } })}
+                >
+                  <option value="">Не отправлять currency</option>
+                  <option value="810">810</option>
+                </select>
               </Field>
               <Field label="Стадия платежа">
                 <select className="payment-select" value={settings.payment_stage} onChange={(event) => setSettings({ ...settings, payment_stage: event.target.value as Settings["payment_stage"] })}>
@@ -281,6 +293,15 @@ export default function PaymentsSettingsClient() {
                 </select>
               </Field>
             </div>
+
+            <label className="payment-toggle">
+              <input
+                type="checkbox"
+                checked={settings.settings?.dynamicCallbackEnabled === true}
+                onChange={(event) => setSettings({ ...settings, settings: { ...settings.settings, dynamicCallbackEnabled: event.target.checked } })}
+              />
+              Передавать dynamicCallbackUrl в register.do
+            </label>
 
             <div className="payment-grid">
               <label className="payment-toggle">

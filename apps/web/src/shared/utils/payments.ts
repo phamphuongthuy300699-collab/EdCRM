@@ -15,6 +15,8 @@ export type PaymentForStatus = {
 
 const paidStatuses = new Set(["paid", "succeeded"]);
 const finalPaymentStatuses = new Set(["paid", "succeeded", "refunded"]);
+const reusableAlfabankPaymentStatuses = new Set(["pending", "redirected", "authorized"]);
+const reusableAlfabankPaymentTtlMs = 30 * 60 * 1000;
 
 function toAmount(value: number | string | null | undefined) {
   const amount = typeof value === "number" ? value : Number(value || 0);
@@ -57,6 +59,18 @@ export function paidAmount(payments: PaymentForStatus[]) {
 
 export function isFinalPaymentStatus(status: PaymentStatus | string | null | undefined) {
   return finalPaymentStatuses.has(String(status || ""));
+}
+
+export function shouldReuseAlfabankPaymentUrl(
+  payment: { payment_url?: string | null; status?: string | null; created_at?: string | null } | null | undefined,
+  now = new Date(),
+) {
+  if (!payment?.payment_url) return false;
+  if (!reusableAlfabankPaymentStatuses.has(String(payment.status || ""))) return false;
+  if (!payment.created_at) return false;
+  const createdAt = new Date(payment.created_at).getTime();
+  if (!Number.isFinite(createdAt)) return false;
+  return now.getTime() - createdAt < reusableAlfabankPaymentTtlMs;
 }
 
 export function calculateInvoiceStatusFromPayments(

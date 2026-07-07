@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
-import { calculateDiscountedInvoiceAmount } from "@/shared/utils/payments";
+import { calculateDiscountedInvoiceAmount, shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 export default function CrmInvoicesPage() {
@@ -357,10 +357,9 @@ export default function CrmInvoicesPage() {
 
       setOnlinePayingInvoiceId(invoiceId);
 
-      // Check if Alfabank order exists
       const { data: existing } = await (supabase
         .from("payments") as any)
-        .select("payment_url")
+        .select("payment_url, status, created_at")
         .eq("invoice_id", invoiceId)
         .eq("provider", "alfabank")
         .not("payment_url", "is", null)
@@ -368,13 +367,12 @@ export default function CrmInvoicesPage() {
         .limit(1)
         .maybeSingle();
 
-      if (existing?.payment_url) {
+      if (shouldReuseAlfabankPaymentUrl(existing)) {
         await navigator.clipboard.writeText(existing.payment_url);
         alert("Ссылка на оплату скопирована в буфер обмена!");
         return;
       }
 
-      // Generate new one
       const response = await fetch("/api/payments/alfabank/create", {
         method: "POST",
         headers: { "content-type": "application/json" },

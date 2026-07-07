@@ -6,6 +6,7 @@ import {
   isFinalPaymentStatus,
   markInvoicePaidWhenPaymentPaid,
   paidAmount,
+  shouldReuseAlfabankPaymentUrl,
 } from "../shared/utils/payments";
 
 describe("payments model rules", () => {
@@ -96,5 +97,15 @@ describe("payments model rules", () => {
     expect(isFinalPaymentStatus("succeeded")).toBe(true);
     expect(isFinalPaymentStatus("refunded")).toBe(true);
     expect(isFinalPaymentStatus("authorized")).toBe(false);
+  });
+
+  it("reuses only fresh active Alfabank payment links", () => {
+    const now = new Date("2026-07-08T10:30:00Z");
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "pending", created_at: "2026-07-08T10:10:00Z" }, now)).toBe(true);
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "redirected", created_at: "2026-07-08T10:10:00Z" }, now)).toBe(true);
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "authorized", created_at: "2026-07-08T10:10:00Z" }, now)).toBe(true);
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "failed", created_at: "2026-07-08T10:10:00Z" }, now)).toBe(false);
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "paid", created_at: "2026-07-08T10:10:00Z" }, now)).toBe(false);
+    expect(shouldReuseAlfabankPaymentUrl({ payment_url: "https://pay", status: "pending", created_at: "2026-07-08T09:50:00Z" }, now)).toBe(false);
   });
 });

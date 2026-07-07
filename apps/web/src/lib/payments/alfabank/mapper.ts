@@ -6,8 +6,6 @@ import type {
   SafeAlfaRegisterRequest,
 } from "./types";
 
-const rubIso4217 = "643";
-
 export function normalizeGatewayUrl(gatewayUrl: string) {
   const trimmed = gatewayUrl.trim();
   if (!trimmed) return "";
@@ -25,18 +23,21 @@ export function toMinorUnits(amount: number) {
 
 export function mapCreateOrderToAlfaRequest(
   input: CreateAlfaOrderInput,
-  config: Pick<AlfaGatewayConfig, "apiLogin" | "apiPassword">,
+  config: Pick<AlfaGatewayConfig, "apiLogin" | "apiPassword" | "currencyCode">,
 ): AlfaRegisterRequest {
-  return {
+  const currencyCode = input.currencyCode || config.currencyCode || "";
+  const request: AlfaRegisterRequest = {
     userName: config.apiLogin,
     password: config.apiPassword,
     orderNumber: input.orderNumber,
     amount: toMinorUnits(input.amount),
-    currency: rubIso4217,
     returnUrl: input.returnUrl,
     failUrl: input.failUrl,
     description: input.description.slice(0, 512),
   };
+  if (currencyCode.trim()) request.currency = currencyCode.trim();
+  if (input.dynamicCallbackUrl) request.dynamicCallbackUrl = input.dynamicCallbackUrl;
+  return request;
 }
 
 export function sanitizeAlfaRequest(request: AlfaRegisterRequest): SafeAlfaRegisterRequest {
@@ -93,4 +94,3 @@ export function redactSensitivePaymentPayload(payload: any): any {
   recurse(copy);
   return copy;
 }
-
