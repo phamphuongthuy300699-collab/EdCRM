@@ -6,6 +6,12 @@ import { Phone } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
 import { publicMapBranches } from "@/shared/utils/public-map";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import {
+  defaultFooterLinks,
+  defaultHeaderLinks,
+  safePublicNavLinks,
+  type PublicNavLink,
+} from "@/shared/utils/public-navigation";
 import Header from "./Header";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +52,8 @@ export default async function PublicLayout({
     { title: "Конфиденциальность", href: "/privacy-policy", enabled: true, sortOrder: 60 },
     { title: "Согласие на ОПД", href: "/consent", enabled: true, sortOrder: 70 },
   ];
+  let headerLinks: PublicNavLink[] = defaultHeaderLinks;
+  let footerLinks: PublicNavLink[] = defaultFooterLinks;
   let branches: any[] = [];
 
   let brandName = "Робокс";
@@ -94,6 +102,18 @@ export default async function PublicLayout({
             .filter((link: any) => link?.title && link?.href && link.enabled !== false)
             .sort((a: any, b: any) => Number(a.sortOrder ?? 100) - Number(b.sortOrder ?? 100));
         }
+      }
+
+      // Load public navigation settings
+      const { data: navBlock } = await (supabase.from("site_content_blocks") as any)
+        .select("content")
+        .eq("organization_id", org.id)
+        .eq("block_key", "site.navigation")
+        .maybeSingle();
+
+      if (navBlock?.content) {
+        headerLinks = safePublicNavLinks(navBlock.content.headerLinks, defaultHeaderLinks);
+        footerLinks = safePublicNavLinks(navBlock.content.footerLinks, defaultFooterLinks);
       }
 
       // Load branding settings
@@ -169,6 +189,7 @@ export default async function PublicLayout({
         logoAlt={logoAlt}
         logoDisplay={logoDisplay}
         phone={phone}
+        headerLinks={headerLinks}
       />
 
       {/* Main Content */}
@@ -224,12 +245,11 @@ export default async function PublicLayout({
             <div>
               <h4 style={{ marginBottom: "16px", fontSize: "var(--font-small)", textTransform: "uppercase", letterSpacing: "0.05em", color: "#9CA3AF" }}>Навигация</h4>
               <ul style={{ listStyle: "none", display: "grid", gap: "12px", fontSize: "var(--font-small)" }}>
-                <li><Link href="/robototekhnika-dlya-detey-lipetsk" style={{ color: "#E5E7EB" }}>Робототехника</Link></li>
-                <li><Link href="/programmirovanie-dlya-detey-lipetsk" style={{ color: "#E5E7EB" }}>Программирование</Link></li>
-                <li><Link href="/raspisanie" style={{ color: "#E5E7EB" }}>Расписание</Link></li>
-                <li><Link href="/stoimost" style={{ color: "#E5E7EB" }}>Стоимость</Link></li>
-                <li><Link href="/teachers" style={{ color: "#E5E7EB" }}>Преподаватели</Link></li>
-                <li><Link href="/contacts" style={{ color: "#E5E7EB" }}>Контакты</Link></li>
+                {footerLinks.map((link) => (
+                  <li key={link.id || link.href}>
+                    <Link href={link.href} style={{ color: "#E5E7EB" }}>{link.title}</Link>
+                  </li>
+                ))}
               </ul>
             </div>
 

@@ -16,7 +16,7 @@ export default function ProbnoeZanyatiePage() {
   const jsonLdOrg = {
     "@context": "https://schema.org",
     "@type": "EducationalOrganization",
-    "name": "Школа Robotics Липецк",
+    "name": "Робокс Липецк",
     "url": "https://robotics-lipetsk.ru",
     "description": "Бесплатное ознакомительное занятие по робототехнике и программированию для детей в Липецке."
   };

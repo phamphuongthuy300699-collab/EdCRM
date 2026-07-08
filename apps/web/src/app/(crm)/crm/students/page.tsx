@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
 import { 
   Users, 
@@ -30,6 +29,8 @@ interface Student {
   group: string;
   parent: string;
   phone: string;
+  parentEmail?: string | null;
+  guardianId?: string | null;
   paymentStatus: "paid" | "pending" | "overdue";
   attendance: string; // Rate string (e.g. "95%")
   attendanceValue: number; // Numeric rate (e.g. 95)
@@ -41,12 +42,12 @@ interface Student {
 
 export default function CrmStudentsPage() {
   const { askAction, modal: actionModal } = useActionConfirmation();
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "archived">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Manual Add Student Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -64,6 +65,10 @@ export default function CrmStudentsPage() {
   const [studentInvoices, setStudentInvoices] = useState<any[]>([]);
   const [studentAttendance, setStudentAttendance] = useState<any[]>([]);
   const [loadingDrawer, setLoadingDrawer] = useState(false);
+  const [parentAccess, setParentAccess] = useState<any | null>(null);
+  const [parentAccessLoading, setParentAccessLoading] = useState(false);
+  const [parentAccessMessage, setParentAccessMessage] = useState("");
+  const [temporaryParentPassword, setTemporaryParentPassword] = useState("");
 
   const supabase = createSupabaseBrowserClient();
 
@@ -163,7 +168,8 @@ export default function CrmStudentsPage() {
               const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
 
               // Find primary guardian
-              const parentLink = s.student_guardians?.[0]?.guardians || null;
+              const parentRelation = s.student_guardians?.[0] || null;
+              const parentLink = parentRelation?.guardians || null;
               const parentName = parentLink ? parentLink.full_name : "Не указан";
               const parentPhone = parentLink ? parentLink.phone : "—";
 
@@ -187,6 +193,8 @@ export default function CrmStudentsPage() {
                 group: groupTitle,
                 parent: parentName,
                 phone: parentPhone,
+                parentEmail: parentLink?.email || null,
+                guardianId: parentRelation?.guardian_id || null,
                 paymentStatus: "paid" as const,
                 attendance: `${attVal}%`,
                 attendanceValue: attVal,
@@ -214,16 +222,69 @@ export default function CrmStudentsPage() {
     }
 
     loadData();
-  }, []);
+  }, [reloadKey]);
 
   function initialLeadsAsStudents(mocks: Student[], dbStudents: any[]) {
     return mocks.filter(m => !dbStudents.some((d: any) => d.name === m.name));
   }
 
+  const loadParentAccessStatus = async (student: any) => {
+    setParentAccess(null);
+    setParentAccessMessage("");
+    setTemporaryParentPassword("");
+    if (!student?.guardianId || typeof student.id === "number" || !orgId) {
+      setParentAccess({ status: { status: "missing_guardian", label: "Родитель не привязан" } });
+      return;
+    }
+
+    try {
+      setParentAccessLoading(true);
+      const response = await fetch("/api/crm/parent-access/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ organizationId: orgId, guardianId: student.guardianId, studentId: student.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось получить статус доступа");
+      setParentAccess(payload);
+    } catch (error: any) {
+      setParentAccessMessage(error.message || "Не удалось получить статус доступа");
+    } finally {
+      setParentAccessLoading(false);
+    }
+  };
+
+  const runParentAccessAction = async (action: "issue" | "reset-password" | "disable") => {
+    if (!selectedStudent?.guardianId || typeof selectedStudent.id === "number" || !orgId) return;
+
+    try {
+      setParentAccessLoading(true);
+      setParentAccessMessage("");
+      setTemporaryParentPassword("");
+      const response = await fetch(`/api/crm/parent-access/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ organizationId: orgId, guardianId: selectedStudent.guardianId, studentId: selectedStudent.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
+      if (payload.temporaryPassword) setTemporaryParentPassword(payload.temporaryPassword);
+      setParentAccessMessage(payload.message || "Готово");
+      await loadParentAccessStatus(selectedStudent);
+    } catch (error: any) {
+      setParentAccessMessage(error.message || "Не удалось выполнить действие");
+    } finally {
+      setParentAccessLoading(false);
+    }
+  };
+
   const handleOpenDrawer = async (student: any) => {
     setSelectedStudent(student);
     setStudentInvoices([]);
     setStudentAttendance([]);
+    setParentAccess(null);
+    setParentAccessMessage("");
+    setTemporaryParentPassword("");
     
     if (typeof student.id === "number") {
       setStudentInvoices([
@@ -240,6 +301,7 @@ export default function CrmStudentsPage() {
 
     try {
       setLoadingDrawer(true);
+      loadParentAccessStatus(student);
       // Fetch invoices
       const { data: invs } = await supabase
         .from("invoices")
@@ -335,6 +397,8 @@ export default function CrmStudentsPage() {
         group: groupTitle,
         parent: guardian.full_name,
         phone: guardian.phone,
+        parentEmail: guardian.email || null,
+        guardianId: guardian.id,
         paymentStatus: "paid",
         attendance: "100%",
         attendanceValue: 100,
@@ -419,6 +483,7 @@ export default function CrmStudentsPage() {
       setStudents((prev) => action === "delete"
         ? prev.filter((item) => item.id !== student.id)
         : prev.map((item) => item.id === student.id ? { ...item, status: action === "restore" ? "active" : "archived" } : item));
+      setReloadKey((value) => value + 1);
     } catch (err: any) {
       alert(err.message || "Не удалось выполнить действие с учеником");
     }
@@ -643,7 +708,7 @@ export default function CrmStudentsPage() {
                         }}>
                           <CreditCard size={14} />
                         </button>
-                        <button onClick={() => router.push(`/crm/students/${student.id}`)} title="Подробнее" style={{
+                        <button onClick={() => handleOpenDrawer(student)} title="Подробнее" style={{
                           width: "32px",
                           height: "32px",
                           borderRadius: "6px",
@@ -913,6 +978,40 @@ export default function CrmStudentsPage() {
               <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Родитель (законный представитель)</span>
               <div><strong>ФИО:</strong> {selectedStudent.parent}</div>
               <div><strong>Телефон:</strong> {selectedStudent.phone}</div>
+            </div>
+
+            <div style={{ background: "white", border: "1px solid var(--color-border)", padding: "16px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Доступ родителя в ЛК</span>
+                <span className={parentAccess?.status?.status === "linked" ? "badge badge-green" : "badge badge-gray"}>
+                  {parentAccessLoading ? "Проверяем..." : parentAccess?.status?.label || "Не проверено"}
+                </span>
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                Email: {selectedStudent.parentEmail || "не указан"}
+              </div>
+              {parentAccessMessage && (
+                <div style={{ fontSize: "12px", color: parentAccessMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-success)", fontWeight: 700 }}>
+                  {parentAccessMessage}
+                </div>
+              )}
+              {temporaryParentPassword && (
+                <div style={{ background: "var(--color-warning-soft)", border: "1px solid var(--color-warning)", borderRadius: "8px", padding: "10px", fontSize: "12px" }}>
+                  <strong>Временный пароль:</strong> <code>{temporaryParentPassword}</code>
+                  <div style={{ marginTop: "4px", color: "var(--color-text-muted)" }}>Показывается один раз. Передайте родителю безопасным каналом.</div>
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <Button type="button" variant="primary-crm" disabled={parentAccessLoading || !selectedStudent.guardianId || !selectedStudent.parentEmail} onClick={() => runParentAccessAction("issue")} style={{ fontSize: "12px", minHeight: "36px" }}>
+                  Выдать доступ
+                </Button>
+                <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId} onClick={() => runParentAccessAction("reset-password")} style={{ fontSize: "12px", minHeight: "36px" }}>
+                  Сбросить пароль
+                </Button>
+                <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId || parentAccess?.status?.status !== "linked"} onClick={() => runParentAccessAction("disable")} style={{ fontSize: "12px", minHeight: "36px", gridColumn: "1 / -1", color: "var(--color-danger)" }}>
+                  Отключить доступ
+                </Button>
+              </div>
             </div>
 
             {/* Performance progress */}

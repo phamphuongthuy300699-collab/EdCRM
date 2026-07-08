@@ -20,7 +20,7 @@ export default function RobototekhnikaPage() {
     "description": "Практический курс конструирования и программирования роботов для детей 6–9 лет с использованием наборов LEGO Education.",
     "provider": {
       "@type": "EducationalOrganization",
-      "name": "Школа Robotics Липецк",
+      "name": "Робокс Липецк",
       "sameAs": "https://robotics-lipetsk.ru"
     }
   };

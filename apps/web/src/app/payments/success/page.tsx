@@ -15,7 +15,9 @@ function PaymentSuccessInner() {
   useEffect(() => {
     const orderId = searchParams.get("orderId");
     const paymentId = searchParams.get("paymentId");
-    if (!orderId && !paymentId) return;
+    const invoiceId = searchParams.get("invoiceId");
+    const providerOrderId = searchParams.get("providerOrderId");
+    if (!orderId && !providerOrderId && !paymentId) return;
 
     const isUuid = (val: string | null): val is string => {
       if (!val) return false;
@@ -28,15 +30,12 @@ function PaymentSuccessInner() {
         setStatusText("Проверяем статус платежа в банке...");
 
         const bodyPayload: Record<string, string> = {};
-        if (isUuid(paymentId)) {
-          bodyPayload.paymentId = paymentId;
-        } else if (isUuid(orderId)) {
-          bodyPayload.paymentId = orderId;
-        } else if (orderId) {
-          bodyPayload.providerOrderId = orderId;
-        }
+        if (isUuid(paymentId)) bodyPayload.paymentId = paymentId;
+        if (isUuid(invoiceId)) bodyPayload.invoiceId = invoiceId;
+        if (providerOrderId) bodyPayload.providerOrderId = providerOrderId;
+        if (orderId) bodyPayload.orderId = orderId;
 
-        const res = await fetch("/api/payments/alfabank/status", {
+        const res = await fetch("/api/payments/alfabank/return-status", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(bodyPayload),

@@ -43,6 +43,8 @@ export default function CrmInvoicesPage() {
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [onlinePayingInvoiceId, setOnlinePayingInvoiceId] = useState<string | null>(null);
   const [onlinePaymentError, setOnlinePaymentError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
 
@@ -215,7 +217,7 @@ export default function CrmInvoicesPage() {
     }
 
     loadData();
-  }, []);
+  }, [reloadKey]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -270,6 +272,7 @@ export default function CrmInvoicesPage() {
 
       if (demo || isMockId) {
         setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
+        setActionMessage("Счет отмечен оплаченным.");
         alert("Счет отмечен оплаченным вручную! (Демо)");
         return;
       }
@@ -309,6 +312,8 @@ export default function CrmInvoicesPage() {
       if (error) throw error;
 
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
+      setActionMessage("Счет успешно оплачен вручную.");
+      setReloadKey((value) => value + 1);
       alert("Счет успешно оплачен вручную!");
     } catch (err: any) {
       console.error(err);
@@ -330,6 +335,7 @@ export default function CrmInvoicesPage() {
     try {
       if (isDemoMode() || id.startsWith("i-mock-") || id.length < 10) {
         setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "cancelled" } : inv));
+        setActionMessage("Счет отменен.");
         alert("Счет успешно отменен (Демо)");
         return;
       }
@@ -340,6 +346,8 @@ export default function CrmInvoicesPage() {
 
       if (error) throw error;
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "cancelled" } : inv));
+      setActionMessage("Счет отменен.");
+      setReloadKey((value) => value + 1);
       alert("Счет отменен.");
     } catch (err: any) {
       alert("Ошибка отмены счета: " + err.message);
@@ -369,6 +377,8 @@ export default function CrmInvoicesPage() {
 
       if (shouldReuseAlfabankPaymentUrl(existing)) {
         await navigator.clipboard.writeText(existing.payment_url);
+        setActionMessage("Ссылка на оплату скопирована.");
+        setReloadKey((value) => value + 1);
         alert("Ссылка на оплату скопирована в буфер обмена!");
         return;
       }
@@ -385,6 +395,8 @@ export default function CrmInvoicesPage() {
       }
 
       await navigator.clipboard.writeText(data.paymentUrl);
+      setActionMessage("Ссылка на оплату создана и скопирована.");
+      setReloadKey((value) => value + 1);
       alert("Новая ссылка на оплату сгенерирована и скопирована в буфер обмена!");
     } catch (error: any) {
       alert("Ошибка повтора ссылки: " + error.message);
@@ -414,7 +426,8 @@ export default function CrmInvoicesPage() {
       }
 
       alert(`Запрос обработан. Статус платежа: ${data.status}`);
-      window.location.reload();
+      setActionMessage(`Запрос обработан. Статус платежа: ${data.status}`);
+      setReloadKey((value) => value + 1);
     } catch (error: any) {
       alert("Ошибка проверки: " + error.message);
     } finally {
@@ -608,6 +621,15 @@ export default function CrmInvoicesPage() {
           <span>Выставить счет</span>
         </Button>
       </div>
+
+      {/* Date & Period Filters */}
+      {actionMessage && (
+        <div className="card-crm" style={{ background: "white", padding: "14px 16px", borderColor: "var(--color-success)" }}>
+          <p style={{ margin: 0, color: "var(--color-success)", fontSize: "13px", fontWeight: 700 }}>
+            {actionMessage}
+          </p>
+        </div>
+      )}
 
       {/* Date & Period Filters */}
       <div className="card-crm" style={{ background: "white", padding: "16px", display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>

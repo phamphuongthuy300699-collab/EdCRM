@@ -13,6 +13,8 @@ const bodySchema = z.object({
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
 const reusablePaymentStatuses = ["pending", "redirected", "authorized"];
+const activePaymentRetryDelayMs = 350;
+const activePaymentRetryAttempts = 3;
 
 function jsonError(message: string, status = 400, code = "PAYMENT_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -71,6 +73,34 @@ function safeBankFailureDetails(error: unknown) {
   if (error instanceof AlfaBankError) return error.details ?? { code: error.code, status: error.status };
   if (error instanceof Error) return { message: error.message };
   return { message: "Unknown payment error" };
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function findActiveAlfabankPayment(admin: ReturnType<typeof createSupabaseAdminClient>, invoiceId: string) {
+  const { data } = await (admin.from("payments") as any)
+    .select("id, payment_url, status, created_at")
+    .eq("invoice_id", invoiceId)
+    .eq("provider", "alfabank")
+    .in("status", reusablePaymentStatuses)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data;
+}
+
+async function waitForActivePaymentUrl(admin: ReturnType<typeof createSupabaseAdminClient>, invoiceId: string) {
+  for (let attempt = 0; attempt < activePaymentRetryAttempts; attempt += 1) {
+    const activePayment = await findActiveAlfabankPayment(admin, invoiceId);
+    if (shouldReuseAlfabankPaymentUrl(activePayment)) return activePayment;
+    if (!activePayment) return null;
+    if (attempt < activePaymentRetryAttempts - 1) await delay(activePaymentRetryDelayMs);
+  }
+
+  return findActiveAlfabankPayment(admin, invoiceId);
 }
 
 async function canUserPayInvoice(admin: ReturnType<typeof createSupabaseAdminClient>, userId: string, invoice: any) {
@@ -155,18 +185,18 @@ export async function POST(request: NextRequest) {
       return jsonError("Онлайн-оплата доступна только для счетов в RUB", 422, "UNSUPPORTED_CURRENCY");
     }
 
-    const { data: existingPayment } = await (admin.from("payments") as any)
-      .select("id, payment_url, status, created_at")
-      .eq("invoice_id", invoice.id)
-      .eq("provider", "alfabank")
-      .in("status", reusablePaymentStatuses)
-      .not("payment_url", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const existingPayment = await findActiveAlfabankPayment(admin, invoice.id);
 
     if (shouldReuseAlfabankPaymentUrl(existingPayment)) {
       return NextResponse.json({ ok: true, paymentUrl: existingPayment.payment_url, reused: true });
+    }
+
+    if (existingPayment) {
+      const activePayment = await waitForActivePaymentUrl(admin, invoice.id);
+      if (shouldReuseAlfabankPaymentUrl(activePayment)) {
+        return NextResponse.json({ ok: true, paymentUrl: activePayment.payment_url, reused: true });
+      }
+      return jsonError("Ссылка на оплату уже формируется. Повторите через несколько секунд.", 409, "PAYMENT_LINK_PROCESSING");
     }
 
     const { data: settings, error: settingsError } = await (admin.from("payment_provider_settings") as any)
@@ -218,20 +248,11 @@ export async function POST(request: NextRequest) {
 
     if (paymentError || !payment) {
       if (paymentError?.code === "23505") {
-        // Unique key constraint violation: fetch the existing active payment
-        const { data: activePay } = await (admin.from("payments") as any)
-          .select("id, payment_url, status, created_at")
-          .eq("invoice_id", invoice.id)
-          .eq("provider", "alfabank")
-          .in("status", reusablePaymentStatuses)
-          .not("payment_url", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (shouldReuseAlfabankPaymentUrl(activePay)) {
-          return NextResponse.json({ ok: true, paymentUrl: activePay.payment_url, reused: true });
+        const activePayment = await waitForActivePaymentUrl(admin, invoice.id);
+        if (shouldReuseAlfabankPaymentUrl(activePayment)) {
+          return NextResponse.json({ ok: true, paymentUrl: activePayment.payment_url, reused: true });
         }
+        return jsonError("Ссылка на оплату уже формируется. Повторите через несколько секунд.", 409, "PAYMENT_LINK_PROCESSING");
       }
       return jsonError("Не удалось создать запись платежа: " + (paymentError?.message || ""), 500, "PAYMENT_CREATE_FAILED");
     }

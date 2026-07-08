@@ -20,7 +20,7 @@ export default function ArduinoPage() {
     "description": "Практический курс обучения основам электроники, конструирования электронных схем и программирования плат Arduino на языке C/C++.",
     "provider": {
       "@type": "EducationalOrganization",
-      "name": "Школа Robotics Липецк",
+      "name": "Робокс Липецк",
       "sameAs": "https://robotics-lipetsk.ru"
     }
   };

@@ -20,7 +20,7 @@ export default function ScratchPage() {
     "description": "Практический курс обучения основам алгоритмического мышления и разработки 2D-игр в визуальной среде Scratch для детей 7–11 лет.",
     "provider": {
       "@type": "EducationalOrganization",
-      "name": "Школа Robotics Липецк",
+      "name": "Робокс Липецк",
       "sameAs": "https://robotics-lipetsk.ru"
     }
   };

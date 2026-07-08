@@ -20,7 +20,7 @@ export default function ProgrammirovaniePage() {
     "description": "Практическое обучение основам логики, алгоритмов и программирования на Scratch и Python для детей от 7 до 14 лет.",
     "provider": {
       "@type": "EducationalOrganization",
-      "name": "Школа Robotics Липецк",
+      "name": "Робокс Липецк",
       "sameAs": "https://robotics-lipetsk.ru"
     }
   };

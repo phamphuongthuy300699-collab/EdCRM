@@ -21,7 +21,8 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
   it("renders parent/student portal preview block with values", () => {
     render(<LandingPageClient />);
     expect(screen.getByText("Родители видят прогресс ребенка в личном кабинете")).toBeInTheDocument();
-    expect(screen.getByText("Миша Иванов")).toBeInTheDocument();
+    expect(screen.getByText("Ученик Робокс")).toBeInTheDocument();
+    expect(screen.queryByText("Миша Иванов")).not.toBeInTheDocument();
   });
 
   it("uses courses from database props if provided", () => {

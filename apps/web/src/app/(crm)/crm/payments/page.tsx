@@ -213,11 +213,28 @@ export default function CrmPaymentsPage() {
     }
   };
 
-  // Helper to redact confidential keys (e.g. passwords, tokens) before showing to admins
+  // Helper to redact confidential keys and card/browser details before showing to admins.
   const redactSecrets = (obj: any): any => {
     if (!obj || typeof obj !== "object") return obj;
     const copy = JSON.parse(JSON.stringify(obj));
-    const secrets = ["password", "token", "secret", "api_password_secret", "apiPassword"];
+    const secrets = [
+      "password",
+      "token",
+      "secret",
+      "api_password_secret",
+      "apiPassword",
+      "pan",
+      "maskedPan",
+      "cardholderName",
+      "cardholder",
+      "ip",
+      "user_agent",
+      "userAgent",
+      "browser",
+      "authRefNum",
+      "approvalCode",
+      "bindingId",
+    ];
     
     const recurse = (current: any) => {
       for (const key in current) {
