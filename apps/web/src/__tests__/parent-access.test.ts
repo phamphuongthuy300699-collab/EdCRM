@@ -56,11 +56,26 @@ describe("parent access management", () => {
     expect(source).toContain("Выдать доступ");
     expect(source).toContain("Сбросить пароль");
     expect(source).toContain("Отключить доступ");
+    expect(source).toContain("Скопировать пароль");
+    expect(source).toContain("Скопировать инструкцию");
+    expect(source).toContain("Показывается один раз. Скопируйте сейчас.");
     expect(source).toContain("setReloadKey((value) => value + 1)");
     expect(source).toContain("guardian_id");
     expect(source).toContain("student_id");
     expect(source).toContain("is_primary");
     expect(source).toContain("relation.is_primary === true");
     expect(source).toContain("guardianId: parentRelation?.guardian_id");
+  });
+
+  it("keeps the temporary password visible after refreshing parent access status", () => {
+    const source = read("src/app/(crm)/crm/students/page.tsx");
+    const actionStart = source.indexOf('const runParentAccessAction = async (action: "issue" | "reset-password" | "disable")');
+    const reloadIndex = source.indexOf("await loadParentAccessStatus(selectedStudent)", actionStart);
+    const passwordIndex = source.indexOf("setTemporaryParentPassword(payload.temporaryPassword)", actionStart);
+
+    expect(actionStart).toBeGreaterThanOrEqual(0);
+    expect(reloadIndex).toBeGreaterThan(actionStart);
+    expect(passwordIndex).toBeGreaterThan(reloadIndex);
+    expect(source).not.toContain('setTemporaryParentPassword("");\n    if (!student?.guardianId');
   });
 });

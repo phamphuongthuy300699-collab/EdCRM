@@ -69,6 +69,7 @@ export default function CrmStudentsPage() {
   const [parentAccessLoading, setParentAccessLoading] = useState(false);
   const [parentAccessMessage, setParentAccessMessage] = useState("");
   const [temporaryParentPassword, setTemporaryParentPassword] = useState("");
+  const [parentPasswordCopyMessage, setParentPasswordCopyMessage] = useState("");
 
   const supabase = createSupabaseBrowserClient();
 
@@ -235,7 +236,6 @@ export default function CrmStudentsPage() {
   const loadParentAccessStatus = async (student: any) => {
     setParentAccess(null);
     setParentAccessMessage("");
-    setTemporaryParentPassword("");
     if (!student?.guardianId || typeof student.id === "number" || !orgId) {
       setParentAccess({ status: { status: "missing_guardian", label: "Родитель не привязан" } });
       return;
@@ -265,6 +265,7 @@ export default function CrmStudentsPage() {
       setParentAccessLoading(true);
       setParentAccessMessage("");
       setTemporaryParentPassword("");
+      setParentPasswordCopyMessage("");
       const response = await fetch(`/api/crm/parent-access/${action}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -272,14 +273,44 @@ export default function CrmStudentsPage() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
-      if (payload.temporaryPassword) setTemporaryParentPassword(payload.temporaryPassword);
       setParentAccessMessage(payload.message || "Готово");
       await loadParentAccessStatus(selectedStudent);
+      if (payload.temporaryPassword) setTemporaryParentPassword(payload.temporaryPassword);
+      if (action === "disable") setTemporaryParentPassword("");
     } catch (error: any) {
       setParentAccessMessage(error.message || "Не удалось выполнить действие");
     } finally {
       setParentAccessLoading(false);
     }
+  };
+
+  const buildParentAccessInstruction = () => (
+    `Здравствуйте! Для вас создан личный кабинет Робокс.\n\n` +
+    `Адрес входа:\nhttps://робокс48.рф/parent/login\n\n` +
+    `Логин:\n${selectedStudent?.parentEmail || ""}\n\n` +
+    `Временный пароль:\n${temporaryParentPassword}\n\n` +
+    `После входа вы сможете видеть счета, оплаты и информацию по занятиям ребёнка.`
+  );
+
+  const copyParentAccessText = async (text: string, successMessage: string) => {
+    setParentPasswordCopyMessage("");
+    if (!navigator?.clipboard?.writeText) {
+      setParentPasswordCopyMessage("Скопируйте вручную: буфер обмена недоступен");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setParentPasswordCopyMessage(successMessage);
+    } catch {
+      setParentPasswordCopyMessage("Скопируйте вручную: буфер обмена недоступен");
+    }
+  };
+
+  const closeDrawer = () => {
+    setSelectedStudent(null);
+    setTemporaryParentPassword("");
+    setParentPasswordCopyMessage("");
   };
 
   const handleOpenDrawer = async (student: any) => {
@@ -289,6 +320,7 @@ export default function CrmStudentsPage() {
     setParentAccess(null);
     setParentAccessMessage("");
     setTemporaryParentPassword("");
+    setParentPasswordCopyMessage("");
     
     if (typeof student.id === "number") {
       setStudentInvoices([
@@ -968,7 +1000,7 @@ export default function CrmStudentsPage() {
               </p>
             </div>
             <button 
-              onClick={() => setSelectedStudent(null)}
+              onClick={closeDrawer}
               style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer" }}
             >
               Закрыть [x]
@@ -1000,9 +1032,27 @@ export default function CrmStudentsPage() {
                 </div>
               )}
               {temporaryParentPassword && (
-                <div style={{ background: "var(--color-warning-soft)", border: "1px solid var(--color-warning)", borderRadius: "8px", padding: "10px", fontSize: "12px" }}>
-                  <strong>Временный пароль:</strong> <code>{temporaryParentPassword}</code>
-                  <div style={{ marginTop: "4px", color: "var(--color-text-muted)" }}>Показывается один раз. Передайте родителю безопасным каналом.</div>
+                <div style={{ background: "#FFFBEB", border: "1px solid #F59E0B", borderRadius: "8px", padding: "12px", fontSize: "12px", display: "grid", gap: "10px" }}>
+                  <div style={{ fontWeight: 800, color: "#92400E" }}>Показывается один раз. Скопируйте сейчас.</div>
+                  <div style={{ display: "grid", gap: "4px" }}>
+                    <strong>Временный пароль:</strong>
+                    <code style={{ display: "block", padding: "8px", borderRadius: "6px", background: "white", border: "1px solid #FDE68A", fontSize: "13px", userSelect: "all" }}>
+                      {temporaryParentPassword}
+                    </code>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    <Button type="button" variant="secondary-site" onClick={() => copyParentAccessText(temporaryParentPassword, "Пароль скопирован")} style={{ fontSize: "12px", minHeight: "32px" }}>
+                      Скопировать пароль
+                    </Button>
+                    <Button type="button" variant="secondary-site" onClick={() => copyParentAccessText(buildParentAccessInstruction(), "Инструкция скопирована")} style={{ fontSize: "12px", minHeight: "32px" }}>
+                      Скопировать инструкцию
+                    </Button>
+                  </div>
+                  {parentPasswordCopyMessage && (
+                    <div style={{ color: parentPasswordCopyMessage.includes("недоступен") ? "#92400E" : "var(--color-success)", fontWeight: 700 }}>
+                      {parentPasswordCopyMessage}
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
