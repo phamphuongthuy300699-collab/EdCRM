@@ -2,8 +2,9 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET, POST } from "../app/api/crm/media/route";
+import { DELETE, GET, POST } from "../app/api/crm/media/route";
 import { NextRequest } from "next/server";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 
@@ -191,6 +192,118 @@ describe("Media API Endpoint Security", () => {
         url: "/media/teachers/teacher_photo.jpg",
       });
       expect(fs.existsSync(path.join(tempMediaDir, "teachers", "teacher_photo.jpg"))).toBe(true);
+    } finally {
+      if (originalMediaDriver === undefined) {
+        delete process.env.MEDIA_DRIVER;
+      } else {
+        process.env.MEDIA_DRIVER = originalMediaDriver;
+      }
+      if (originalNextPublicMediaDriver === undefined) {
+        delete process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+      } else {
+        process.env.NEXT_PUBLIC_MEDIA_DRIVER = originalNextPublicMediaDriver;
+      }
+      if (originalMediaLocalDir === undefined) {
+        delete process.env.MEDIA_LOCAL_DIR;
+      } else {
+        process.env.MEDIA_LOCAL_DIR = originalMediaLocalDir;
+      }
+      fs.rmSync(tempMediaDir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks media deletion when a file is still referenced in site content", async () => {
+    const mockSupabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { organization_id: "11111111-1111-4111-8111-111111111111", role: "admin" },
+        }),
+      }),
+    };
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+
+    const mockAdmin = {
+      from: vi.fn((table: string) => {
+        if (table === "site_content_blocks") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({
+              data: [{ block_key: "hero.main", title: "Hero", content: { image: "hero/main.jpg" } }],
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ data: [] }),
+        };
+      }),
+    };
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(mockAdmin as any);
+
+    const req = new NextRequest("http://localhost:3000/api/crm/media?path=hero/main.jpg", { method: "DELETE" });
+    const response = await DELETE(req);
+    expect(response.status).toBe(409);
+    const json = await response.json();
+    expect(json.usages).toEqual(["Блок сайта: Hero"]);
+  });
+
+  it("deletes unused local media inside the configured media root and writes audit log", async () => {
+    const originalMediaDriver = process.env.MEDIA_DRIVER;
+    const originalNextPublicMediaDriver = process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+    const originalMediaLocalDir = process.env.MEDIA_LOCAL_DIR;
+    const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-delete-"));
+    const heroDir = path.join(tempMediaDir, "hero");
+    fs.mkdirSync(heroDir, { recursive: true });
+    const filePath = path.join(heroDir, "unused.jpg");
+    fs.writeFileSync(filePath, "unused");
+    process.env.MEDIA_DRIVER = "local";
+    delete process.env.NEXT_PUBLIC_MEDIA_DRIVER;
+    process.env.MEDIA_LOCAL_DIR = tempMediaDir;
+
+    const mockSupabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { organization_id: "11111111-1111-4111-8111-111111111111", role: "admin" },
+        }),
+      }),
+    };
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+
+    const insertAudit = vi.fn().mockResolvedValue({ error: null });
+    const mockAdmin = {
+      from: vi.fn((table: string) => {
+        if (table === "crm_audit_log") {
+          return { insert: insertAudit };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ data: [] }),
+        };
+      }),
+    };
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(mockAdmin as any);
+
+    try {
+      const req = new NextRequest("http://localhost:3000/api/crm/media?path=hero/unused.jpg", { method: "DELETE" });
+      const response = await DELETE(req);
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ ok: true, path: "hero/unused.jpg" });
+      expect(fs.existsSync(filePath)).toBe(false);
+      expect(insertAudit).toHaveBeenCalledWith(expect.objectContaining({
+        action: "delete_media",
+        entity_table: "media_files",
+        entity_title: "hero/unused.jpg",
+      }));
     } finally {
       if (originalMediaDriver === undefined) {
         delete process.env.MEDIA_DRIVER;

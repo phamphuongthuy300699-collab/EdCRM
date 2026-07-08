@@ -29,6 +29,8 @@ export type PublicLegalData = {
   correspondentAccount: string;
   bankAddress: string;
   branches: any[];
+  contactsPage: Record<string, any>;
+  showBankRequisites: boolean;
 };
 
 function textValue(value: unknown, fallback: string) {
@@ -57,7 +59,21 @@ export async function getPublicLegalData(): Promise<PublicLegalData> {
     accountNumber: "40802810102930009628",
     correspondentAccount: "30101810200000000593",
     bankAddress: "398059, Липецк, ул. Барашева, д. 7",
-    branches: []
+    branches: [],
+    contactsPage: {
+      eyebrow: "Робокс",
+      title: "Контакты",
+      subtitle: "Свяжитесь с нами, выберите удобный филиал или запишитесь на пробное занятие.",
+      notice: "Официальные реквизиты школы Робокс.",
+      showBranches: true,
+      showLegalSummary: true,
+      showBankRequisites: false,
+      showMapLinks: true,
+      ctaTitle: "Записаться на пробное занятие",
+      ctaText: "Оставьте заявку, и администратор подберет удобную группу и филиал.",
+      ctaHref: "/#lead-form",
+    },
+    showBankRequisites: false
   };
 
   try {
@@ -75,10 +91,23 @@ export async function getPublicLegalData(): Promise<PublicLegalData> {
     if (!org) return fallback;
 
     const { data: branches } = await (supabase.from("branches") as any)
-      .select("name, address, phone, email, work_hours, is_active, show_on_site, sort_order")
+      .select("name, address, phone, email, work_hours, map_url, is_active, show_on_site, sort_order")
       .eq("organization_id", org.id)
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
+
+    const { data: contactsBlock } = await (supabase.from("site_content_blocks") as any)
+      .select("content")
+      .eq("organization_id", org.id)
+      .eq("page_slug", "/contacts")
+      .eq("block_key", "contacts.page")
+      .eq("status", "published")
+      .maybeSingle();
+
+    const contactsPage = {
+      ...fallback.contactsPage,
+      ...(contactsBlock?.content || {}),
+    };
 
     const visibleBranches = (branches || []).filter((b: any) => b.show_on_site !== false);
     const primaryBranch = visibleBranches[0] || branches?.[0];
@@ -112,7 +141,9 @@ export async function getPublicLegalData(): Promise<PublicLegalData> {
       accountNumber: textValue(org.account_number, fallback.accountNumber),
       correspondentAccount: textValue(org.correspondent_account, fallback.correspondentAccount),
       bankAddress: textValue(org.bank_address, fallback.bankAddress),
-      branches: visibleBranches
+      branches: visibleBranches,
+      contactsPage,
+      showBankRequisites: contactsPage.showBankRequisites === true
     };
   } catch (error) {
     console.error("Failed to load public legal data", error);

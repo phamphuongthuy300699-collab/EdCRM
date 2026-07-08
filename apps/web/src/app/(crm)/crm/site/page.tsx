@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@robotics-crm/ui";
 import { 
+  Archive,
   Globe, 
   BookOpen, 
   Calendar, 
@@ -20,6 +21,7 @@ import {
   EyeOff, 
   Save, 
   CheckCircle2, 
+  RotateCcw,
   X,
   Upload,
   ArrowRight,
@@ -32,6 +34,7 @@ import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
 import { getLegalPageDefault, legalPageDocs } from "@/shared/utils/legal-page-defaults";
 import { mergeSiteImageItems, normalizeSiteMediaPath, readableMediaTitle } from "@/shared/utils/site-media";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -87,7 +90,55 @@ function toImageItem(value: any, index: number) {
   };
 }
 
+function makeId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+const defaultDocumentLinks = [
+  { id: "legal", title: "Реквизиты", href: "/legal", enabled: true, sortOrder: 10 },
+  { id: "privacy", title: "Политика обработки данных", href: "/privacy", enabled: true, sortOrder: 20 },
+  { id: "offer", title: "Публичная оферта", href: "/offer", enabled: true, sortOrder: 30 },
+  { id: "payment", title: "Условия оплаты", href: "/payment", enabled: true, sortOrder: 40 },
+  { id: "refund", title: "Условия возврата", href: "/refund", enabled: true, sortOrder: 50 },
+  { id: "privacy-policy", title: "Конфиденциальность", href: "/privacy-policy", enabled: true, sortOrder: 60 },
+  { id: "consent", title: "Согласие на ОПД", href: "/consent", enabled: true, sortOrder: 70 },
+];
+
+const emptyReview = () => ({
+  id: makeId("review"),
+  author: "",
+  caption: "",
+  initials: "",
+  text: "",
+  rating: 5,
+  isActive: true,
+  sortOrder: 100,
+});
+
+const emptyProject = () => ({
+  id: makeId("project"),
+  title: "",
+  badge: "",
+  description: "",
+  image: "",
+  alt: "",
+  isActive: true,
+  sortOrder: 100,
+});
+
+const emptyLessonStep = () => ({
+  id: makeId("step"),
+  number: "",
+  title: "",
+  description: "",
+  image: "",
+  alt: "",
+  isActive: true,
+  sortOrder: 100,
+});
+
 export default function CrmSitePage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -211,6 +262,36 @@ export default function CrmSitePage() {
   const [footerVk, setFooterVk] = useState("");
   const [footerTelegram, setFooterTelegram] = useState("");
   const [footerWhatsapp, setFooterWhatsapp] = useState("");
+  const [footerDocumentLinks, setFooterDocumentLinks] = useState<any[]>(defaultDocumentLinks);
+
+  const [contactsPage, setContactsPage] = useState({
+    eyebrow: "Робокс",
+    title: "Контакты",
+    subtitle: "",
+    notice: "Официальные реквизиты школы Робокс.",
+    showBranches: true,
+    showLegalSummary: true,
+    showBankRequisites: false,
+    showMapLinks: true,
+    ctaTitle: "Записаться на пробное занятие",
+    ctaText: "",
+    ctaHref: "/#lead-form",
+  });
+
+  const [testimonialsEnabled, setTestimonialsEnabled] = useState(false);
+  const [testimonialsTitle, setTestimonialsTitle] = useState("Отзывы родителей");
+  const [testimonialsSubtitle, setTestimonialsSubtitle] = useState("");
+  const [testimonialItems, setTestimonialItems] = useState<any[]>([]);
+
+  const [studentProjectsEnabled, setStudentProjectsEnabled] = useState(false);
+  const [studentProjectsTitle, setStudentProjectsTitle] = useState("Проекты наших учеников");
+  const [studentProjectsSubtitle, setStudentProjectsSubtitle] = useState("");
+  const [studentProjectItems, setStudentProjectItems] = useState<any[]>([]);
+
+  const [lessonProcessEnabled, setLessonProcessEnabled] = useState(false);
+  const [lessonProcessTitle, setLessonProcessTitle] = useState("Как проходит занятие: 5 этапов урока");
+  const [lessonProcessSubtitle, setLessonProcessSubtitle] = useState("");
+  const [lessonStepItems, setLessonStepItems] = useState<any[]>([]);
 
   // Tab 8: Media Manager
   const [activeMediaFolder, setActiveMediaFolder] = useState("branding");
@@ -309,6 +390,7 @@ export default function CrmSitePage() {
           setFooterVk(fBlock?.content?.socials?.vk || "");
           setFooterTelegram(fBlock?.content?.socials?.telegram || "");
           setFooterWhatsapp(fBlock?.content?.socials?.whatsapp || "");
+          setFooterDocumentLinks(Array.isArray(fBlock?.content?.documentLinks) ? fBlock.content.documentLinks : defaultDocumentLinks);
         }
 
         // Branding block
@@ -322,6 +404,35 @@ export default function CrmSitePage() {
           setBrandGradient(brand.content?.gradient || "linear-gradient(135deg, #8ED0DD 0%, #463E8E 50%, #DA3C8C 100%)");
           setBrandLogoDisplay(brand.content?.logoDisplay || "full");
           setBrandLogoAlt(brand.content?.logoAlt || "Робокс — школа робототехники и программирования в Липецке");
+        }
+
+        const contacts = blocks.find((b: any) => b.block_key === "contacts.page");
+        if (contacts?.content) {
+          setContactsPage((prev) => ({ ...prev, ...contacts.content }));
+        }
+
+        const testimonials = blocks.find((b: any) => b.block_key === "home.testimonials");
+        if (testimonials) {
+          setTestimonialsEnabled(testimonials.content?.enabled === true);
+          setTestimonialsTitle(testimonials.content?.title || testimonials.title || "Отзывы родителей");
+          setTestimonialsSubtitle(testimonials.content?.subtitle || testimonials.subtitle || "");
+          setTestimonialItems(Array.isArray(testimonials.content?.items) ? testimonials.content.items : []);
+        }
+
+        const projects = blocks.find((b: any) => b.block_key === "home.student_projects");
+        if (projects) {
+          setStudentProjectsEnabled(projects.content?.enabled === true);
+          setStudentProjectsTitle(projects.content?.title || projects.title || "Проекты наших учеников");
+          setStudentProjectsSubtitle(projects.content?.subtitle || projects.subtitle || "");
+          setStudentProjectItems(Array.isArray(projects.content?.items) ? projects.content.items : []);
+        }
+
+        const lessonProcess = blocks.find((b: any) => b.block_key === "home.lesson_process");
+        if (lessonProcess) {
+          setLessonProcessEnabled(lessonProcess.content?.enabled === true);
+          setLessonProcessTitle(lessonProcess.content?.title || lessonProcess.title || "Как проходит занятие: 5 этапов урока");
+          setLessonProcessSubtitle(lessonProcess.content?.subtitle || lessonProcess.subtitle || "");
+          setLessonStepItems(Array.isArray(lessonProcess.content?.steps) ? lessonProcess.content.steps : []);
         }
       }
 
@@ -448,10 +559,15 @@ export default function CrmSitePage() {
       console.log(`Demo mode block save: ${key}`, { title, subtitle, content });
       return;
     }
+    const pageSlug = key === "contacts.page"
+      ? "/contacts"
+      : key.startsWith("legal.page")
+        ? selectedDoc(key).path
+        : "/";
     const { error } = await (supabase.from("site_content_blocks") as any)
       .upsert({
         organization_id: orgId,
-        page_slug: key.startsWith("legal.page") ? selectedDoc(key).path : "/",
+        page_slug: pageSlug,
         block_key: key,
         title,
         subtitle,
@@ -487,9 +603,41 @@ export default function CrmSitePage() {
         teacherNote: portalTeacherNote
       });
       await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1 });
+      await saveBlock("home.testimonials", testimonialsTitle, testimonialsSubtitle, {
+        enabled: testimonialsEnabled,
+        title: testimonialsTitle,
+        subtitle: testimonialsSubtitle,
+        items: testimonialItems
+      });
+      await saveBlock("home.student_projects", studentProjectsTitle, studentProjectsSubtitle, {
+        enabled: studentProjectsEnabled,
+        title: studentProjectsTitle,
+        subtitle: studentProjectsSubtitle,
+        items: studentProjectItems
+      });
+      await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
+        enabled: lessonProcessEnabled,
+        title: lessonProcessTitle,
+        subtitle: lessonProcessSubtitle,
+        steps: lessonStepItems
+      });
       setSuccessMsg("Изменения на Главной сохранены!");
     } catch (err: any) {
       setErrorMsg(err.message || "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveContactsPage = async () => {
+    setSaving(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+    try {
+      await saveBlock("contacts.page", contactsPage.title, contactsPage.subtitle, contactsPage);
+      setSuccessMsg("Настройки страницы контактов сохранены!");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Не удалось сохранить страницу контактов");
     } finally {
       setSaving(false);
     }
@@ -683,24 +831,70 @@ export default function CrmSitePage() {
       setEditingTariff(null);
       setSuccessMsg("Тариф сохранен!");
     } catch (e: any) {
-      alert(e.message);
+      setErrorMsg(e.message || "Не удалось сохранить тариф");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteTariff = async (id: string) => {
-    if (!confirm("Вы действительно хотите удалить этот тариф?")) return;
+  const handleTariffLifecycle = async (id: string, action: "archive" | "restore") => {
+    const allowed = await askAction({
+      title: action === "archive" ? "Архивировать тариф" : "Восстановить тариф",
+      description: action === "archive"
+        ? "Тариф будет скрыт с публичного сайта, но останется в CRM и истории."
+        : "Тариф снова можно будет показывать на публичном сайте.",
+      dangerLevel: action === "archive" ? "warning" : "safe",
+      confirmText: action === "archive" ? "Архивировать" : "Восстановить",
+    });
+    if (!allowed) return;
     try {
-      const { error } = await (supabase.from("course_tariffs") as any)
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-      setTariffs(tariffs.filter(t => t.id !== id));
+      const response = await fetch(`/api/crm/entities/course_tariffs/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, organizationId: orgId }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось выполнить действие");
+      await loadData();
+      setSuccessMsg(action === "archive" ? "Тариф архивирован" : "Тариф восстановлен");
+    } catch (e: any) {
+      setErrorMsg(e.message || "Не удалось выполнить действие с тарифом");
+    }
+  };
+
+  const handleDeleteTariff = async (id: string) => {
+    const allowed = await askAction({
+      title: "Удалить тариф",
+      description: "Тариф будет удален только если он не используется в истории. Использованные тарифы лучше скрывать с сайта.",
+      dangerLevel: "danger",
+      confirmText: "Удалить",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
+    try {
+      const response = await fetch("/api/crm/entities/course_tariffs/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, organizationId: orgId, expectedText: "УДАЛИТЬ" }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось удалить тариф");
+      await loadData();
       setSuccessMsg("Тариф удален!");
     } catch (e: any) {
-      alert(e.message);
+      setErrorMsg(e.message || "Не удалось удалить тариф");
     }
+  };
+
+  const removeContentItem = async (label: string, onRemove: () => void) => {
+    const allowed = await askAction({
+      title: `Удалить ${label}`,
+      description: "Элемент будет удален из JSON-блока сайта после сохранения формы.",
+      dangerLevel: "warning",
+      confirmText: "Удалить",
+    });
+    if (allowed) onRemove();
   };
 
   // Tab 5: Schedule visibility toggle
@@ -839,7 +1033,8 @@ export default function CrmSitePage() {
           vk: footerVk,
           telegram: footerTelegram,
           whatsapp: footerWhatsapp
-        }
+        },
+        documentLinks: footerDocumentLinks
       });
       setSuccessMsg("Настройки футера сохранены!");
     } catch (err: any) {
@@ -909,6 +1104,39 @@ export default function CrmSitePage() {
 
   const handleClearMediaSelection = () => {
     setSelectedFilePaths([]);
+  };
+
+  const handleDeleteSelectedFile = async () => {
+    const path = mediaPath(selectedFile);
+    if (!path) return;
+    const allowed = await askAction({
+      title: "Удалить медиафайл",
+      description: `Файл "${path}" будет удален только если он нигде не используется на сайте, в профилях или брендинге.`,
+      dangerLevel: "danger",
+      confirmText: "Удалить файл",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
+
+    try {
+      setSaving(true);
+      setErrorMsg("");
+      const response = await fetch(`/api/crm/media?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false) {
+        const usages = Array.isArray(payload.usages) ? `\n${payload.usages.join("\n")}` : "";
+        throw new Error(`${payload.error || "Не удалось удалить файл"}${usages}`);
+      }
+      setSuccessMsg("Файл удален");
+      handleSelectMediaFile(null);
+      setSelectedFilePaths((prev) => prev.filter((item) => item !== path));
+      await loadMediaFiles();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Не удалось удалить файл");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderMediaApplyActions = () => {
@@ -1378,6 +1606,112 @@ export default function CrmSitePage() {
                 </div>
               </div>
 
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Отзывы родителей</h3>
+                <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "13px", fontWeight: 700 }}>
+                  <input type="checkbox" checked={testimonialsEnabled} onChange={e => setTestimonialsEnabled(e.target.checked)} />
+                  Показывать блок
+                </label>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Заголовок</label>
+                    <input className="form-input" value={testimonialsTitle} onChange={e => setTestimonialsTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Подзаголовок</label>
+                    <input className="form-input" value={testimonialsSubtitle} onChange={e => setTestimonialsSubtitle(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: "12px" }}>
+                  {testimonialItems.map((item, idx) => (
+                    <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
+                      <div className="form-grid-3">
+                        <input className="form-input" placeholder="Автор" value={item.author || ""} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, author: e.target.value } : v))} />
+                        <input className="form-input" placeholder="Подпись" value={item.caption || ""} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, caption: e.target.value } : v))} />
+                        <input className="form-input" placeholder="Инициалы" value={item.initials || ""} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, initials: e.target.value } : v))} />
+                      </div>
+                      <textarea className="form-input" placeholder="Текст отзыва" value={item.text || ""} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, text: e.target.value } : v))} />
+                      <div className="form-grid-3">
+                        <input className="form-input" type="number" min="1" max="5" placeholder="Рейтинг" value={item.rating ?? 5} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, rating: Number(e.target.value) } : v))} />
+                        <input className="form-input" type="number" placeholder="Сортировка" value={item.sortOrder ?? 100} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                        <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                          <input type="checkbox" checked={item.isActive !== false} onChange={e => setTestimonialItems(testimonialItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
+                          Активен
+                        </label>
+                      </div>
+                      <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("отзыв", () => setTestimonialItems(testimonialItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
+                    </div>
+                  ))}
+                </div>
+                <Button type="button" variant="secondary-crm" onClick={() => setTestimonialItems([...testimonialItems, emptyReview()])}><Plus size={14} /> Добавить отзыв</Button>
+              </div>
+
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Проекты учеников</h3>
+                <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "13px", fontWeight: 700 }}>
+                  <input type="checkbox" checked={studentProjectsEnabled} onChange={e => setStudentProjectsEnabled(e.target.checked)} />
+                  Показывать блок
+                </label>
+                <div className="form-grid-2">
+                  <input className="form-input" placeholder="Заголовок" value={studentProjectsTitle} onChange={e => setStudentProjectsTitle(e.target.value)} />
+                  <input className="form-input" placeholder="Подзаголовок" value={studentProjectsSubtitle} onChange={e => setStudentProjectsSubtitle(e.target.value)} />
+                </div>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку student-projects и вставляйте storage path, например student-projects/project-1.jpg.</p>
+                {studentProjectItems.map((item, idx) => (
+                  <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
+                    <div className="form-grid-3">
+                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
+                      <input className="form-input" placeholder="Бейдж" value={item.badge || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, badge: e.target.value } : v))} />
+                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                    </div>
+                    <textarea className="form-input" placeholder="Описание" value={item.description || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
+                    <div className="form-grid-3">
+                      <input className="form-input" placeholder="student-projects/..." value={item.image || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
+                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
+                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
+                        Активен
+                      </label>
+                    </div>
+                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("проект", () => setStudentProjectItems(studentProjectItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
+                  </div>
+                ))}
+                <Button type="button" variant="secondary-crm" onClick={() => setStudentProjectItems([...studentProjectItems, emptyProject()])}><Plus size={14} /> Добавить проект</Button>
+              </div>
+
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Как проходит занятие</h3>
+                <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "13px", fontWeight: 700 }}>
+                  <input type="checkbox" checked={lessonProcessEnabled} onChange={e => setLessonProcessEnabled(e.target.checked)} />
+                  Показывать блок
+                </label>
+                <div className="form-grid-2">
+                  <input className="form-input" placeholder="Заголовок" value={lessonProcessTitle} onChange={e => setLessonProcessTitle(e.target.value)} />
+                  <input className="form-input" placeholder="Подзаголовок" value={lessonProcessSubtitle} onChange={e => setLessonProcessSubtitle(e.target.value)} />
+                </div>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку lesson-process и вставляйте storage path, например lesson-process/step-1.jpg.</p>
+                {lessonStepItems.map((item, idx) => (
+                  <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
+                    <div className="form-grid-3">
+                      <input className="form-input" placeholder="Номер" value={item.number || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, number: e.target.value } : v))} />
+                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
+                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                    </div>
+                    <textarea className="form-input" placeholder="Описание этапа" value={item.description || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
+                    <div className="form-grid-3">
+                      <input className="form-input" placeholder="lesson-process/..." value={item.image || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
+                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
+                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
+                        Активен
+                      </label>
+                    </div>
+                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("этап", () => setLessonStepItems(lessonStepItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
+                  </div>
+                ))}
+                <Button type="button" variant="secondary-crm" onClick={() => setLessonStepItems([...lessonStepItems, emptyLessonStep()])}><Plus size={14} /> Добавить этап</Button>
+              </div>
+
               <div>
                 <Button type="submit" variant="primary-crm" disabled={saving}>
                   <Save size={16} /> Сохранить главную страницу
@@ -1558,6 +1892,55 @@ export default function CrmSitePage() {
           {/* TAB 3: BRANCHES & CONTACTS */}
           {activeTab === "branches" && (
             <div style={{ display: "grid", gap: "24px" }}>
+              <div className="card-crm">
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Страница /contacts</h3>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Заголовок</label>
+                    <input className="form-input" value={contactsPage.title} onChange={e => setContactsPage({ ...contactsPage, title: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Eyebrow</label>
+                    <input className="form-input" value={contactsPage.eyebrow} onChange={e => setContactsPage({ ...contactsPage, eyebrow: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Описание</label>
+                  <textarea className="form-input" value={contactsPage.subtitle} onChange={e => setContactsPage({ ...contactsPage, subtitle: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Уведомление</label>
+                  <input className="form-input" value={contactsPage.notice} onChange={e => setContactsPage({ ...contactsPage, notice: e.target.value })} />
+                </div>
+                <div className="form-grid-2">
+                  {[
+                    ["showBranches", "Показывать филиалы"],
+                    ["showLegalSummary", "Показывать краткую юр. информацию"],
+                    ["showBankRequisites", "Показывать банковские реквизиты на /legal"],
+                    ["showMapLinks", "Показывать ссылки на карты"],
+                  ].map(([key, label]) => (
+                    <label key={key} style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "13px", fontWeight: 700 }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean((contactsPage as any)[key])}
+                        onChange={e => setContactsPage({ ...contactsPage, [key]: e.target.checked })}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <div className="form-grid-3">
+                  <input className="form-input" placeholder="CTA заголовок" value={contactsPage.ctaTitle} onChange={e => setContactsPage({ ...contactsPage, ctaTitle: e.target.value })} />
+                  <input className="form-input" placeholder="CTA текст" value={contactsPage.ctaText} onChange={e => setContactsPage({ ...contactsPage, ctaText: e.target.value })} />
+                  <input className="form-input" placeholder="CTA ссылка" value={contactsPage.ctaHref} onChange={e => setContactsPage({ ...contactsPage, ctaHref: e.target.value })} />
+                </div>
+                <div>
+                  <Button type="button" variant="primary-crm" disabled={saving} onClick={handleSaveContactsPage}>
+                    <Save size={16} /> Сохранить страницу контактов
+                  </Button>
+                </div>
+              </div>
+
               <form onSubmit={handleSaveOrgInfo} className="card-crm">
                 <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>Контакты организации и банковские реквизиты</h3>
                 <div className="form-grid-2">
@@ -1759,6 +2142,9 @@ export default function CrmSitePage() {
                             <div style={{ display: "inline-flex", gap: "6px" }}>
                               <Button variant="secondary-crm" onClick={() => setEditingTariff({ ...t, price: t.price.toString() })} style={{ height: "30px", fontSize: "11px" }}>
                                 <Edit size={12} />
+                              </Button>
+                              <Button variant="secondary-crm" onClick={() => handleTariffLifecycle(t.id, t.show_on_site ? "archive" : "restore")} style={{ height: "30px", fontSize: "11px" }}>
+                                {t.show_on_site ? <Archive size={12} /> : <RotateCcw size={12} />}
                               </Button>
                               <Button variant="secondary-crm" onClick={() => handleDeleteTariff(t.id)} style={{ height: "30px", fontSize: "11px", color: "#EF4444" }}>
                                 <Trash2 size={12} />
@@ -2043,6 +2429,29 @@ export default function CrmSitePage() {
                 </div>
               </div>
 
+              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", display: "grid", gap: "12px" }}>
+                <h4 style={{ fontSize: "13px", fontWeight: 700, margin: 0 }}>Ссылки в колонке «Документы»</h4>
+                {footerDocumentLinks.map((link, idx) => (
+                  <div key={link.id || idx} className="form-grid-3" style={{ alignItems: "center" }}>
+                    <input className="form-input" placeholder="Название" value={link.title || ""} onChange={e => setFooterDocumentLinks(footerDocumentLinks.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
+                    <input className="form-input" placeholder="/legal" value={link.href || ""} onChange={e => setFooterDocumentLinks(footerDocumentLinks.map((v, i) => i === idx ? { ...v, href: e.target.value } : v))} />
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <input className="form-input" type="number" placeholder="Порядок" value={link.sortOrder ?? 100} onChange={e => setFooterDocumentLinks(footerDocumentLinks.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                      <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                        <input type="checkbox" checked={link.enabled !== false} onChange={e => setFooterDocumentLinks(footerDocumentLinks.map((v, i) => i === idx ? { ...v, enabled: e.target.checked } : v))} />
+                        Вкл.
+                      </label>
+                      <button type="button" onClick={() => setFooterDocumentLinks(footerDocumentLinks.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "#EF4444", cursor: "pointer" }}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <Button type="button" variant="secondary-crm" onClick={() => setFooterDocumentLinks([...footerDocumentLinks, { id: makeId("doc"), title: "", href: "", enabled: true, sortOrder: 100 }])} style={{ width: "fit-content" }}>
+                  <Plus size={14} /> Добавить ссылку
+                </Button>
+              </div>
+
               <div style={{ border: "1px solid var(--color-border)", background: "#F9FAFB", borderRadius: "10px", padding: "14px 16px", display: "grid", gap: "6px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 800 }}>Карта в футере</div>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
@@ -2290,6 +2699,15 @@ export default function CrmSitePage() {
                         >
                           Копировать публичную ссылку
                         </Button>
+                        <Button
+                          type="button"
+                          variant="secondary-crm"
+                          onClick={handleDeleteSelectedFile}
+                          disabled={saving}
+                          style={{ width: "100%", fontSize: "11px", height: "32px", color: "#DC2626" }}
+                        >
+                          Удалить файл
+                        </Button>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "12px", marginTop: "12px" }}>
                           <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text)" }}>Применить файл</span>
@@ -2311,6 +2729,7 @@ export default function CrmSitePage() {
           )}
         </div>
       </div>
+      {actionModal}
     </div>
   );
 }

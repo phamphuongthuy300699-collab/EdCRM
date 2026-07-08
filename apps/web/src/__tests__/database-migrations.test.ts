@@ -45,4 +45,33 @@ describe("Database production safety migrations", () => {
     expect(migration).toContain("a3848a60-a292-491a-85eb-7f2824cf4e77");
     expect(migration).toContain("4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a");
   });
+
+  it("seeds editable public content defaults without overwriting production edits", () => {
+    const migrationName = "20260706000001_editable_public_content_blocks.sql";
+    const migration = fs.readFileSync(path.join(migrationsDir, migrationName), "utf8");
+
+    expect(migration).toContain("slug = 'robotics-lipetsk'");
+    expect(migration).toContain("site.footer");
+    expect(migration).toContain("contacts.page");
+    expect(migration).toContain("home.testimonials");
+    expect(migration).toContain("home.student_projects");
+    expect(migration).toContain("home.lesson_process");
+    expect(migration.toLowerCase()).toContain("on conflict (organization_id, page_slug, block_key) do nothing");
+    expect(migration.toLowerCase()).not.toContain("do update set content");
+  });
+
+  it("adds CRM archive/delete controls and an audit log without destructive schema changes", () => {
+    const migrationName = "20260707000001_crm_archive_delete_controls.sql";
+    const migration = fs.readFileSync(path.join(migrationsDir, migrationName), "utf8");
+
+    expect(migration).toContain("create table if not exists public.crm_audit_log");
+    expect(migration).toContain("archived_at timestamptz");
+    expect(migration).toContain("archived_by uuid references auth.users(id)");
+    expect(migration).toContain("alter table public.groups");
+    expect(migration).toContain("alter table public.branches");
+    expect(migration).toContain("alter table public.course_tariffs");
+    expect(migration.toLowerCase()).toContain("enable row level security");
+    expect(migration.toLowerCase()).not.toContain("drop table");
+    expect(migration.toLowerCase()).not.toContain("drop column");
+  });
 });

@@ -22,14 +22,33 @@ describe("alfabank mapper", () => {
         description: "Абонемент",
         returnUrl: "https://example.com/success",
         failUrl: "https://example.com/fail",
+        currencyCode: undefined,
         orderNumber: "INV-2026-0001",
       },
       { apiLogin: "merchant", apiPassword: "secret-password" },
     );
 
     expect(request.amount).toBe("450000");
-    expect(request.currency).toBe("643");
+    expect(request).not.toHaveProperty("currency");
     expect(sanitizeAlfaRequest(request).password).toBe("[redacted]");
+  });
+
+  it("sends currency 810 only when explicitly configured", () => {
+    const request = mapCreateOrderToAlfaRequest(
+      {
+        invoiceId: "00000000-0000-0000-0000-000000000001",
+        amount: 4500,
+        currency: "RUB",
+        currencyCode: "810",
+        description: "Абонемент",
+        returnUrl: "https://example.com/success",
+        failUrl: "https://example.com/fail",
+        orderNumber: "INV-2026-0001",
+      },
+      { apiLogin: "merchant", apiPassword: "secret-password" },
+    );
+
+    expect(request.currency).toBe("810");
   });
 
   it("uses registerPreAuth for two-step payments unless endpoint is configured", () => {

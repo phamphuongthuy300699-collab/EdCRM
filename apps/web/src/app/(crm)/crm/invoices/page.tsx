@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
-import { calculateDiscountedInvoiceAmount } from "@/shared/utils/payments";
+import { calculateDiscountedInvoiceAmount, shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 export default function CrmInvoicesPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "draft" | "issued" | "paid" | "cancelled" | "overdue">("all");
   const [startDate, setStartDate] = useState("");
@@ -318,7 +320,13 @@ export default function CrmInvoicesPage() {
   };
 
   const handleCancelInvoice = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите отменить этот счет?")) return;
+    const allowed = await askAction({
+      title: "Отменить счет",
+      description: "Счет будет помечен как отмененный. Оплаченные платежи и события не удаляются.",
+      dangerLevel: "warning",
+      confirmText: "Отменить счет",
+    });
+    if (!allowed) return;
     try {
       if (isDemoMode() || id.startsWith("i-mock-") || id.length < 10) {
         setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "cancelled" } : inv));
@@ -349,10 +357,9 @@ export default function CrmInvoicesPage() {
 
       setOnlinePayingInvoiceId(invoiceId);
 
-      // Check if Alfabank order exists
       const { data: existing } = await (supabase
         .from("payments") as any)
-        .select("payment_url")
+        .select("payment_url, status, created_at")
         .eq("invoice_id", invoiceId)
         .eq("provider", "alfabank")
         .not("payment_url", "is", null)
@@ -360,13 +367,12 @@ export default function CrmInvoicesPage() {
         .limit(1)
         .maybeSingle();
 
-      if (existing?.payment_url) {
+      if (shouldReuseAlfabankPaymentUrl(existing)) {
         await navigator.clipboard.writeText(existing.payment_url);
         alert("Ссылка на оплату скопирована в буфер обмена!");
         return;
       }
 
-      // Generate new one
       const response = await fetch("/api/payments/alfabank/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -969,6 +975,7 @@ export default function CrmInvoicesPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }

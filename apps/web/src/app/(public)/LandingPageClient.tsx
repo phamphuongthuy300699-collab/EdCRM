@@ -172,14 +172,6 @@ export default function LandingPageClient({
     }
   };
 
-  const steps = [
-    { num: "01", title: "Разбираем идею", text: "Объясняем тему занятия на простых физических примерах.", img: "/images/classroom_lipetsk.png" },
-    { num: "02", title: "Собираем модель", text: "Конструируем робота или схему собственными руками.", img: "/images/robot_sumo.png" },
-    { num: "03", title: "Пишем алгоритм", text: "Программируем логику поведения на компьютере.", img: "/images/arduino_greenhouse.png" },
-    { num: "04", title: "Тестируем проект", text: "Запускаем робота на трассе, находим ошибки в коде.", img: "/images/robot_sumo.png" },
-    { num: "05", title: "Защищаем результат", text: "Ребёнок объясняет работу модели и показывает её родителям.", img: "/images/classroom_lipetsk.png" }
-  ];
-
   const faqItems = [
     { q: "Нужна ли подготовка ребенку?", a: "Нет, наши курсы рассчитаны на обучение с нуля. Преподаватели плавно адаптируют ребенка к нагрузке." },
     { q: "Что делать, если мы пропустили занятие?", a: "Мы предоставляем возможность отработать занятие с другой группой по согласованию с администратором." },
@@ -191,6 +183,14 @@ export default function LandingPageClient({
   const getBlock = (key: string) => {
     return initialBlocks?.find(b => b.block_key === key);
   };
+
+  const sortedActiveItems = (items: any[] | undefined) => (
+    Array.isArray(items)
+      ? items
+          .filter((item) => item?.isActive !== false)
+          .sort((a, b) => Number(a?.sortOrder ?? 100) - Number(b?.sortOrder ?? 100))
+      : []
+  );
 
   // Block Mappings & Fallbacks
   const heroBlock = getBlock('home.hero');
@@ -250,10 +250,44 @@ export default function LandingPageClient({
   const facilitiesImages = mediaItems(facilitiesBlock?.content?.images);
 
   const studentProjectsBlock = getBlock('home.student_projects');
-  const studentProjectsImages = mediaItems(studentProjectsBlock?.content?.images);
+  const studentProjectsContent = studentProjectsBlock?.content || {};
+  const projectsToRender = studentProjectsContent.enabled === true
+    ? sortedActiveItems(studentProjectsContent.items).map((project: any, idx: number) => ({
+        img: mediaPath(project.image) ? getMediaUrl(mediaPath(project.image)) : "",
+        tag: project.badge || "Проект ученика",
+        tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
+        title: project.title || "Проект ученика",
+        alt: project.alt || project.title || "Проект ученика",
+        desc: project.description || "",
+      }))
+    : [];
+  const showStudentProjects = projectsToRender.length > 0;
 
   const lessonProcessBlock = getBlock('home.lesson_process');
-  const lessonProcessImages = mediaItems(lessonProcessBlock?.content?.images);
+  const lessonProcessContent = lessonProcessBlock?.content || {};
+  const stepsToRender = lessonProcessContent.enabled === true
+    ? sortedActiveItems(lessonProcessContent.steps).map((step: any, idx: number) => ({
+        num: step.number || String(idx + 1).padStart(2, "0"),
+        title: step.title || "Этап занятия",
+        text: step.description || "",
+        img: mediaPath(step.image) ? getMediaUrl(mediaPath(step.image)) : "",
+        alt: step.alt || step.title || "Этап занятия",
+      }))
+    : [];
+  const showLessonProcess = stepsToRender.length > 0;
+
+  const testimonialsBlock = getBlock('home.testimonials');
+  const testimonialsContent = testimonialsBlock?.content || {};
+  const testimonialsToRender = testimonialsContent.enabled === true
+    ? sortedActiveItems(testimonialsContent.items).map((item: any) => ({
+        author: item.author || "",
+        caption: item.caption || "",
+        initials: item.initials || "",
+        text: item.text || "",
+        rating: Number(item.rating || 0),
+      })).filter((item: any) => item.author && item.text)
+    : [];
+  const showTestimonials = testimonialsToRender.length > 0;
 
   const equipmentBlock = getBlock('home.equipment');
   const equipmentImages = mediaItems(equipmentBlock?.content?.images);
@@ -264,50 +298,6 @@ export default function LandingPageClient({
   const contactClassroomImage = mediaPath(contactsMediaBlock?.content?.classroomImage)
     || mediaPath(contactsMediaBlock?.content?.image)
     || mediaPath(contactsImages[2]);
-
-  const stepsToRender = steps.map((step, idx) => {
-    const customImg = lessonProcessImages[idx];
-    return {
-      ...step,
-      img: customImg ? mediaSrc(customImg) : step.img
-    };
-  });
-
-  const defaultProjects = [
-    {
-      img: "/images/robot_sumo.png",
-      tag: "Lego Education · 8-10 лет",
-      tagColor: "badge-amber",
-      title: "Робот для соревнований «Сумо»",
-      desc: "Проект Данила (8 лет). Робот оборудован ультразвуковым датчиком для поиска противника на ринге и гусеничным приводом для максимальной силы выталкивания."
-    },
-    {
-      img: "/images/arduino_greenhouse.png",
-      tag: "Arduino & C++ · 11-14 лет",
-      tagColor: "badge-purple",
-      title: "Автоматическая микро-теплица",
-      desc: "Проект Ивана (12 лет). Конструкция автоматически включает светодиодное освещение при затенении и поливает почву при срабатывании датчика влажности."
-    }
-  ];
-
-  const projectsToRender = studentProjectsImages.length > 0
-    ? studentProjectsImages.map((img: any, idx: number) => {
-        const defaultProj = defaultProjects[idx] || {
-          tag: "Инженерный проект",
-          tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
-          title: mediaTitle(img, `Роботехническая разработка ${idx + 1}`),
-          desc: "Ребенок собрал и запрограммировал действующий механизм, решающий конкретную задачу."
-        };
-        return {
-          img: mediaSrc(img),
-          tag: defaultProj.tag,
-          tagColor: defaultProj.tagColor,
-          title: mediaTitle(img, defaultProj.title),
-          alt: mediaAlt(img, defaultProj.title),
-          desc: defaultProj.desc
-        };
-      })
-    : defaultProjects;
 
   const resolvedClassroomMainImage = facilitiesImages[0] 
     ? mediaSrc(facilitiesImages[0])
@@ -833,14 +823,15 @@ export default function LandingPageClient({
       </section>
 
       {/* 5. PROJECTS SECTION (Trust) */}
+      {showStudentProjects && (
       <section id="projects" style={{ padding: "100px 0", borderBottom: "1px solid var(--color-border)" }}>
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              Проекты наших учеников
+              {studentProjectsContent.title || studentProjectsBlock?.title || "Проекты наших учеников"}
             </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              Посмотрите, какие реальные инженерные проекты собирают и программируют дети
+              {studentProjectsContent.subtitle || studentProjectsBlock?.subtitle || ""}
             </p>
           </div>
 
@@ -848,11 +839,17 @@ export default function LandingPageClient({
             {projectsToRender.map((proj: any, idx: number) => (
               <div key={idx} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <div style={{ height: "240px", position: "relative" }}>
-                  <img 
-                    src={proj.img} 
-                    alt={proj.alt || proj.title}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
+                  {proj.img ? (
+                    <img
+                      src={proj.img}
+                      alt={proj.alt || proj.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", background: "var(--color-surface-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 700 }}>
+                      Фото проекта появится после загрузки
+                    </div>
+                  )}
                 </div>
                 <div style={{ padding: "24px" }}>
                   <span className={`badge ${proj.tagColor}`} style={{ marginBottom: "12px" }}>{proj.tag}</span>
@@ -866,16 +863,18 @@ export default function LandingPageClient({
           </div>
         </div>
       </section>
+      )}
 
       {/* 6. HOW IT WORKS (TIMELINE) */}
+      {showLessonProcess && (
       <section style={{ padding: "100px 0", borderBottom: "1px solid var(--color-border)" }}>
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "80px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              Как проходит занятие: 5 этапов урока
+              {lessonProcessContent.title || lessonProcessBlock?.title || "Как проходит занятие"}
             </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              Занятие строится как полноценный спринт разработки
+              {lessonProcessContent.subtitle || lessonProcessBlock?.subtitle || ""}
             </p>
           </div>
 
@@ -916,7 +915,13 @@ export default function LandingPageClient({
                   position: "relative",
                   background: "var(--color-surface-soft)"
                 }}>
-                  <img src={step.img} alt={step.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  {step.img ? (
+                    <img src={step.img} alt={step.alt || step.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "11px", fontWeight: 700 }}>
+                      Этап
+                    </div>
+                  )}
                   <div className="bg-grid-blueprint" style={{ position: "absolute", inset: 0, opacity: 0.1, pointerEvents: "none" }} />
                 </div>
                 <div style={{
@@ -949,6 +954,7 @@ export default function LandingPageClient({
           </div>
         </div>
       </section>
+      )}
 
       {/* 7. CLASSROOM PHOTOS */}
       <section id="classroom-photos" style={{ padding: "100px 0", background: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
@@ -1182,59 +1188,42 @@ export default function LandingPageClient({
       </section>
 
       {/* 8. TRUST / REVIEWS SECTION */}
+      {showTestimonials && (
       <section style={{ padding: "100px 0", borderBottom: "1px solid var(--color-border)" }}>
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              Отзывы родителей
+              {testimonialsContent.title || testimonialsBlock?.title || "Отзывы родителей"}
             </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              Мнения семей наших учеников, которые уже оценили прогресс в обучении
+              {testimonialsContent.subtitle || testimonialsBlock?.subtitle || ""}
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px" }}>
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Ребенок ходит на робототехнику с огромным удовольствием. Каждое занятие ждет с нетерпением. За месяц собрал робота-пылесоса и машинку на датчиках. Удивительно, как быстро дети вовлекаются!»
-              </p>
-              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-primary-dark)" }}>ОН</div>
-                <div>
-                  <h5 style={{ fontWeight: 700, fontSize: "13px", margin: 0 }}>Ольга Николаева</h5>
-                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>Мама Артема (8 лет)</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px" }}>
+            {testimonialsToRender.map((review: any, idx: number) => (
+              <div key={idx} className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
+                  {review.text}
+                </p>
+                {review.rating > 0 && (
+                  <div aria-label={`Оценка ${review.rating} из 5`} style={{ color: "var(--color-accent)", fontSize: "13px", fontWeight: 800 }}>
+                    {"★".repeat(Math.min(5, review.rating))}
+                  </div>
+                )}
+                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-primary-dark)" }}>{review.initials || review.author.slice(0, 2).toUpperCase()}</div>
+                  <div>
+                    <h5 style={{ fontWeight: 700, fontSize: "13px", margin: 0 }}>{review.author}</h5>
+                    {review.caption && <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{review.caption}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Сын увлекался играми, решили направить интерес в полезное русло. На курсе Scratch он сам создал 2D платформер! Преподаватели очень чуткие и терпеливые. Рекомендую школу Робокс!»
-              </p>
-              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-accent-dark)" }}>ДП</div>
-                <div>
-                  <h5 style={{ fontWeight: 700, fontSize: "13px", margin: 0 }}>Дмитрий Петров</h5>
-                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>Папа Игоря (10 лет)</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="card-site" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <p style={{ fontStyle: "italic", fontSize: "var(--font-small)", lineHeight: 1.6, color: "var(--color-text)" }}>
-                «Отличные светлые классы и качественное оборудование. Дочка занимается схемотехникой на Arduino. Наставники объясняют все на пальцах. Очень радует наличие отчетов в личном кабинете.»
-              </p>
-              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--color-success-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", color: "var(--color-success)" }}>ЕС</div>
-                <div>
-                  <h5 style={{ fontWeight: 700, fontSize: "13px", margin: 0 }}>Елена Смирнова</h5>
-                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>Мама Ани (11 лет)</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
+      )}
 
       {/* 9. SCHEDULE */}
       <section id="schedule" style={{ padding: "100px 0" }}>

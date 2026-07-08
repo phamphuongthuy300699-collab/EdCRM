@@ -19,6 +19,8 @@ const payloadSchema = z.object({
   successPath: pathValue,
   failPath: pathValue,
   currency: z.literal("RUB"),
+  alfabankCurrencyCode: z.enum(["", "810"]).optional().nullable(),
+  dynamicCallbackEnabled: z.boolean().optional(),
   paymentStage: z.enum(["one_step", "two_step"]),
   sbpEnabled: z.boolean(),
   fiscalizationEnabled: z.boolean(),
@@ -51,7 +53,7 @@ function defaultSettings(): AlfabankSettingsResponse {
     is_enabled: false,
     mode: "test",
     api_login: "",
-    test_gateway_url: "https://web.rbsuat.com/ab/rest/",
+    test_gateway_url: "https://alfa.rbsuat.com/payment/rest/",
     production_gateway_url: "https://engine.paymentgate.ru/payment/rest/",
     callback_path: "/api/payments/alfabank/callback",
     success_path: "/payments/success",
@@ -139,7 +141,7 @@ export async function POST(request: Request) {
     const admin = createSupabaseAdminClient();
 
     const { data: current, error: currentError } = await (admin.from("payment_provider_settings") as any)
-      .select("api_password_secret")
+      .select("api_password_secret, settings")
       .eq("organization_id", organizationId)
       .eq("provider", "alfabank")
       .maybeSingle();
@@ -170,8 +172,11 @@ export async function POST(request: Request) {
         taxation_system: input.taxationSystem || null,
         vat_rate: input.vatRate || null,
         settings: {
+          ...(current?.settings || {}),
           lastSavedAt: new Date().toISOString(),
           passwordConfigured: Boolean(password),
+          alfabankCurrencyCode: input.alfabankCurrencyCode || null,
+          dynamicCallbackEnabled: Boolean(input.dynamicCallbackEnabled),
         },
         updated_at: new Date().toISOString(),
       },

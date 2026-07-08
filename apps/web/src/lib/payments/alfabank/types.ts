@@ -7,6 +7,7 @@ export type AlfaGatewayConfig = {
   registerEndpoint?: string;
   apiLogin: string;
   apiPassword: string;
+  currencyCode?: string | null;
   paymentStage?: AlfaPaymentStage;
   timeoutMs?: number;
 };
@@ -15,9 +16,11 @@ export type CreateAlfaOrderInput = {
   invoiceId: string;
   amount: number;
   currency: "RUB";
+  currencyCode?: string | null;
   description: string;
   returnUrl: string;
   failUrl: string;
+  dynamicCallbackUrl?: string;
   orderNumber: string;
 };
 
@@ -26,9 +29,10 @@ export type AlfaRegisterRequest = {
   password: string;
   orderNumber: string;
   amount: string;
-  currency: string;
+  currency?: string;
   returnUrl: string;
   failUrl: string;
+  dynamicCallbackUrl?: string;
   description: string;
 };
 

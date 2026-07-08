@@ -27,7 +27,10 @@ export async function createAlfaOrder(input: CreateAlfaOrderInput, config: AlfaG
 
   const request = mapCreateOrderToAlfaRequest(input, config);
   const safeRequest = sanitizeAlfaRequest(request);
-  const body = new URLSearchParams(request);
+  const body = new URLSearchParams();
+  Object.entries(request).forEach(([key, value]) => {
+    if (value !== undefined) body.set(key, value);
+  });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 15000);
 

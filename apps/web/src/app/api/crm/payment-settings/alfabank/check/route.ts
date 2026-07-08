@@ -13,6 +13,21 @@ function isValidUrl(value: string | null | undefined) {
   }
 }
 
+async function assertGatewayDoesNotReturnHtml404(gatewayUrl: string) {
+  const checkUrl = new URL("getOrderStatusExtended.do", gatewayUrl.endsWith("/") ? gatewayUrl : `${gatewayUrl}/`).toString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(checkUrl, { method: "GET", cache: "no-store", signal: controller.signal });
+    const contentType = response.headers.get("content-type") || "";
+    if (response.status === 404 && contentType.toLowerCase().includes("text/html")) {
+      throw new Error(`Gateway ${gatewayUrl} возвращает HTML 404. Проверьте URL платежного шлюза.`);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function POST() {
   try {
     if (isDemoMode()) {
@@ -45,11 +60,20 @@ export async function POST() {
       !isValidUrl(gatewayUrl) ? "gateway URL" : "",
     ].filter(Boolean);
 
+    let gatewayError: string | null = null;
+    if (!missing.length) {
+      try {
+        await assertGatewayDoesNotReturnHtml404(gatewayUrl);
+      } catch (error: any) {
+        gatewayError = error.message || "Gateway не прошел диагностическую проверку";
+      }
+    }
+
     const settings = {
       ...(data.settings || {}),
       lastCheckedAt: new Date().toISOString(),
-      lastCheckStatus: missing.length ? "error" : "ok",
-      lastCheckError: missing.length ? `Заполните обязательные поля: ${missing.join(", ")}` : null,
+      lastCheckStatus: missing.length || gatewayError ? "error" : "ok",
+      lastCheckError: missing.length ? `Заполните обязательные поля: ${missing.join(", ")}` : gatewayError,
     };
 
     await (admin.from("payment_provider_settings") as any)
@@ -65,10 +89,18 @@ export async function POST() {
       }, { status: 400 });
     }
 
+    if (gatewayError) {
+      return NextResponse.json({
+        ok: false,
+        status: "error",
+        message: gatewayError,
+      }, { status: 400 });
+    }
+
     return NextResponse.json({
       ok: true,
       status: "ok",
-      message: "Настройки выглядят корректно. Реальный тестовый платёж не выполнялся.",
+      message: "Gateway доступен и не возвращает HTML 404. Реальный тестовый платеж не выполнялся.",
     });
   } catch (error: any) {
     console.error("Alfabank settings check error:", error);

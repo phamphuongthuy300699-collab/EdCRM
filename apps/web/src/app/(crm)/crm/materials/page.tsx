@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface Course {
   id: string;
@@ -48,6 +49,7 @@ interface LessonTemplate {
 }
 
 export default function MaterialsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [modules, setModules] = useState<Module[]>([]);
@@ -233,7 +235,15 @@ export default function MaterialsPage() {
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm("Вы уверены, что хотите удалить этот модуль? Все уроки модуля останутся в курсе, но без привязки к разделу.")) return;
+    const allowed = await askAction({
+      title: "Удалить модуль",
+      description: "Уроки модуля останутся в курсе, но будут без привязки к разделу.",
+      dangerLevel: "danger",
+      confirmText: "Удалить",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -252,7 +262,15 @@ export default function MaterialsPage() {
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm("Вы уверены, что хотите удалить этот шаблон урока?")) return;
+    const allowed = await askAction({
+      title: "Удалить шаблон урока",
+      description: "Шаблон урока будет удален. Уже проведенные занятия не должны удаляться.",
+      dangerLevel: "danger",
+      confirmText: "Удалить",
+      requireTypedConfirmation: true,
+      expectedText: "УДАЛИТЬ",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -870,6 +888,7 @@ export default function MaterialsPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }

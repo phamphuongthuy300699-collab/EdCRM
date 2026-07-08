@@ -1,12 +1,57 @@
 "use client";
 
-import React from "react";
-import { useRouter } from "next/navigation";
-import { XCircle, ArrowLeft, RefreshCcw } from "lucide-react";
+import React, { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { XCircle, ArrowLeft, RefreshCcw, Clock } from "lucide-react";
 import { Button } from "@robotics-crm/ui";
 
-export default function PaymentFailPage() {
+function PaymentFailInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [checking, setChecking] = useState(false);
+  const [statusText, setStatusText] = useState("Уточняем статус платежа в банке...");
+
+  useEffect(() => {
+    const orderId = searchParams.get("orderId");
+    const paymentId = searchParams.get("paymentId");
+    if (!orderId && !paymentId) {
+      setStatusText("Транзакция была отменена, прервана или отклонена банком. Деньги с вашей карты не были списаны.");
+      return;
+    }
+
+    const isUuid = (value: string | null): value is string => Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value));
+
+    async function verifyPayment() {
+      try {
+        setChecking(true);
+        const bodyPayload: Record<string, string> = {};
+        if (isUuid(paymentId)) bodyPayload.paymentId = paymentId;
+        else if (isUuid(orderId)) bodyPayload.paymentId = orderId;
+        else if (orderId) bodyPayload.providerOrderId = orderId;
+
+        const response = await fetch("/api/payments/alfabank/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(bodyPayload),
+        });
+        const payload = await response.json();
+        if (response.ok && payload.ok) {
+          if (payload.status === "paid") setStatusText("Банк подтвердил оплату. Счет будет отмечен оплаченным.");
+          else if (payload.status === "failed" || payload.status === "cancelled") setStatusText("Банк подтвердил, что платеж не завершен. Счет остается доступным для повторной оплаты.");
+          else setStatusText(`Статус платежа: ${payload.status}. Если деньги списались, статус обновится после подтверждения банка.`);
+        } else {
+          setStatusText("Платеж не завершен. Счет остается доступным для повторной оплаты.");
+        }
+      } catch (error) {
+        console.error("Fail payment verification error:", error);
+        setStatusText("Платеж не завершен. Счет остается доступным для повторной оплаты.");
+      } finally {
+        setChecking(false);
+      }
+    }
+
+    verifyPayment();
+  }, [searchParams]);
 
   return (
     <div style={{
@@ -41,7 +86,7 @@ export default function PaymentFailPage() {
           justifyContent: "center",
           color: "var(--color-danger)"
         }}>
-          <XCircle size={36} />
+          {checking ? <Clock size={36} className="spin" /> : <XCircle size={36} />}
         </div>
 
         <div>
@@ -49,7 +94,7 @@ export default function PaymentFailPage() {
             Оплата не завершена
           </h1>
           <p style={{ fontSize: "14px", color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}>
-            Транзакция была отменена, прервана или отклонена банком. Деньги с вашей карты не были списаны.
+            {statusText}
           </p>
         </div>
 
@@ -82,5 +127,17 @@ export default function PaymentFailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentFailPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)" }}>
+        <p style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>Загрузка результата оплаты...</p>
+      </div>
+    }>
+      <PaymentFailInner />
+    </Suspense>
   );
 }

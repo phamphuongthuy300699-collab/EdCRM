@@ -16,6 +16,7 @@ import {
   Edit
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
+import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
 interface CallScript {
   id: string;
@@ -36,6 +37,7 @@ interface Objection {
 }
 
 export default function ScriptsPage() {
+  const { askAction, modal: actionModal } = useActionConfirmation();
   const [activeTab, setActiveTab] = useState<"scripts" | "objections">("scripts");
   const [scripts, setScripts] = useState<CallScript[]>([]);
   const [objections, setObjections] = useState<Objection[]>([]);
@@ -246,7 +248,13 @@ export default function ScriptsPage() {
   };
 
   const handleDeleteScript = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите удалить этот скрипт?")) return;
+    const allowed = await askAction({
+      title: "Скрыть скрипт",
+      description: "Скрипт будет деактивирован и скрыт из рабочего списка.",
+      dangerLevel: "warning",
+      confirmText: "Скрыть",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -264,7 +272,13 @@ export default function ScriptsPage() {
   };
 
   const handleDeleteObjection = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите удалить это возражение?")) return;
+    const allowed = await askAction({
+      title: "Скрыть возражение",
+      description: "Возражение будет деактивировано и скрыто из рабочего списка.",
+      dangerLevel: "warning",
+      confirmText: "Скрыть",
+    });
+    if (!allowed) return;
 
     try {
       const { error } = await (supabase
@@ -738,6 +752,7 @@ export default function ScriptsPage() {
           </div>
         </div>
       )}
+      {actionModal}
     </div>
   );
 }
