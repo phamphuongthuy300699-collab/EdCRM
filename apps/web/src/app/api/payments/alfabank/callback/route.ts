@@ -51,7 +51,6 @@ async function processCallback(request: NextRequest) {
   try {
     const payment = await findAlfabankPayment(admin, {
       providerOrderId: orderId,
-      paymentId: orderNumber,
     });
 
     await (admin.from("payment_events") as any).insert({

@@ -74,4 +74,13 @@ describe("Alfabank payment flow production hotfixes", () => {
     expect(source).toContain("PAYMENT_LINK_PROCESSING");
     expect(source).toContain("waitForActivePaymentUrl");
   });
+
+  it("callback resolves mdOrder by provider_order_id and never treats orderNumber as payment id", () => {
+    const root = process.cwd();
+    const source = fs.readFileSync(path.join(root, "src/app/api/payments/alfabank/callback/route.ts"), "utf8");
+
+    expect(source).toContain("const orderId = rawPayload.mdOrder || rawPayload.orderId");
+    expect(source).toContain("providerOrderId: orderId");
+    expect(source).not.toContain("paymentId: orderNumber");
+  });
 });

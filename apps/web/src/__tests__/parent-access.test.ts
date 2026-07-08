@@ -57,5 +57,10 @@ describe("parent access management", () => {
     expect(source).toContain("Сбросить пароль");
     expect(source).toContain("Отключить доступ");
     expect(source).toContain("setReloadKey((value) => value + 1)");
+    expect(source).toContain("guardian_id");
+    expect(source).toContain("student_id");
+    expect(source).toContain("is_primary");
+    expect(source).toContain("relation.is_primary === true");
+    expect(source).toContain("guardianId: parentRelation?.guardian_id");
   });
 });

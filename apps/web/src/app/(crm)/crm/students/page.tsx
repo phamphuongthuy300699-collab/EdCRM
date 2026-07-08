@@ -139,6 +139,9 @@ export default function CrmStudentsPage() {
               )
             ),
             student_guardians (
+              guardian_id,
+              student_id,
+              is_primary,
               relation,
               guardians (
                 full_name,
@@ -168,7 +171,8 @@ export default function CrmStudentsPage() {
               const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
 
               // Find primary guardian
-              const parentRelation = s.student_guardians?.[0] || null;
+              const guardianRelations = Array.isArray(s.student_guardians) ? s.student_guardians : [];
+              const parentRelation = guardianRelations.find((relation: any) => relation.is_primary === true) || guardianRelations[0] || null;
               const parentLink = parentRelation?.guardians || null;
               const parentName = parentLink ? parentLink.full_name : "Не указан";
               const parentPhone = parentLink ? parentLink.phone : "—";

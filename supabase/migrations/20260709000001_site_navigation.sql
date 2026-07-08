@@ -47,5 +47,5 @@ begin
     'published',
     15
   )
-  on conflict (organization_id, block_key) do nothing;
+  on conflict (organization_id, page_slug, block_key) do nothing;
 end $$;

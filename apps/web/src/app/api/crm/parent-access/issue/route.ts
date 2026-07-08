@@ -87,7 +87,9 @@ export async function POST(request: Request) {
       email: guardian.email,
       createdAuthUser,
       temporaryPassword: createdAuthUser ? password : null,
-      message: createdAuthUser ? "Доступ выдан. Временный пароль показан один раз." : "Доступ привязан к существующему Auth user.",
+      message: createdAuthUser
+        ? "Доступ выдан. Временный пароль показан один раз."
+        : "Auth user уже существовал. Пароль не менялся. При необходимости нажмите Сбросить пароль.",
     });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message || "Не удалось выдать доступ родителю" }, { status: 500 });

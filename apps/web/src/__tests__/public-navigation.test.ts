@@ -42,7 +42,7 @@ describe("editable public navigation", () => {
     expect(crmSite).toContain("headerNavLinks");
     expect(crmSite).toContain("footerNavLinks");
     expect(migration).toContain("'site.navigation'");
-    expect(migration.toLowerCase()).toContain("on conflict");
+    expect(migration.toLowerCase()).toContain("on conflict (organization_id, page_slug, block_key) do nothing");
     expect(migration).toContain('"/#teachers"');
     expect(migration).not.toContain('"/crm');
   });
