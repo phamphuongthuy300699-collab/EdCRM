@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Phone, Menu, X } from "lucide-react";
 import { Button } from "@robotics-crm/ui";
 import { getMediaUrl } from "@/shared/utils/media";
+import type { PublicNavLink } from "@/shared/utils/public-navigation";
+import { defaultHeaderLinks } from "@/shared/utils/public-navigation";
 
 interface HeaderProps {
   brandName: string;
@@ -12,6 +14,7 @@ interface HeaderProps {
   logoAlt: string;
   logoDisplay: string;
   phone: string;
+  headerLinks?: PublicNavLink[];
 }
 
 export default function Header({
@@ -20,6 +23,7 @@ export default function Header({
   logoAlt,
   logoDisplay,
   phone,
+  headerLinks = defaultHeaderLinks,
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -83,11 +87,11 @@ export default function Header({
             fontSize: "var(--font-small)",
             color: "var(--color-text-muted)"
           }} className="desktop-nav">
-            <Link href="/#courses" style={{ transition: "color 0.2s" }} className="nav-link">Курсы</Link>
-            <Link href="/#prices" style={{ transition: "color 0.2s" }} className="nav-link">Цены</Link>
-            <Link href="/#schedule" style={{ transition: "color 0.2s" }} className="nav-link">Расписание</Link>
-            <Link href="/#teachers" style={{ transition: "color 0.2s" }} className="nav-link">Преподаватели</Link>
-            <Link href="/#contacts" style={{ transition: "color 0.2s" }} className="nav-link">Контакты</Link>
+            {headerLinks.map((link) => (
+              <Link key={link.id || link.href} href={link.href} style={{ transition: "color 0.2s" }} className="nav-link">
+                {link.title}
+              </Link>
+            ))}
           </nav>
 
           {/* Desktop Actions */}
@@ -163,11 +167,16 @@ export default function Header({
             fontWeight: 700,
             fontFamily: "var(--font-inter)"
           }}>
-            <Link href="/#courses" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Курсы</Link>
-            <Link href="/#prices" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Цены</Link>
-            <Link href="/#schedule" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Расписание</Link>
-            <Link href="/#teachers" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Преподаватели</Link>
-            <Link href="/#contacts" onClick={() => setIsMenuOpen(false)} style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>Контакты</Link>
+            {headerLinks.map((link) => (
+              <Link
+                key={link.id || link.href}
+                href={link.href}
+                onClick={() => setIsMenuOpen(false)}
+                style={{ color: "var(--color-text)", borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}
+              >
+                {link.title}
+              </Link>
+            ))}
           </nav>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "auto", paddingBottom: "48px" }}>

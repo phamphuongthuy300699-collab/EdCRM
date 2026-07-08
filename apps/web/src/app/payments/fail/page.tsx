@@ -14,7 +14,9 @@ function PaymentFailInner() {
   useEffect(() => {
     const orderId = searchParams.get("orderId");
     const paymentId = searchParams.get("paymentId");
-    if (!orderId && !paymentId) {
+    const invoiceId = searchParams.get("invoiceId");
+    const providerOrderId = searchParams.get("providerOrderId");
+    if (!orderId && !providerOrderId && !paymentId) {
       setStatusText("Транзакция была отменена, прервана или отклонена банком. Деньги с вашей карты не были списаны.");
       return;
     }
@@ -26,10 +28,11 @@ function PaymentFailInner() {
         setChecking(true);
         const bodyPayload: Record<string, string> = {};
         if (isUuid(paymentId)) bodyPayload.paymentId = paymentId;
-        else if (isUuid(orderId)) bodyPayload.paymentId = orderId;
-        else if (orderId) bodyPayload.providerOrderId = orderId;
+        if (isUuid(invoiceId)) bodyPayload.invoiceId = invoiceId;
+        if (providerOrderId) bodyPayload.providerOrderId = providerOrderId;
+        if (orderId) bodyPayload.orderId = orderId;
 
-        const response = await fetch("/api/payments/alfabank/status", {
+        const response = await fetch("/api/payments/alfabank/return-status", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(bodyPayload),

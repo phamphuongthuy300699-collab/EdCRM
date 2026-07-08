@@ -77,6 +77,17 @@ export function redactSensitivePaymentPayload(payload: any): any {
     "api_login",
     "terminal_id",
     "merchant_id",
+    "pan",
+    "maskedpan",
+    "cardholder",
+    "cardholdername",
+    "ip",
+    "user_agent",
+    "useragent",
+    "browser",
+    "authrefnum",
+    "approvalcode",
+    "bindingid",
     "sig",
     "signature"
   ];

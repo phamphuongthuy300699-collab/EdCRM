@@ -34,9 +34,13 @@ import { isDemoMode } from "@/shared/utils/demo";
 import { getMediaUrl } from "@/shared/utils/media";
 import { getLegalPageDefault, legalPageDocs } from "@/shared/utils/legal-page-defaults";
 import { mergeSiteImageItems, normalizeSiteMediaPath, readableMediaTitle } from "@/shared/utils/site-media";
+import {
+  defaultFooterLinks as defaultPublicFooterLinks,
+  defaultHeaderLinks as defaultPublicHeaderLinks,
+} from "@/shared/utils/public-navigation";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
-type TabId = "home" | "branding" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
+type TabId = "home" | "branding" | "navigation" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
 const mediaFolders = [
   { id: "branding", label: "Брендинг и логотип" },
@@ -263,6 +267,8 @@ export default function CrmSitePage() {
   const [footerTelegram, setFooterTelegram] = useState("");
   const [footerWhatsapp, setFooterWhatsapp] = useState("");
   const [footerDocumentLinks, setFooterDocumentLinks] = useState<any[]>(defaultDocumentLinks);
+  const [headerNavLinks, setHeaderNavLinks] = useState<any[]>(defaultPublicHeaderLinks);
+  const [footerNavLinks, setFooterNavLinks] = useState<any[]>(defaultPublicFooterLinks);
 
   const [contactsPage, setContactsPage] = useState({
     eyebrow: "Робокс",
@@ -392,6 +398,10 @@ export default function CrmSitePage() {
           setFooterWhatsapp(fBlock?.content?.socials?.whatsapp || "");
           setFooterDocumentLinks(Array.isArray(fBlock?.content?.documentLinks) ? fBlock.content.documentLinks : defaultDocumentLinks);
         }
+
+        const navBlock = blocks.find((b: any) => b.block_key === "site.navigation");
+        setHeaderNavLinks(Array.isArray(navBlock?.content?.headerLinks) ? navBlock.content.headerLinks : defaultPublicHeaderLinks);
+        setFooterNavLinks(Array.isArray(navBlock?.content?.footerLinks) ? navBlock.content.footerLinks : defaultPublicFooterLinks);
 
         // Branding block
         const brand = blocks.find((b: any) => b.block_key === "site.branding");
@@ -1010,6 +1020,39 @@ export default function CrmSitePage() {
     }
   };
 
+  const updateNavigationLink = (section: "header" | "footer", idx: number, patch: Record<string, any>) => {
+    const setter = section === "header" ? setHeaderNavLinks : setFooterNavLinks;
+    setter((links) => links.map((link, i) => i === idx ? { ...link, ...patch } : link));
+  };
+
+  const addNavigationLink = (section: "header" | "footer") => {
+    const setter = section === "header" ? setHeaderNavLinks : setFooterNavLinks;
+    setter((links) => [...links, { id: makeId(`${section}-nav`), title: "", href: "", enabled: true, sortOrder: (links.length + 1) * 10 }]);
+  };
+
+  const removeNavigationLink = (section: "header" | "footer", idx: number) => {
+    const setter = section === "header" ? setHeaderNavLinks : setFooterNavLinks;
+    setter((links) => links.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveNavigation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+    try {
+      await saveBlock("site.navigation", "Навигация сайта", "Ссылки в шапке и футере публичного сайта", {
+        headerLinks: headerNavLinks,
+        footerLinks: footerNavLinks,
+      });
+      setSuccessMsg("Навигация сайта сохранена!");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Не удалось сохранить навигацию");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Tab 7: Save Footer
   const handleSaveFooter = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1421,6 +1464,7 @@ export default function CrmSitePage() {
         >
           <option value="home">🏠 Главная страница</option>
           <option value="branding">✨ Брендинг</option>
+          <option value="navigation">🧭 Навигация</option>
           <option value="teachers">👥 Преподаватели</option>
           <option value="branches">📍 Контакты & Филиалы</option>
           <option value="prices">💵 Цены & Тарифы</option>
@@ -1436,6 +1480,7 @@ export default function CrmSitePage() {
           {[
             { id: "home", label: "Контент главной", desc: "Hero, преимущества, кабинет", icon: Globe },
             { id: "branding", label: "Бренд и логотип", desc: "Логотип, favicon, цвета", icon: Sparkles },
+            { id: "navigation", label: "Навигация", desc: "Шапка и футер сайта", icon: ArrowRight },
             { id: "teachers", label: "Команда", desc: "Преподаватели на сайте", icon: Users },
             { id: "branches", label: "Филиалы и контакты", desc: "Адреса, телефоны, часы", icon: MapPin },
             { id: "prices", label: "Продажи и тарифы", desc: "Пробный, абонементы, цены", icon: DollarSign },
@@ -1803,6 +1848,72 @@ export default function CrmSitePage() {
               <div>
                 <Button type="submit" variant="primary-crm" disabled={saving}>
                   <Save size={16} /> Сохранить настройки бренда
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB: NAVIGATION */}
+          {activeTab === "navigation" && (
+            <form onSubmit={handleSaveNavigation} className="card-crm" style={{ gap: "20px" }}>
+              <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "12px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>Навигация публичного сайта</h3>
+                <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>
+                  Управляйте ссылками в шапке и навигационной колонке футера. Публичный сайт не показывает ссылки в CRM.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: "16px" }}>
+                <div style={{ display: "grid", gap: "12px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 800, margin: 0 }}>Шапка сайта</h4>
+                  {headerNavLinks.map((link, idx) => (
+                    <div key={link.id || idx} className="form-grid-3" style={{ alignItems: "center" }}>
+                      <input className="form-input" placeholder="Название" value={link.title || ""} onChange={e => updateNavigationLink("header", idx, { title: e.target.value })} />
+                      <input className="form-input" placeholder="/#courses" value={link.href || ""} onChange={e => updateNavigationLink("header", idx, { href: e.target.value })} />
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input className="form-input" type="number" placeholder="Порядок" value={link.sortOrder ?? 100} onChange={e => updateNavigationLink("header", idx, { sortOrder: Number(e.target.value) })} />
+                        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                          <input type="checkbox" checked={link.enabled !== false} onChange={e => updateNavigationLink("header", idx, { enabled: e.target.checked })} />
+                          Вкл.
+                        </label>
+                        <button type="button" onClick={() => removeNavigationLink("header", idx)} style={{ border: "none", background: "none", color: "#EF4444", cursor: "pointer" }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="secondary-crm" onClick={() => addNavigationLink("header")} style={{ width: "fit-content" }}>
+                    <Plus size={14} /> Добавить ссылку в шапку
+                  </Button>
+                </div>
+
+                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", display: "grid", gap: "12px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 800, margin: 0 }}>Футер: колонка навигации</h4>
+                  {footerNavLinks.map((link, idx) => (
+                    <div key={link.id || idx} className="form-grid-3" style={{ alignItems: "center" }}>
+                      <input className="form-input" placeholder="Название" value={link.title || ""} onChange={e => updateNavigationLink("footer", idx, { title: e.target.value })} />
+                      <input className="form-input" placeholder="/contacts" value={link.href || ""} onChange={e => updateNavigationLink("footer", idx, { href: e.target.value })} />
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input className="form-input" type="number" placeholder="Порядок" value={link.sortOrder ?? 100} onChange={e => updateNavigationLink("footer", idx, { sortOrder: Number(e.target.value) })} />
+                        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
+                          <input type="checkbox" checked={link.enabled !== false} onChange={e => updateNavigationLink("footer", idx, { enabled: e.target.checked })} />
+                          Вкл.
+                        </label>
+                        <button type="button" onClick={() => removeNavigationLink("footer", idx)} style={{ border: "none", background: "none", color: "#EF4444", cursor: "pointer" }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="secondary-crm" onClick={() => addNavigationLink("footer")} style={{ width: "fit-content" }}>
+                    <Plus size={14} /> Добавить ссылку в футер
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Button type="submit" variant="primary-crm" disabled={saving}>
+                  <Save size={16} /> Сохранить навигацию
                 </Button>
               </div>
             </form>

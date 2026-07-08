@@ -20,7 +20,7 @@ export default function PythonPage() {
     "description": "Практический курс обучения программированию на языке Python для школьников от 10 до 14 лет.",
     "provider": {
       "@type": "EducationalOrganization",
-      "name": "Школа Robotics Липецк",
+      "name": "Робокс Липецк",
       "sameAs": "https://robotics-lipetsk.ru"
     }
   };

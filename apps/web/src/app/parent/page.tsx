@@ -84,6 +84,7 @@ export default function ParentDashboard() {
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const [accessMessage, setAccessMessage] = useState("");
 
   // Demo Fallback Data (Anna Petrova & Igor Petrov)
   const demoData = {
@@ -95,7 +96,7 @@ export default function ParentDashboard() {
     teacherName: "Алексей Дмитриев",
     roomName: "Кабинет 101 (Лего-конструирование)",
     nextClass: "Вторник, 17:00",
-    currentMission: "Робот-сумоист «RoboSort-3000»",
+    currentMission: "Учебный инженерный проект",
     currentMissionDesc: "Программируем ультразвуковой датчик расстояния и сервопривод для сортировки деталей и выталкивания соперников.",
     feedback: "Игорь отлично справился с логикой ветвления. Сам доработал алгоритм захвата кубиков, добавив датчик расстояния. Очень активный и толковый инженер!",
     attendance: [
@@ -118,12 +119,11 @@ export default function ParentDashboard() {
     async function loadParentSession() {
       try {
         setLoading(true);
+        setAccessMessage("");
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-          // If no supabase session, we are in demo or need login
-          // We'll check if the path works on local. Since this is demo-enabled, we allow viewing demo if no auth
-          console.log("No active user session. Showing demo dashboard.");
+          setAccessMessage("Войдите в личный кабинет, чтобы увидеть данные ребенка.");
           setLoading(false);
           return;
         }
@@ -136,7 +136,7 @@ export default function ParentDashboard() {
           .single();
 
         if (linkErr || !linkData) {
-          console.log("No linked guardian found for user_id:", user.id);
+          setAccessMessage("Доступ к личному кабинету не привязан. Обратитесь к администратору школы.");
           setLoading(false);
           return;
         }
@@ -268,6 +268,7 @@ export default function ParentDashboard() {
   const isDemo = isDemoMode();
   const hasRealData = childrenList.length > 0;
   const showDemoData = isDemo && !hasRealData;
+  const displayParentName = showDemoData ? demoData.parentName : guardian?.full_name || "";
   
   // Robo message based on state
   const isBalanceLow = !showDemoData 
@@ -276,7 +277,9 @@ export default function ParentDashboard() {
 
   const roboMessage = isBalanceLow 
     ? "Внимание! На абонементе Игоря осталось всего 2 занятия. Пожалуйста, продлите абонемент, чтобы не пропустить сборку следующей миссии! ⚠️" 
-    : `Здравствуйте, ${guardian?.full_name || demoData.parentName}! Ваш ребенок делает успехи! Загляните в отчет наставника. 🚀`;
+    : displayParentName
+      ? `Здравствуйте, ${displayParentName}! Ваш ребенок делает успехи! Загляните в отчет наставника. 🚀`
+      : "Доступ к личному кабинету пока не связан с карточкой родителя.";
 
   const roboMood = isBalanceLow ? "warning" : "happy";
 
@@ -296,10 +299,10 @@ export default function ParentDashboard() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px" }}>
-              Здравствуйте, {guardian?.full_name || demoData.parentName}!
+              Здравствуйте{displayParentName ? `, ${displayParentName}` : ""}!
             </h1>
             <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-              Рады видеть вас в кабинете инженерной школы Robotics!
+              Рады видеть вас в кабинете инженерной школы Робокс!
             </p>
           </div>
         </div>
@@ -529,7 +532,7 @@ export default function ParentDashboard() {
       ) : childrenList.length === 0 ? (
         <div style={{ textAlign: "center", padding: "64px 0", background: "white", borderRadius: "14px", border: "1px solid var(--color-border)", width: "100%" }}>
           <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)", margin: 0 }}>
-            К вашему аккаунту не привязано ни одного ученика. Пожалуйста, обратитесь к администратору.
+            {accessMessage || "К вашему аккаунту не привязано ни одного ученика. Пожалуйста, обратитесь к администратору."}
           </p>
         </div>
       ) : (

@@ -60,6 +60,14 @@ describe("alfabank mapper", () => {
   it("scrubs sensitive values from payment logs nested payloads", () => {
     const payload = {
       orderId: "123",
+      maskedPan: "411111******1111",
+      cardholderName: "IVAN IVANOV",
+      ip: "203.0.113.10",
+      browserParams: {
+        user_agent: "Mozilla/5.0",
+        approvalCode: "123456",
+        authRefNum: "654321",
+      },
       credentials: {
         userName: "user-123",
         password: "secret-password-123",
@@ -73,6 +81,10 @@ describe("alfabank mapper", () => {
 
     const redacted = redactSensitivePaymentPayload(payload);
     expect(redacted.orderId).toBe("123");
+    expect(redacted.maskedPan).toBe("[redacted]");
+    expect(redacted.cardholderName).toBe("[redacted]");
+    expect(redacted.ip).toBe("[redacted]");
+    expect(redacted.browserParams).toBe("[redacted]");
     expect(redacted.credentials.userName).toBe("[redacted]");
     expect(redacted.credentials.password).toBe("[redacted]");
     expect(redacted.credentials.api_password_secret).toBe("[redacted]");

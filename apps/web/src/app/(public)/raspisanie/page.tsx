@@ -10,7 +10,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Расписание занятий по робототехнике в Липецке",
-  description: "Расписание учебных групп школы робототехники и программирования Robotics Липецк. Группы по возрастам для детей от 6 до 15 лет.",
+  description: "Расписание учебных групп школы робототехники и программирования Робокс Липецк. Группы по возрастам для детей от 6 до 15 лет.",
   alternates: {
     canonical: "https://robotics-lipetsk.ru/raspisanie",
   },

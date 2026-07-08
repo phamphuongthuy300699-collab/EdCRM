@@ -186,7 +186,7 @@ export default function LoginPage() {
               fontSize: "var(--font-small)",
               color: "var(--color-text-muted)"
             }}>
-              Панель управления Robotics CRM Липецк
+              Панель управления Робокс CRM Липецк
             </p>
           </div>
 

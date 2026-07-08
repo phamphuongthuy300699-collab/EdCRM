@@ -219,15 +219,15 @@ export default function LandingPageClient({
   const portalPreviewTitle = portalPreviewBlock?.title || "Родители видят прогресс ребенка в личном кабинете";
   const portalPreviewSubtitle = portalPreviewBlock?.subtitle || "Расписание, посещаемость, баланс, материалы урока и отчеты наставника — в одном месте.";
   const portalData = portalPreviewBlock?.content || {
-    studentName: "Миша Иванов",
+    studentName: "Ученик Робокс",
     age: "8 лет",
     course: "Робототехника LEGO",
     nextLesson: "Суббота, 12:00",
     cabinet: "Кабинет 3",
     attendance: "7 из 8",
-    project: "Робот RoboSort-3000",
+    project: "Учебный инженерный проект",
     balance: "Осталось 2 занятия",
-    teacherNote: "Миша отлично справился с логикой ветвления и доработал алгоритм захвата кубиков."
+    teacherNote: "Наставник отмечает уверенный прогресс и аккуратную работу над проектом."
   };
 
   const pricesBlock = getBlock('home.prices');

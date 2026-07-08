@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@robotics-crm/ui";
 import { 
   CreditCard, 
@@ -17,6 +18,7 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 
 export default function ParentPaymentsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export default function ParentPaymentsPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
+  const [accessMessage, setAccessMessage] = useState("");
   const supabase = createSupabaseBrowserClient();
 
   const demoInvoices = [
@@ -40,6 +43,7 @@ export default function ParentPaymentsPage() {
     async function loadData() {
       try {
         setLoading(true);
+        setAccessMessage("");
         
         // Check if online payment is enabled in the backend settings
         fetch("/api/parent/payment-status")
@@ -57,8 +61,11 @@ export default function ParentPaymentsPage() {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          setInvoices(demoInvoices);
-          setPayments(demoPayments);
+          setInvoices([]);
+          setPayments([]);
+          setDiscounts([]);
+          setAccessMessage("Войдите в личный кабинет, чтобы увидеть счета и платежи.");
+          router.replace("/parent/login");
           setLoading(false);
           return;
         }
@@ -71,8 +78,10 @@ export default function ParentPaymentsPage() {
           .maybeSingle() as any;
 
         if (!linkData) {
-          setInvoices(demoInvoices);
-          setPayments(demoPayments);
+          setInvoices([]);
+          setPayments([]);
+          setDiscounts([]);
+          setAccessMessage("Доступ к личному кабинету не привязан. Обратитесь к администратору школы.");
           setLoading(false);
           return;
         }
@@ -159,6 +168,8 @@ export default function ParentPaymentsPage() {
   }, []);
 
   const handleRequestPaymentLink = async (invoiceId: string) => {
+    if (payingInvoiceId) return;
+
     if (invoiceId.startsWith("i-demo-")) {
       alert("Для демонстрационного счета оплата недоступна.");
       return;
@@ -258,6 +269,14 @@ export default function ParentPaymentsPage() {
           Управление абонементами, просмотр выставленных счетов и история онлайн-оплат
         </p>
       </div>
+
+      {accessMessage && (
+        <div className="card-crm" style={{ background: "white", padding: "20px", borderColor: "var(--color-warning)" }}>
+          <p style={{ margin: 0, color: "var(--color-text)", fontSize: "14px", fontWeight: 700 }}>
+            {accessMessage}
+          </p>
+        </div>
+      )}
 
       {/* Active Discounts */}
       <div className="card-crm" style={{ background: "white", padding: "24px" }}>
