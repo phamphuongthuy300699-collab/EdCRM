@@ -6,6 +6,7 @@ import {
   Archive,
   Banknote,
   BookOpen,
+  Bot,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
   EyeOff,
   KeyRound,
   Link as LinkIcon,
+  MessageCircle,
   Percent,
   Plus,
   RotateCcw,
@@ -32,7 +34,7 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 
-type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "system";
+type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "bots" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
 type StaffRole = "owner" | "admin" | "manager" | "teacher" | "accountant";
 
@@ -283,6 +285,15 @@ export default function CrmSettingsPage() {
     settings: {},
   });
   const [paymentSecretsConfigured, setPaymentSecretsConfigured] = useState(false);
+  const [maxSettings, setMaxSettings] = useState<any>({
+    isEnabled: false,
+    tokenConfigured: false,
+    webhookSecret: "",
+    webhookUrl: "https://робокс48.рф/api/bots/max/webhook",
+    botUsername: "",
+    settings: {},
+  });
+  const [maxBotToken, setMaxBotToken] = useState("");
 
   const [discountTypes, setDiscountTypes] = useState<any[]>([]);
   const [discountAssignments, setDiscountAssignments] = useState<any[]>([]);
@@ -405,6 +416,7 @@ export default function CrmSettingsPage() {
         groupsRes,
         staffListRes,
         paymentRes,
+        maxSettingsRes,
       ] = await Promise.all([
         (supabase.from("branches") as any).select("*").eq("organization_id", orgData.id).order("sort_order"),
         (supabase.from("rooms") as any).select("*").eq("organization_id", orgData.id).order("name"),
@@ -423,6 +435,7 @@ export default function CrmSettingsPage() {
           .order("sort_order"),
         fetch("/api/crm/staff/list").then((res) => res.json()).catch(() => ({ ok: false, staff: [] })),
         fetch("/api/crm/payment-settings/alfabank").then((res) => res.json()).catch(() => null),
+        fetch("/api/crm/bot-settings/max").then((res) => res.json()).catch(() => null),
       ]);
 
       if (branchesRes.error) throw branchesRes.error;
@@ -441,6 +454,17 @@ export default function CrmSettingsPage() {
       if (paymentRes?.ok) {
         setPaymentSettings(paymentRes.settings || paymentSettings);
         setPaymentSecretsConfigured(Boolean(paymentRes.passwordConfigured));
+      }
+      if (maxSettingsRes?.ok) {
+        setMaxSettings({
+          isEnabled: Boolean(maxSettingsRes.settings?.isEnabled),
+          tokenConfigured: Boolean(maxSettingsRes.settings?.tokenConfigured),
+          webhookSecret: maxSettingsRes.settings?.webhookSecret || "",
+          webhookUrl: maxSettingsRes.settings?.webhookUrl || "https://робокс48.рф/api/bots/max/webhook",
+          botUsername: maxSettingsRes.settings?.botUsername || "",
+          settings: maxSettingsRes.settings?.settings || {},
+        });
+        setMaxBotToken("");
       }
 
       // Load discount data
@@ -488,7 +512,7 @@ export default function CrmSettingsPage() {
         window.location.assign("/crm/settings/payments");
         return;
       }
-      if (requestedTab && ["organization", "branches", "courses", "groups", "staff", "payments", "discounts", "system"].includes(requestedTab)) {
+      if (requestedTab && ["organization", "branches", "courses", "groups", "staff", "payments", "discounts", "bots", "system"].includes(requestedTab)) {
         setActiveTab(requestedTab);
       }
     }
@@ -1235,6 +1259,81 @@ export default function CrmSettingsPage() {
     }
   }
 
+  function generateClientSecret() {
+    const bytes = new Uint8Array(24);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      crypto.getRandomValues(bytes);
+    } else {
+      for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+    }
+    return Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function saveMaxBotSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      const response = await fetch("/api/crm/bot-settings/max", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isEnabled: Boolean(maxSettings.isEnabled),
+          botToken: maxBotToken.trim() || undefined,
+          webhookSecret: maxSettings.webhookSecret,
+          webhookUrl: maxSettings.webhookUrl,
+          botUsername: maxSettings.botUsername,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сохранить настройки MAX");
+      setMaxSettings({
+        ...maxSettings,
+        ...payload.settings,
+        tokenConfigured: Boolean(payload.settings?.tokenConfigured),
+      });
+      setMaxBotToken("");
+      setNotice("Настройки MAX сохранены. Токен скрыт и больше не показывается в интерфейсе.");
+    } catch (err: any) {
+      setError(err.message || "Не удалось сохранить настройки MAX");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function checkMaxBotToken() {
+    try {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      const response = await fetch("/api/crm/bot-settings/max/check", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось проверить токен MAX");
+      setNotice(`MAX bot доступен${payload.bot?.username ? `: @${payload.bot.username}` : ""}`);
+    } catch (err: any) {
+      setError(err.message || "Не удалось проверить токен MAX");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function subscribeMaxWebhookAction() {
+    try {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      const response = await fetch("/api/crm/bot-settings/max/subscribe", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось подписать webhook MAX");
+      setNotice("Webhook MAX подписан. Проверьте, что публичный домен работает по HTTPS на 443.");
+    } catch (err: any) {
+      setError(err.message || "Не удалось подписать webhook MAX");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const tabs = [
     { id: "organization", label: "Организация", icon: Building2 },
     { id: "branches", label: "Филиалы и кабинеты", icon: DoorOpen },
@@ -1243,6 +1342,7 @@ export default function CrmSettingsPage() {
     { id: "staff", label: "Сотрудники и доступы", icon: Users },
     { id: "payments", label: "Платежи → Альфа-Банк", icon: CreditCard },
     { id: "discounts", label: "Скидки", icon: Percent },
+    { id: "bots", label: "Боты и уведомления", icon: Bot },
     { id: "system", label: "Системные параметры", icon: Settings },
   ] as const;
 
@@ -1870,6 +1970,77 @@ export default function CrmSettingsPage() {
                   </form>
                 </Modal>
               )}
+            </>
+          )}
+
+          {activeTab === "bots" && (
+            <>
+              <div className="settings-panel-title">
+                <div>
+                  <h2>Боты и уведомления</h2>
+                  <p>MAX MVP: привязка родителя по телефону, webhook и отправка ссылок на оплату из notification_outbox.</p>
+                </div>
+                <span className={`badge ${maxSettings.tokenConfigured ? "badge-green" : "badge-amber"}`}>
+                  {maxSettings.tokenConfigured ? "Токен настроен" : "Токен не задан"}
+                </span>
+              </div>
+
+              <form onSubmit={saveMaxBotSettings} className="settings-card-list">
+                <div className="settings-card">
+                  <div className="settings-card-head">
+                    <div>
+                      <h3><MessageCircle size={16} /> MAX</h3>
+                      <p>Сохраненный bot token не показывается повторно. Для webhook MAX должен видеть HTTPS endpoint на 443.</p>
+                    </div>
+                    <span className={`badge ${maxSettings.isEnabled ? "badge-green" : "badge-gray"}`}>
+                      {maxSettings.isEnabled ? "Включен" : "Выключен"}
+                    </span>
+                  </div>
+
+                  <div className="settings-grid-2">
+                    <Toggle checked={Boolean(maxSettings.isEnabled)} onChange={(checked) => setMaxSettings({ ...maxSettings, isEnabled: checked })} label="Включить MAX уведомления" />
+                    <div className="settings-muted">
+                      Статус токена: {maxSettings.tokenConfigured ? "сохранен на сервере" : "не сохранен"}
+                    </div>
+                    <Field label="Новый bot token">
+                      <TextInput
+                        type="password"
+                        value={maxBotToken}
+                        autoComplete="new-password"
+                        placeholder={maxSettings.tokenConfigured ? "Оставьте пустым, чтобы не менять" : "Вставьте токен MAX"}
+                        onChange={(event) => setMaxBotToken(event.target.value)}
+                      />
+                    </Field>
+                    <Field label="Bot username">
+                      <TextInput value={maxSettings.botUsername || ""} onChange={(event) => setMaxSettings({ ...maxSettings, botUsername: event.target.value })} />
+                    </Field>
+                    <Field label="Webhook secret">
+                      <div className="settings-actions" style={{ alignItems: "stretch" }}>
+                        <TextInput style={{ flex: 1 }} value={maxSettings.webhookSecret || ""} onChange={(event) => setMaxSettings({ ...maxSettings, webhookSecret: event.target.value })} />
+                        <Button type="button" variant="secondary-crm" onClick={() => setMaxSettings({ ...maxSettings, webhookSecret: generateClientSecret() })}>Сгенерировать</Button>
+                      </div>
+                    </Field>
+                    <Field label="Webhook URL">
+                      <TextInput value={maxSettings.webhookUrl || ""} onChange={(event) => setMaxSettings({ ...maxSettings, webhookUrl: event.target.value })} />
+                    </Field>
+                  </div>
+
+                  <div className="settings-form-actions">
+                    <Button type="button" variant="secondary-crm" onClick={checkMaxBotToken} disabled={saving || !maxSettings.tokenConfigured}>
+                      <CheckCircle2 size={16} /> Проверить токен
+                    </Button>
+                    <Button type="button" variant="secondary-crm" onClick={subscribeMaxWebhookAction} disabled={saving || !maxSettings.tokenConfigured || !maxSettings.webhookUrl || !maxSettings.webhookSecret}>
+                      <LinkIcon size={16} /> Подписать webhook
+                    </Button>
+                    <Button type="button" variant="secondary-crm" disabled title="Станет доступно после привязки тестового MAX аккаунта">
+                      Отправить тест
+                    </Button>
+                    <Button type="submit" variant="primary-crm" disabled={saving}>
+                      <Save size={16} /> Сохранить MAX
+                    </Button>
+                  </div>
+                </div>
+              </form>
             </>
           )}
 

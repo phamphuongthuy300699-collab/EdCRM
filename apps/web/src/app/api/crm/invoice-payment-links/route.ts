@@ -61,12 +61,27 @@ export async function POST(request: NextRequest) {
     });
 
     const message = `Робокс: выставлен счёт ${invoice.title} на сумму ${Number(invoice.amount).toLocaleString("ru-RU")} ₽. Оплатить: ${link.payUrl}`;
+    const { data: maxSettings } = await (admin.from("bot_settings") as any)
+      .select("is_enabled")
+      .eq("organization_id", invoice.organization_id)
+      .eq("provider", "max")
+      .maybeSingle();
+    const { data: maxAccount } = invoice.guardian_id
+      ? await (admin.from("guardian_messenger_accounts") as any)
+        .select("id")
+        .eq("organization_id", invoice.organization_id)
+        .eq("guardian_id", invoice.guardian_id)
+        .eq("provider", "max")
+        .eq("is_verified", true)
+        .maybeSingle()
+      : { data: null };
+    const outboxChannel = maxSettings?.is_enabled && maxAccount ? "max" : "manual";
 
     await (admin.from("notification_outbox") as any).insert({
       organization_id: invoice.organization_id,
       guardian_id: invoice.guardian_id || null,
       invoice_id: invoice.id,
-      channel: "manual",
+      channel: outboxChannel,
       destination: null,
       template_key: "invoice_payment_link",
       payload: {
@@ -86,6 +101,8 @@ export async function POST(request: NextRequest) {
       publicId: link.publicId,
       reused: link.reused,
       regenerated: parsed.data.regenerate === true,
+      channel: outboxChannel,
+      maxLinked: outboxChannel === "max",
       message,
     });
   } catch (error: any) {
