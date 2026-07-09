@@ -53,12 +53,13 @@ describe("parent access management", () => {
 
     expect(source).toContain("/api/crm/parent-access/status");
     expect(source).toContain("/api/crm/parent-access/${action}");
-    expect(source).toContain("Выдать доступ");
-    expect(source).toContain("Сбросить пароль");
     expect(source).toContain("Отключить доступ");
+    expect(source).toContain("Открыть доступ родителю");
+    expect(source).toContain("Выдать новый пароль");
     expect(source).toContain("Скопировать пароль");
     expect(source).toContain("Скопировать инструкцию");
     expect(source).toContain("Показывается один раз. Скопируйте сейчас.");
+    expect(source).toContain("используйте ранее выданный пароль или запросите новый");
     expect(source).toContain("setReloadKey((value) => value + 1)");
     expect(source).toContain("guardian_id");
     expect(source).toContain("student_id");
