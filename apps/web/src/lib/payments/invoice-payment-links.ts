@@ -5,7 +5,7 @@ export type InvoicePaymentLinkResult = {
   invoiceId: string;
   organizationId: string;
   guardianId: string | null;
-  token: string;
+  publicId: string;
   tokenHash: string;
   payUrl: string;
   reused: boolean;
@@ -20,14 +20,14 @@ export function hashInvoicePaymentToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function newInvoicePaymentToken() {
-  return crypto.randomBytes(32).toString("base64url");
+function newPublicPaymentLinkId() {
+  return `pl_${crypto.randomBytes(24).toString("base64url")}`;
 }
 
-export function buildPublicPayUrl(token: string, origin?: string | null) {
+export function buildPublicPayUrl(publicId: string, origin?: string | null) {
   const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || origin || "";
-  if (!configuredOrigin) return `/pay/${token}`;
-  return new URL(`/pay/${token}`, configuredOrigin).toString();
+  if (!configuredOrigin) return `/pay/${publicId}`;
+  return new URL(`/pay/${publicId}`, configuredOrigin).toString();
 }
 
 async function loadInvoice(admin: ReturnType<typeof createSupabaseAdminClient>, invoiceId: string) {
@@ -45,7 +45,7 @@ async function loadInvoice(admin: ReturnType<typeof createSupabaseAdminClient>, 
 
 export async function createOrReuseInvoicePaymentLink(
   invoiceId: string,
-  input: { origin?: string | null; expiresAt?: string | null; metadata?: Record<string, any> } = {},
+  input: { origin?: string | null; expiresAt?: string | null; metadata?: Record<string, any>; regenerate?: boolean } = {},
 ): Promise<InvoicePaymentLinkResult> {
   const admin = createSupabaseAdminClient();
   const invoice = await loadInvoice(admin, invoiceId);
@@ -55,7 +55,7 @@ export async function createOrReuseInvoicePaymentLink(
   }
 
   const { data: existing } = await (admin.from("invoice_payment_links") as any)
-    .select("id, token_hash, status, expires_at")
+    .select("id, public_id, token_hash, status, expires_at")
     .eq("invoice_id", invoice.id)
     .eq("status", "active")
     .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
@@ -63,21 +63,53 @@ export async function createOrReuseInvoicePaymentLink(
     .limit(1)
     .maybeSingle();
 
-  const token = newInvoicePaymentToken();
-  const tokenHash = hashInvoicePaymentToken(token);
   const now = new Date().toISOString();
 
-  if (existing?.id) {
+  if (existing?.id && existing.public_id && !input.regenerate) {
+    return {
+      invoiceId: invoice.id,
+      organizationId: invoice.organization_id,
+      guardianId: invoice.guardian_id || null,
+      publicId: existing.public_id,
+      tokenHash: existing.token_hash,
+      payUrl: buildPublicPayUrl(existing.public_id, input.origin),
+      reused: true,
+    };
+  }
+
+  if (existing?.id && !input.regenerate) {
+    const publicId = newPublicPaymentLinkId();
+    const tokenHash = existing.token_hash || hashInvoicePaymentToken(publicId);
+    const { error: updateError } = await (admin.from("invoice_payment_links") as any)
+      .update({ public_id: publicId, token_hash: tokenHash, updated_at: now })
+      .eq("id", existing.id);
+    if (updateError) throw new Error(updateError.message || "Не удалось обновить публичную ссылку");
+
+    return {
+      invoiceId: invoice.id,
+      organizationId: invoice.organization_id,
+      guardianId: invoice.guardian_id || null,
+      publicId,
+      tokenHash,
+      payUrl: buildPublicPayUrl(publicId, input.origin),
+      reused: true,
+    };
+  }
+
+  if (existing?.id && input.regenerate) {
     await (admin.from("invoice_payment_links") as any)
       .update({ status: "inactive", updated_at: now })
       .eq("id", existing.id);
   }
 
+  const publicId = newPublicPaymentLinkId();
+  const tokenHash = hashInvoicePaymentToken(publicId);
   const { data: link, error: insertError } = await (admin.from("invoice_payment_links") as any)
     .insert({
       organization_id: invoice.organization_id,
       invoice_id: invoice.id,
       guardian_id: invoice.guardian_id || null,
+      public_id: publicId,
       token_hash: tokenHash,
       status: "active",
       expires_at: input.expiresAt || null,
@@ -97,19 +129,18 @@ export async function createOrReuseInvoicePaymentLink(
     invoiceId: invoice.id,
     organizationId: invoice.organization_id,
     guardianId: invoice.guardian_id || null,
-    token,
+    publicId,
     tokenHash,
-    payUrl: buildPublicPayUrl(token, input.origin),
-    reused: Boolean(existing?.id),
+    payUrl: buildPublicPayUrl(publicId, input.origin),
+    reused: false,
   };
 }
 
-export async function verifyInvoicePaymentToken(token: string): Promise<VerifiedInvoicePaymentToken> {
+export async function verifyInvoicePaymentPublicId(publicId: string): Promise<VerifiedInvoicePaymentToken> {
   const admin = createSupabaseAdminClient();
-  const tokenHash = hashInvoicePaymentToken(token);
   const { data: link, error } = await (admin.from("invoice_payment_links") as any)
-    .select("id, organization_id, invoice_id, guardian_id, token_hash, status, expires_at")
-    .eq("token_hash", tokenHash)
+    .select("id, organization_id, invoice_id, guardian_id, public_id, token_hash, status, expires_at")
+    .eq("public_id", publicId)
     .maybeSingle();
 
   if (error || !link) {
@@ -133,4 +164,16 @@ export async function verifyInvoicePaymentToken(token: string): Promise<Verified
     .eq("id", link.id);
 
   return { link, invoice };
+}
+
+export async function verifyInvoicePaymentToken(token: string): Promise<VerifiedInvoicePaymentToken> {
+  const admin = createSupabaseAdminClient();
+  const tokenHash = hashInvoicePaymentToken(token);
+  const { data: link, error } = await (admin.from("invoice_payment_links") as any)
+    .select("public_id")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (error || !link?.public_id) throw new Error("PAY_LINK_NOT_FOUND");
+  return verifyInvoicePaymentPublicId(link.public_id);
 }

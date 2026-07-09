@@ -3,13 +3,13 @@ import { z } from "zod";
 import { createAlfaOrder } from "@/lib/payments/alfabank/client";
 import { alfaErrorMessage, AlfaBankError } from "@/lib/payments/alfabank/errors";
 import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
-import { verifyInvoicePaymentToken } from "@/lib/payments/invoice-payment-links";
+import { verifyInvoicePaymentPublicId } from "@/lib/payments/invoice-payment-links";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 import { buildPaymentReturnUrl } from "../../alfabank/create/route";
 
 const bodySchema = z.object({
-  token: z.string().min(32),
+  publicId: z.string().min(16),
 });
 
 const reusablePaymentStatuses = ["pending", "redirected", "authorized"];
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       return jsonError("Некорректная ссылка оплаты", 422, "INVALID_PAY_TOKEN");
     }
 
-    const { invoice } = await verifyInvoicePaymentToken(parsed.data.token);
+    const { invoice } = await verifyInvoicePaymentPublicId(parsed.data.publicId);
     if (["paid", "cancelled"].includes(invoice.status)) {
       return jsonError(invoice.status === "paid" ? "Счет уже оплачен" : "Счет отменен", 409, "INVOICE_NOT_PAYABLE");
     }

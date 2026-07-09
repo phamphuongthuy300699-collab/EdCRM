@@ -1,5 +1,5 @@
 import PayTokenClient from "./PayTokenClient";
-import { verifyInvoicePaymentToken } from "@/lib/payments/invoice-payment-links";
+import { verifyInvoicePaymentPublicId } from "@/lib/payments/invoice-payment-links";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +19,13 @@ function statusMessage(code: string) {
   }
 }
 
-export default async function PublicPayPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
+export default async function PublicPayPage({ params }: { params: Promise<{ publicId: string }> }) {
+  const { publicId } = await params;
   let invoice: any = null;
   let errorMessage = "";
 
   try {
-    const verified = await verifyInvoicePaymentToken(token);
+    const verified = await verifyInvoicePaymentPublicId(publicId);
     invoice = verified.invoice;
   } catch (error: any) {
     errorMessage = statusMessage(error?.message || "");
@@ -76,7 +76,7 @@ export default async function PublicPayPage({ params }: { params: Promise<{ toke
                 Счет отменен.
               </div>
             )}
-            <PayTokenClient token={token} disabled={disabled} />
+            <PayTokenClient publicId={publicId} disabled={disabled} />
           </>
         )}
       </section>

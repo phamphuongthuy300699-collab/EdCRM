@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@robotics-crm/ui";
 
-export default function PayTokenClient({ token, disabled }: { token: string; disabled: boolean }) {
+export default function PayTokenClient({ publicId, disabled }: { publicId: string; disabled: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,7 +15,7 @@ export default function PayTokenClient({ token, disabled }: { token: string; dis
       const response = await fetch("/api/payments/public-link/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ publicId }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.paymentUrl) {

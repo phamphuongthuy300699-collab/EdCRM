@@ -45,7 +45,7 @@ export default function CrmInvoicesPage() {
   const [onlinePaymentError, setOnlinePaymentError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [publishMessage, setPublishMessage] = useState("");
-  const [publishedInvoiceLink, setPublishedInvoiceLink] = useState<{ invoiceId: string; payUrl: string; message: string } | null>(null);
+  const [publishedInvoiceLink, setPublishedInvoiceLink] = useState<{ invoiceId: string; payUrl: string; publicId?: string; message: string; regenerated?: boolean } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
@@ -407,7 +407,7 @@ export default function CrmInvoicesPage() {
     }
   };
 
-  const handlePublishInvoiceToParent = async (invoice: any) => {
+  const handlePublishInvoiceToParent = async (invoice: any, regenerate = false) => {
     if (onlinePayingInvoiceId) return;
     try {
       setOnlinePayingInvoiceId(invoice.id);
@@ -417,15 +417,15 @@ export default function CrmInvoicesPage() {
       if (isDemoMode() || invoice.id.startsWith("i-mock-") || invoice.id.length < 10) {
         const payUrl = `${window.location.origin}/pay/demo-${invoice.id}`;
         const message = `Робокс: выставлен счёт ${invoice.title} на сумму ${invoice.amount.toLocaleString("ru-RU")} ₽. Оплатить: ${payUrl}`;
-        setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl, message });
-        setPublishMessage("Демо-ссылка подготовлена.");
+        setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl, publicId: `demo-${invoice.id}`, message, regenerated: regenerate });
+        setPublishMessage(regenerate ? "Демо-ссылка перевыпущена. Старая ссылка больше не используется." : "Демо-ссылка подготовлена.");
         return;
       }
 
       const response = await fetch("/api/crm/invoice-payment-links", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ invoiceId: invoice.id }),
+        body: JSON.stringify({ invoiceId: invoice.id, regenerate }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.payUrl) {
@@ -433,8 +433,8 @@ export default function CrmInvoicesPage() {
       }
 
       const message = payload.message || `Робокс: выставлен счёт ${invoice.title} на сумму ${invoice.amount.toLocaleString("ru-RU")} ₽. Оплатить: ${payload.payUrl}`;
-      setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl: payload.payUrl, message });
-      setPublishMessage("Ссылка для родителя подготовлена.");
+      setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl: payload.payUrl, publicId: payload.publicId, message, regenerated: payload.regenerated === true });
+      setPublishMessage(payload.regenerated ? "Ссылка перевыпущена. Старая ссылка перестала работать." : "Ссылка для родителя подготовлена.");
       setActionMessage("Счет выставлен родителю.");
       setReloadKey((value) => value + 1);
     } catch (error: any) {
@@ -893,6 +893,26 @@ export default function CrmInvoicesPage() {
                         </button>
                       )}
 
+                      {["issued", "overdue"].includes(inv.status) && (
+                        <button
+                          onClick={() => handlePublishInvoiceToParent(inv, true)}
+                          disabled={onlinePayingInvoiceId === inv.id}
+                          title="Перевыпустить ссылку"
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "1px solid #F59E0B",
+                            background: "#FFFBEB",
+                            color: "#92400E",
+                            fontWeight: 800,
+                            fontSize: "11px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Перевыпустить ссылку
+                        </button>
+                      )}
+
                       {/* Mark As Paid (Manual cash/card mark) */}
                       {inv.status !== "paid" && inv.status !== "cancelled" && (
                         <button
@@ -946,6 +966,11 @@ export default function CrmInvoicesPage() {
                         <code style={{ maxWidth: "360px", width: "100%", padding: "6px 8px", borderRadius: "6px", background: "#F8FAFC", border: "1px solid var(--color-border)", color: "var(--color-text)", fontSize: "11px", textAlign: "left", overflowWrap: "anywhere" }}>
                           {publishedInvoiceLink!.payUrl}
                         </code>
+                        {publishedInvoiceLink!.regenerated && (
+                          <div style={{ maxWidth: "360px", color: "#92400E", fontSize: "11px", fontWeight: 800, textAlign: "left" }}>
+                            Старая ссылка перестала работать.
+                          </div>
+                        )}
                         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <Button type="button" variant="secondary-site" onClick={() => copyPublishedInvoiceText(publishedInvoiceLink!.payUrl, "Ссылка скопирована")} style={{ fontSize: "11px", minHeight: "30px" }}>
                             Скопировать ссылку
