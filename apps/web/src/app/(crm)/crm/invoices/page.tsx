@@ -44,6 +44,8 @@ export default function CrmInvoicesPage() {
   const [onlinePayingInvoiceId, setOnlinePayingInvoiceId] = useState<string | null>(null);
   const [onlinePaymentError, setOnlinePaymentError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [publishMessage, setPublishMessage] = useState("");
+  const [publishedInvoiceLink, setPublishedInvoiceLink] = useState<{ invoiceId: string; payUrl: string; message: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const processingMap = useRef<Record<string, boolean>>({});
   const supabase = createSupabaseBrowserClient();
@@ -405,6 +407,56 @@ export default function CrmInvoicesPage() {
     }
   };
 
+  const handlePublishInvoiceToParent = async (invoice: any) => {
+    if (onlinePayingInvoiceId) return;
+    try {
+      setOnlinePayingInvoiceId(invoice.id);
+      setPublishMessage("");
+      setPublishedInvoiceLink(null);
+
+      if (isDemoMode() || invoice.id.startsWith("i-mock-") || invoice.id.length < 10) {
+        const payUrl = `${window.location.origin}/pay/demo-${invoice.id}`;
+        const message = `Робокс: выставлен счёт ${invoice.title} на сумму ${invoice.amount.toLocaleString("ru-RU")} ₽. Оплатить: ${payUrl}`;
+        setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl, message });
+        setPublishMessage("Демо-ссылка подготовлена.");
+        return;
+      }
+
+      const response = await fetch("/api/crm/invoice-payment-links", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoiceId: invoice.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.payUrl) {
+        throw new Error(payload.error || "Не удалось выставить счет родителю");
+      }
+
+      const message = payload.message || `Робокс: выставлен счёт ${invoice.title} на сумму ${invoice.amount.toLocaleString("ru-RU")} ₽. Оплатить: ${payload.payUrl}`;
+      setPublishedInvoiceLink({ invoiceId: invoice.id, payUrl: payload.payUrl, message });
+      setPublishMessage("Ссылка для родителя подготовлена.");
+      setActionMessage("Счет выставлен родителю.");
+      setReloadKey((value) => value + 1);
+    } catch (error: any) {
+      setPublishMessage(error.message || "Не удалось выставить счет родителю");
+    } finally {
+      setOnlinePayingInvoiceId(null);
+    }
+  };
+
+  const copyPublishedInvoiceText = async (text: string, successMessage: string) => {
+    if (!navigator?.clipboard?.writeText) {
+      setPublishMessage("Скопируйте вручную: буфер обмена недоступен");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setPublishMessage(successMessage);
+    } catch {
+      setPublishMessage("Скопируйте вручную: буфер обмена недоступен");
+    }
+  };
+
   const handleCheckPaymentStatus = async (invoiceId: string) => {
     try {
       if (isDemoMode() || invoiceId.startsWith("i-mock-") || invoiceId.length < 10) {
@@ -630,6 +682,13 @@ export default function CrmInvoicesPage() {
           </p>
         </div>
       )}
+      {publishMessage && (
+        <div className="card-crm" style={{ background: "white", padding: "14px 16px", borderColor: publishMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-primary)" }}>
+          <p style={{ margin: 0, color: publishMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-primary-dark)", fontSize: "13px", fontWeight: 700 }}>
+            {publishMessage}
+          </p>
+        </div>
+      )}
 
       {/* Date & Period Filters */}
       <div className="card-crm" style={{ background: "white", padding: "16px", display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
@@ -814,6 +873,26 @@ export default function CrmInvoicesPage() {
                         </button>
                       )}
 
+                      {["draft", "issued", "overdue"].includes(inv.status) && (
+                        <button
+                          onClick={() => handlePublishInvoiceToParent(inv)}
+                          disabled={onlinePayingInvoiceId === inv.id}
+                          title="Выставить родителю"
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--color-primary)",
+                            background: "var(--color-primary-soft)",
+                            color: "var(--color-primary-dark)",
+                            fontWeight: 800,
+                            fontSize: "11px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Выставить родителю
+                        </button>
+                      )}
+
                       {/* Mark As Paid (Manual cash/card mark) */}
                       {inv.status !== "paid" && inv.status !== "cancelled" && (
                         <button
@@ -862,6 +941,21 @@ export default function CrmInvoicesPage() {
                       )}
 
                     </div>
+                    {publishedInvoiceLink?.invoiceId === inv.id && (
+                      <div style={{ marginTop: "8px", display: "grid", gap: "6px", justifyItems: "end" }}>
+                        <code style={{ maxWidth: "360px", width: "100%", padding: "6px 8px", borderRadius: "6px", background: "#F8FAFC", border: "1px solid var(--color-border)", color: "var(--color-text)", fontSize: "11px", textAlign: "left", overflowWrap: "anywhere" }}>
+                          {publishedInvoiceLink!.payUrl}
+                        </code>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                          <Button type="button" variant="secondary-site" onClick={() => copyPublishedInvoiceText(publishedInvoiceLink!.payUrl, "Ссылка скопирована")} style={{ fontSize: "11px", minHeight: "30px" }}>
+                            Скопировать ссылку
+                          </Button>
+                          <Button type="button" variant="secondary-site" onClick={() => copyPublishedInvoiceText(publishedInvoiceLink!.message, "Сообщение родителю скопировано")} style={{ fontSize: "11px", minHeight: "30px" }}>
+                            Скопировать сообщение родителю
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

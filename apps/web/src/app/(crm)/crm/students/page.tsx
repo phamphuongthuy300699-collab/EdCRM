@@ -288,7 +288,9 @@ export default function CrmStudentsPage() {
     `Здравствуйте! Для вас создан личный кабинет Робокс.\n\n` +
     `Адрес входа:\nhttps://робокс48.рф/parent/login\n\n` +
     `Логин:\n${selectedStudent?.parentEmail || ""}\n\n` +
-    `Временный пароль:\n${temporaryParentPassword}\n\n` +
+    (temporaryParentPassword
+      ? `Временный пароль:\n${temporaryParentPassword}\n\n`
+      : "Пароль:\nиспользуйте ранее выданный пароль или запросите новый у администратора.\n\n") +
     `После входа вы сможете видеть счета, оплаты и информацию по занятиям ребёнка.`
   );
 
@@ -1023,8 +1025,13 @@ export default function CrmStudentsPage() {
                   {parentAccessLoading ? "Проверяем..." : parentAccess?.status?.label || "Не проверено"}
                 </span>
               </div>
+              {parentAccess?.status?.status === "linked" && (
+                <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534", borderRadius: "8px", padding: "10px", fontSize: "12px", fontWeight: 800 }}>
+                  Доступ выдан
+                </div>
+              )}
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                Email: {selectedStudent.parentEmail || "не указан"}
+                Email / логин: {selectedStudent.parentEmail || "не указан"}
               </div>
               {parentAccessMessage && (
                 <div style={{ fontSize: "12px", color: parentAccessMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-success)", fontWeight: 700 }}>
@@ -1055,16 +1062,31 @@ export default function CrmStudentsPage() {
                   )}
                 </div>
               )}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                <Button type="button" variant="primary-crm" disabled={parentAccessLoading || !selectedStudent.guardianId || !selectedStudent.parentEmail} onClick={() => runParentAccessAction("issue")} style={{ fontSize: "12px", minHeight: "36px" }}>
-                  Выдать доступ
-                </Button>
-                <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId} onClick={() => runParentAccessAction("reset-password")} style={{ fontSize: "12px", minHeight: "36px" }}>
-                  Сбросить пароль
-                </Button>
-                <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId || parentAccess?.status?.status !== "linked"} onClick={() => runParentAccessAction("disable")} style={{ fontSize: "12px", minHeight: "36px", gridColumn: "1 / -1", color: "var(--color-danger)" }}>
-                  Отключить доступ
-                </Button>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {parentAccess?.status?.status === "linked" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <Button type="button" variant="primary-crm" disabled={parentAccessLoading || !selectedStudent.parentEmail} onClick={() => copyParentAccessText(buildParentAccessInstruction(), "Инструкция скопирована")} style={{ fontSize: "12px", minHeight: "36px" }}>
+                      Скопировать инструкцию
+                    </Button>
+                    <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId} onClick={() => runParentAccessAction("reset-password")} style={{ fontSize: "12px", minHeight: "36px" }}>
+                      Выдать новый пароль
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="primary-crm" disabled={parentAccessLoading || !selectedStudent.guardianId || !selectedStudent.parentEmail} onClick={() => runParentAccessAction("issue")} style={{ fontSize: "12px", minHeight: "38px" }}>
+                    Открыть доступ родителю
+                  </Button>
+                )}
+                {parentPasswordCopyMessage && !temporaryParentPassword && (
+                  <div style={{ color: parentPasswordCopyMessage.includes("недоступен") ? "#92400E" : "var(--color-success)", fontWeight: 700, fontSize: "12px" }}>
+                    {parentPasswordCopyMessage}
+                  </div>
+                )}
+                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "4px" }}>
+                  <Button type="button" variant="secondary-site" disabled={parentAccessLoading || !selectedStudent.guardianId || parentAccess?.status?.status !== "linked"} onClick={() => runParentAccessAction("disable")} style={{ fontSize: "12px", minHeight: "34px", color: "var(--color-danger)" }}>
+                    Отключить доступ
+                  </Button>
+                </div>
               </div>
             </div>
 
