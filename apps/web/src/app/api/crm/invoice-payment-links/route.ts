@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
+  regenerate: z.boolean().optional(),
 });
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
@@ -55,7 +56,26 @@ export async function POST(request: NextRequest) {
 
     const link = await createOrReuseInvoicePaymentLink(invoice.id, {
       origin: request.nextUrl.origin,
+      regenerate: parsed.data.regenerate === true,
       metadata: { source: "crm_publish_action", actorId: user.id },
+    });
+
+    const message = `Робокс: выставлен счёт ${invoice.title} на сумму ${Number(invoice.amount).toLocaleString("ru-RU")} ₽. Оплатить: ${link.payUrl}`;
+
+    await (admin.from("notification_outbox") as any).insert({
+      organization_id: invoice.organization_id,
+      guardian_id: invoice.guardian_id || null,
+      invoice_id: invoice.id,
+      channel: "manual",
+      destination: null,
+      template_key: "invoice_payment_link",
+      payload: {
+        invoiceId: invoice.id,
+        payUrl: link.payUrl,
+        publicId: link.publicId,
+        amount: Number(invoice.amount),
+        title: invoice.title,
+      },
     });
 
     return NextResponse.json({
@@ -63,9 +83,10 @@ export async function POST(request: NextRequest) {
       invoiceId: invoice.id,
       guardianId: invoice.guardian_id || null,
       payUrl: link.payUrl,
-      token: link.token,
+      publicId: link.publicId,
       reused: link.reused,
-      message: `Робокс: выставлен счёт ${invoice.title} на сумму ${Number(invoice.amount).toLocaleString("ru-RU")} ₽. Оплатить: ${link.payUrl}`,
+      regenerated: parsed.data.regenerate === true,
+      message,
     });
   } catch (error: any) {
     return jsonError(error.message || "Не удалось создать ссылку для родителя", 500);
