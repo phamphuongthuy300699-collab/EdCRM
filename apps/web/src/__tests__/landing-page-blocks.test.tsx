@@ -46,6 +46,29 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText("от 9999 ₽ / мес")).toBeInTheDocument();
   });
 
+  it("uses the course card image as a stable background and skips empty image URLs", () => {
+    const { container, rerender } = render(<LandingPageClient initialCourses={[{
+      id: "course-with-image",
+      title: "Курс с фоном",
+      slug: "course-with-image",
+      card_image_url: "course-cards/robotics.webp",
+      card_image_alt: "Робот на учебном столе",
+    }]} />);
+
+    const card = container.querySelector('[data-course-card="course-with-image"]');
+    expect(card).toHaveStyle({ minHeight: "380px" });
+    expect(card?.getAttribute("style")).toContain("course-cards/robotics.webp");
+
+    rerender(<LandingPageClient initialCourses={[{
+      id: "course-without-image",
+      title: "Курс без фона",
+      slug: "course-without-image",
+      card_image_url: "",
+    }]} />);
+    const fallbackCard = container.querySelector('[data-course-card="course-without-image"]');
+    expect(fallbackCard?.getAttribute("style")).not.toContain("background-image");
+  });
+
   it("renders courses empty state when initialCourses prop is empty", () => {
     render(<LandingPageClient initialCourses={[]} />);
     expect(screen.getByText("Направления обучения пока не заполнены в CRM.")).toBeInTheDocument();

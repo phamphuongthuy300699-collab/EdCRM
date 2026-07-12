@@ -326,6 +326,7 @@ export default function LandingPageClient({
         mission: "",
         results: [],
         icon: Cpu,
+        cardImageUrl: typeof dbCourse.card_image_url === "string" ? dbCourse.card_image_url.trim() : "",
         price: dbCourse.price_monthly ? `от ${Math.round(dbCourse.price_monthly)} ₽ / мес` : "Цена уточняется"
       }))
     : [];
@@ -737,13 +738,20 @@ export default function LandingPageClient({
             ) : (
               coursesToRender.map((course) => {
                 const IconComp = course.icon;
+                const hasCardImage = Boolean(course.cardImageUrl);
                 return (
-                <div key={course.id} className="card-site" style={{
+                <div key={course.id} className="card-site" data-course-card={course.id} style={{
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
                   gap: "24px",
-                  minHeight: "380px"
+                  minHeight: "380px",
+                  ...(hasCardImage ? {
+                    backgroundImage: `linear-gradient(rgba(5, 20, 46, 0.72), rgba(5, 20, 46, 0.82)), url("${getMediaUrl(course.cardImageUrl)}")`,
+                    backgroundPosition: "center",
+                    backgroundSize: "cover",
+                    color: "white",
+                  } : {}),
                 }}>
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -759,14 +767,14 @@ export default function LandingPageClient({
                       <span className="badge badge-blue" style={{ fontWeight: 800 }}>{course.age}</span>
                     </div>
                     <Link href={course.slug} onClick={() => triggerGoal("course_page_viewed")}>
-                      <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "12px", fontFamily: "var(--font-geologica)", transition: "color 0.2s" }} className="hover-link-primary">
+                      <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "12px", fontFamily: "var(--font-geologica)", transition: "color 0.2s", color: hasCardImage ? "white" : undefined }} className="hover-link-primary">
                         {course.title}
                       </h3>
                     </Link>
                     
                     {course.mission && (
                       <div style={{ 
-                        background: "var(--color-bg)", 
+                        background: hasCardImage ? "rgba(255, 255, 255, 0.92)" : "var(--color-bg)",
                         padding: "12px", 
                         borderRadius: "8px", 
                         marginBottom: "16px",
@@ -777,15 +785,15 @@ export default function LandingPageClient({
                       </div>
                     )}
 
-                    <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)", marginBottom: "16px" }}>{course.desc}</p>
+                    <p style={{ fontSize: "var(--font-small)", color: hasCardImage ? "rgba(255, 255, 255, 0.9)" : "var(--color-text-muted)", marginBottom: "16px" }}>{course.desc}</p>
                     
                     {course.results.length > 0 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Результаты первого месяца:</div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: hasCardImage ? "rgba(255, 255, 255, 0.85)" : "var(--color-text-muted)" }}>Результаты первого месяца:</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                           {course.results.map((res: string, i: number) => (
                             <span key={i} style={{
-                              background: "rgba(37, 99, 235, 0.05)",
+                              background: hasCardImage ? "rgba(255, 255, 255, 0.9)" : "rgba(37, 99, 235, 0.05)",
                               color: "var(--color-primary-dark)",
                               padding: "4px 8px",
                               borderRadius: "6px",
@@ -799,8 +807,8 @@ export default function LandingPageClient({
                       </div>
                     )}
                   </div>
-                  <div className="site-course-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
-                    <span style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--color-text)" }}>{course.price}</span>
+                  <div className="site-course-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: hasCardImage ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid var(--color-border)", paddingTop: "16px" }}>
+                    <span style={{ fontWeight: 800, fontSize: "1.1rem", color: hasCardImage ? "white" : "var(--color-text)" }}>{course.price}</span>
                     <div className="site-course-card-actions" style={{ display: "flex", gap: "12px" }}>
                       <Link href={course.slug}>
                         <Button variant="secondary-site" style={{ height: "38px", padding: "0 16px", fontSize: "12px" }}>

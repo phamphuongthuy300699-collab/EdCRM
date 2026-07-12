@@ -10,6 +10,7 @@ const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
 const WHITELIST_FOLDERS = [
   "branding",
   "hero",
+  "course-cards",
   "teachers",
   "facilities",
   "student-projects",
@@ -222,6 +223,11 @@ export async function DELETE(req: NextRequest) {
     .select("full_name")
     .eq("avatar_url", mediaPath);
   (profiles || []).forEach((profile: any) => usages.push(`Фото сотрудника: ${profile.full_name || "без имени"}`));
+
+  const { data: courses } = await (admin.from("courses") as any)
+    .select("title")
+    .eq("card_image_url", mediaPath);
+  (courses || []).forEach((course: any) => usages.push(`Фон курса: ${course.title || "без названия"}`));
 
   if (usages.length > 0) {
     return NextResponse.json({

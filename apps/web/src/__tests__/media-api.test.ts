@@ -142,6 +142,33 @@ describe("Media API Endpoint Security", () => {
     }
   });
 
+  it("allows the CRM to list course card media", async () => {
+    const originalMediaDriver = process.env.MEDIA_DRIVER;
+    const originalMediaLocalDir = process.env.MEDIA_LOCAL_DIR;
+    const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-course-card-media-"));
+    process.env.MEDIA_DRIVER = "local";
+    process.env.MEDIA_LOCAL_DIR = tempMediaDir;
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }) },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+      }),
+    } as any);
+
+    try {
+      const response = await GET(new NextRequest("http://localhost:3000/api/crm/media?folder=course-cards"));
+      expect(response.status).toBe(200);
+    } finally {
+      if (originalMediaDriver === undefined) delete process.env.MEDIA_DRIVER;
+      else process.env.MEDIA_DRIVER = originalMediaDriver;
+      if (originalMediaLocalDir === undefined) delete process.env.MEDIA_LOCAL_DIR;
+      else process.env.MEDIA_LOCAL_DIR = originalMediaLocalDir;
+      fs.rmSync(tempMediaDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns local /media URLs and writes uploaded files to the local media root", async () => {
     const originalMediaDriver = process.env.MEDIA_DRIVER;
     const originalNextPublicMediaDriver = process.env.NEXT_PUBLIC_MEDIA_DRIVER;

@@ -31,6 +31,7 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { getMediaUrl } from "@/shared/utils/media";
 
 type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
@@ -93,6 +94,8 @@ const emptyCourse = {
   sort_order: 100,
   seo_title: "",
   seo_description: "",
+  card_image_url: "",
+  card_image_alt: "",
 };
 
 const emptyGroup = {
@@ -298,6 +301,7 @@ export default function CrmSettingsPage() {
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
   const [staffError, setStaffError] = useState("");
   const [uploadingStaffAvatar, setUploadingStaffAvatar] = useState(false);
+  const [uploadingCourseImage, setUploadingCourseImage] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
 
   const supabase = createSupabaseBrowserClient();
@@ -700,6 +704,8 @@ export default function CrmSettingsPage() {
         sort_order: Number(courseDraft.sort_order || 100),
         seo_title: courseDraft.seo_title || null,
         seo_description: courseDraft.seo_description || null,
+        card_image_url: courseDraft.card_image_url?.trim() || null,
+        card_image_alt: courseDraft.card_image_alt?.trim() || null,
         updated_at: new Date().toISOString(),
       };
       if (demo) {
@@ -719,6 +725,28 @@ export default function CrmSettingsPage() {
       setError(err.message || "Не удалось сохранить направление");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCourseImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !courseDraft) return;
+
+    try {
+      setUploadingCourseImage(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "course-cards");
+      const response = await fetch("/api/crm/media", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error || "Не удалось загрузить фон");
+      setCourseDraft((current: any) => current ? { ...current, card_image_url: payload.path } : current);
+      setNotice("Фон карточки загружен");
+    } catch (err: any) {
+      setError(err.message || "Не удалось загрузить фон карточки");
+    } finally {
+      setUploadingCourseImage(false);
     }
   }
 
@@ -1963,6 +1991,28 @@ export default function CrmSettingsPage() {
             <Field label="Краткое описание"><TextArea value={courseDraft.short_description || ""} onChange={(e) => setCourseDraft({ ...courseDraft, short_description: e.target.value })} /></Field>
             <Field label="Полное описание"><TextArea value={courseDraft.full_description || ""} onChange={(e) => setCourseDraft({ ...courseDraft, full_description: e.target.value })} /></Field>
             <Field label="SEO description"><TextArea value={courseDraft.seo_description || ""} onChange={(e) => setCourseDraft({ ...courseDraft, seo_description: e.target.value })} /></Field>
+            <div className="settings-card">
+              <div className="settings-card-head">
+                <div>
+                  <h3>Фон карточки курса</h3>
+                  <p>Файл хранится в media/course-cards, а в курсе — только путь.</p>
+                </div>
+                {courseDraft.card_image_url && (
+                  <Button type="button" variant="secondary-crm" onClick={() => setCourseDraft({ ...courseDraft, card_image_url: "", card_image_alt: "" })}>Очистить</Button>
+                )}
+              </div>
+              {courseDraft.card_image_url && (
+                <img src={getMediaUrl(courseDraft.card_image_url)} alt={courseDraft.card_image_alt || courseDraft.title || "Фон карточки курса"} style={{ width: "100%", height: "220px", objectFit: "cover", borderRadius: "12px" }} />
+              )}
+              <div className="settings-grid-2">
+                <Field label="Путь / URL изображения"><TextInput value={courseDraft.card_image_url || ""} onChange={(e) => setCourseDraft({ ...courseDraft, card_image_url: e.target.value })} placeholder="course-cards/robotics.webp" /></Field>
+                <Field label="Описание изображения"><TextInput value={courseDraft.card_image_alt || ""} onChange={(e) => setCourseDraft({ ...courseDraft, card_image_alt: e.target.value })} /></Field>
+              </div>
+              <label className="btn btn-secondary-crm" style={{ alignSelf: "flex-start", cursor: uploadingCourseImage ? "wait" : "pointer" }}>
+                <Upload size={16} /> {uploadingCourseImage ? "Загрузка..." : "Загрузить в media"}
+                <input type="file" accept="image/*" hidden disabled={uploadingCourseImage} onChange={handleCourseImageUpload} />
+              </label>
+            </div>
             <div className="settings-actions">
               <Toggle checked={courseDraft.is_public} onChange={(checked) => setCourseDraft({ ...courseDraft, is_public: checked })} label="Показывать на сайте" />
               <Toggle checked={courseDraft.is_active} onChange={(checked) => setCourseDraft({ ...courseDraft, is_active: checked })} label="Активен" />
