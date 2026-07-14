@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { MaxBotError, maxErrorResponse, safeMaxHttpCode, safeMaxNetworkCode } from "../lib/bots/max/client";
 import {
   findGuardianByVerifiedPhone,
   normalizeMaxVcfInfo,
@@ -12,6 +14,23 @@ import {
 
 function read(relativePath: string) {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
+}
+
+function openSslBin() {
+  const candidates = [
+    process.env.OPENSSL_BIN,
+    "openssl",
+    "C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe",
+    "C:\\Program Files\\Git\\usr\\bin\\openssl.exe",
+  ].filter(Boolean) as string[];
+  return candidates.find((candidate) => {
+    try {
+      execFileSync(candidate, ["version"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  }) || "openssl";
 }
 
 describe("MAX bot MVP", () => {
@@ -32,6 +51,25 @@ describe("MAX bot MVP", () => {
 
     expect(verifyMaxContactHash(token, vcfInfo, hash)).toBe(true);
     expect(verifyMaxContactHash(token, vcfInfo, "bad-hash")).toBe(false);
+  });
+
+  it("maps certificate network causes to MAX_TLS_ERROR", () => {
+    expect(safeMaxNetworkCode({ cause: { code: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", message: "unable to get local issuer certificate" } })).toBe("MAX_TLS_ERROR");
+    expect(safeMaxNetworkCode({ cause: { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" } })).toBe("MAX_TLS_ERROR");
+  });
+
+  it("maps DNS network causes to MAX_DNS_ERROR", () => {
+    expect(safeMaxNetworkCode({ cause: { code: "ENOTFOUND", hostname: "platform-api2.max.ru" } })).toBe("MAX_DNS_ERROR");
+    expect(safeMaxNetworkCode({ cause: { code: "EAI_AGAIN", hostname: "platform-api2.max.ru" } })).toBe("MAX_DNS_ERROR");
+  });
+
+  it("maps timeout network causes to MAX_TIMEOUT", () => {
+    expect(safeMaxNetworkCode({ name: "AbortError", message: "This operation was aborted" })).toBe("MAX_TIMEOUT");
+    expect(safeMaxNetworkCode({ cause: { code: "ETIMEDOUT" } })).toBe("MAX_TIMEOUT");
+  });
+
+  it("maps HTTP 401 to MAX_HTTP_401", () => {
+    expect(safeMaxHttpCode(401)).toBe("MAX_HTTP_401");
   });
 
   it("parses phone from official MAX VCF contact payload with CRLF", () => {
@@ -116,6 +154,13 @@ describe("MAX bot MVP", () => {
   it("bot settings API never returns stored bot token", () => {
     const route = read("src/app/api/crm/bot-settings/max/route.ts");
     const webhook = read("src/app/api/bots/max/webhook/route.ts");
+    const checkRoute = read("src/app/api/crm/bot-settings/max/check/route.ts");
+    const subscribeRoute = read("src/app/api/crm/bot-settings/max/subscribe/route.ts");
+    const client = read("src/lib/bots/max/client.ts");
+    const payload = maxErrorResponse(
+      new MaxBotError("token max-test-token failed", "MAX_HTTP_401", "request-id", 401),
+      "Не удалось проверить токен MAX",
+    );
 
     expect(route).toContain("tokenConfigured");
     expect(route).toContain("bot_token_secret");
@@ -124,5 +169,38 @@ describe("MAX bot MVP", () => {
     expect(route).not.toContain("botToken: current");
     expect(webhook).not.toMatch(/console\.(log|warn|error)\([^)]*bot_token_secret/s);
     expect(webhook).not.toMatch(/NextResponse\.json\([^)]*bot_token_secret/s);
+    expect(JSON.stringify(payload)).not.toContain("max-test-token");
+    expect(checkRoute).toContain("maxErrorResponse");
+    expect(subscribeRoute).toContain("maxErrorResponse");
+    expect(client).not.toMatch(/console\.error\([^)]*Authorization/s);
+    expect(client).not.toMatch(/console\.error\([^)]*token/s);
+  });
+
+  it("Dockerfile installs MAX CA certificates for Node TLS", () => {
+    const dockerfile = read("../../Dockerfile");
+
+    expect(dockerfile).toContain("apk add --no-cache ca-certificates");
+    expect(dockerfile).toContain("update-ca-certificates");
+    expect(dockerfile).toContain("NODE_EXTRA_CA_CERTS=/app/certs/max-ca-bundle.pem");
+    expect(dockerfile).toContain("russian-trusted-root-ca.crt");
+    expect(dockerfile).toContain("russian-trusted-sub-ca.crt");
+  });
+
+  it("Russian trusted CA certificates are readable by openssl x509", () => {
+    const openssl = openSslBin();
+    const root = path.join(process.cwd(), "..", "..", "infra", "certs", "russian-trusted-root-ca.crt");
+    const sub = path.join(process.cwd(), "..", "..", "infra", "certs", "russian-trusted-sub-ca.crt");
+
+    expect(execFileSync(openssl, ["x509", "-in", root, "-noout", "-subject"], { encoding: "utf8" })).toContain("Russian Trusted Root CA");
+    expect(execFileSync(openssl, ["x509", "-in", sub, "-noout", "-subject"], { encoding: "utf8" })).toContain("Russian Trusted Sub CA");
+  });
+
+  it("MAX CA bundle contains only public certificate blocks", () => {
+    const bundle = read("../../infra/certs/max-ca-bundle.pem");
+    const withoutCerts = bundle.replace(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g, "").trim();
+
+    expect((bundle.match(/-----BEGIN CERTIFICATE-----/g) || [])).toHaveLength(2);
+    expect(withoutCerts).toBe("");
+    expect(bundle).not.toContain("PRIVATE KEY");
   });
 });

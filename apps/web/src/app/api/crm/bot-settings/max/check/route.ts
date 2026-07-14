@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
-import { getMaxBotInfo } from "@/lib/bots/max/client";
+import { getMaxBotInfo, maxErrorResponse } from "@/lib/bots/max/client";
 import { requireBotStaff } from "@/lib/bots/max/utils";
 
 export async function POST() {
@@ -16,7 +16,9 @@ export async function POST() {
   try {
     const info: any = await getMaxBotInfo(settings.bot_token_secret);
     return NextResponse.json({ ok: true, bot: { username: info?.username || info?.name || "", id: info?.id || null } });
-  } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error.message || "Не удалось проверить токен" }, { status: 502 });
+  } catch (error) {
+    const payload = maxErrorResponse(error, "Не удалось проверить токен MAX");
+    console.error("[MAX settings check] failed", payload);
+    return NextResponse.json({ ok: false, ...payload }, { status: 502 });
   }
 }

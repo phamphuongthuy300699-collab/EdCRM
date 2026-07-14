@@ -51,6 +51,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+RUN apk add --no-cache ca-certificates
+COPY infra/certs/russian-trusted-root-ca.crt \
+  /usr/local/share/ca-certificates/russian-trusted-root-ca.crt
+COPY infra/certs/russian-trusted-sub-ca.crt \
+  /usr/local/share/ca-certificates/russian-trusted-sub-ca.crt
+RUN update-ca-certificates
+
+COPY infra/certs/max-ca-bundle.pem /app/certs/max-ca-bundle.pem
+
+ENV NODE_EXTRA_CA_CERTS=/app/certs/max-ca-bundle.pem
+
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
