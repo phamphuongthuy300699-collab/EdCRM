@@ -755,16 +755,24 @@ export default function LandingPageClient({
                 }}>
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <Link href={course.slug} onClick={() => triggerGoal("course_page_viewed")} style={{
-                        background: "var(--color-primary-soft)",
-                        color: "var(--color-primary)",
+                      <Link href={course.slug} data-course-card-icon-link onClick={() => triggerGoal("course_page_viewed")} style={{
+                        background: hasCardImage ? "rgba(255, 255, 255, 0.16)" : "var(--color-primary-soft)",
+                        color: hasCardImage ? "white" : "var(--color-primary)",
                         padding: "10px",
                         borderRadius: "10px",
-                        display: "inline-flex"
+                        display: "inline-flex",
+                        border: hasCardImage ? "1px solid rgba(255, 255, 255, 0.32)" : undefined,
+                        boxShadow: hasCardImage ? "0 10px 24px rgba(5, 20, 46, 0.18)" : undefined,
                       }}>
                         <IconComp size={24} />
                       </Link>
-                      <span className="badge badge-blue" style={{ fontWeight: 800 }}>{course.age}</span>
+                      <span className="badge badge-blue" data-course-card-age style={{
+                        fontWeight: 800,
+                        background: hasCardImage ? "rgba(255, 255, 255, 0.16)" : undefined,
+                        color: hasCardImage ? "white" : undefined,
+                        border: hasCardImage ? "1px solid rgba(255, 255, 255, 0.32)" : undefined,
+                        textShadow: hasCardImage ? "0 1px 2px rgba(5, 20, 46, 0.28)" : undefined,
+                      }}>{course.age}</span>
                     </div>
                     <Link href={course.slug} onClick={() => triggerGoal("course_page_viewed")}>
                       <h3 style={{ fontSize: "var(--font-h3)", marginBottom: "12px", fontFamily: "var(--font-geologica)", transition: "color 0.2s", color: hasCardImage ? "white" : undefined }} className="hover-link-primary">

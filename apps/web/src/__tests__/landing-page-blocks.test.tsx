@@ -58,6 +58,14 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     const card = container.querySelector('[data-course-card="course-with-image"]');
     expect(card).toHaveStyle({ minHeight: "380px" });
     expect(card?.getAttribute("style")).toContain("course-cards/robotics.webp");
+    expect(card?.querySelector("[data-course-card-icon-link]")).toHaveStyle({
+      color: "rgb(255, 255, 255)",
+      background: "rgba(255, 255, 255, 0.16)",
+    });
+    expect(card?.querySelector("[data-course-card-age]")).toHaveStyle({
+      color: "rgb(255, 255, 255)",
+      background: "rgba(255, 255, 255, 0.16)",
+    });
 
     rerender(<LandingPageClient initialCourses={[{
       id: "course-without-image",
