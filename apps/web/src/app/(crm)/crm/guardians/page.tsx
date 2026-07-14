@@ -19,6 +19,9 @@ type GuardianRow = {
   debtAmount: number;
   invoices: any[];
   payments: any[];
+  lastPayment: any | null;
+  duplicateReasons: string[];
+  isPossibleDuplicate: boolean;
 };
 
 const filters = [
@@ -29,6 +32,7 @@ const filters = [
   { id: "portal-missing", label: "ЛК не выдан" },
   { id: "max-linked", label: "MAX привязан" },
   { id: "max-missing", label: "MAX не привязан" },
+  { id: "duplicates", label: "Возможные дубликаты" },
   { id: "archived", label: "Архив" },
 ];
 
@@ -40,6 +44,9 @@ export default function CrmGuardiansPage() {
   const [selected, setSelected] = useState<GuardianRow | null>(null);
   const [form, setForm] = useState({ fullName: "", phone: "", email: "", notes: "", status: "active" });
   const [message, setMessage] = useState("");
+  const [mergeMasterId, setMergeMasterId] = useState("");
+  const [mergeDuplicateId, setMergeDuplicateId] = useState("");
+  const [merging, setMerging] = useState(false);
 
   async function loadGuardians() {
     setLoading(true);
@@ -48,6 +55,11 @@ export default function CrmGuardiansPage() {
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось загрузить родителей");
       setGuardians(payload.guardians || []);
+      const requestedGuardianId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("guardian") : null;
+      if (requestedGuardianId) {
+        const requested = (payload.guardians || []).find((guardian: GuardianRow) => guardian.id === requestedGuardianId);
+        if (requested) setSelected(requested);
+      }
     } catch (error: any) {
       setMessage(error.message || "Не удалось загрузить родителей");
     } finally {
@@ -61,6 +73,8 @@ export default function CrmGuardiansPage() {
 
   useEffect(() => {
     if (!selected) return;
+    setMergeMasterId(selected.id);
+    setMergeDuplicateId("");
     setForm({
       fullName: selected.fullName || "",
       phone: selected.phone || "",
@@ -88,6 +102,7 @@ export default function CrmGuardiansPage() {
         filter === "portal-missing" ? guardian.portalStatus !== "active" :
         filter === "max-linked" ? guardian.maxStatus === "linked" :
         filter === "max-missing" ? guardian.maxStatus !== "linked" :
+        filter === "duplicates" ? guardian.isPossibleDuplicate :
         filter === "archived" ? guardian.status === "archived" :
         true;
       return matchesSearch && matchesFilter;
@@ -111,6 +126,45 @@ export default function CrmGuardiansPage() {
     const warning = payload.warnings?.length ? ` Найдены похожие родители: ${payload.warnings.map((item: any) => item.fullName).join(", ")}` : "";
     setMessage(`Родитель сохранён.${warning}`);
     await loadGuardians();
+  }
+
+  async function mergeGuardians() {
+    if (!mergeMasterId || !mergeDuplicateId) {
+      setMessage("Выберите master guardian и duplicate guardian");
+      return;
+    }
+    if (mergeMasterId === mergeDuplicateId) {
+      setMessage("Master и duplicate должны быть разными");
+      return;
+    }
+    setMerging(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/crm/guardians/merge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ masterGuardianId: mergeMasterId, duplicateGuardianId: mergeDuplicateId }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось объединить родителей");
+      setMessage("Родители объединены. Дубль архивирован, связи перенесены.");
+      setSelected(null);
+      await loadGuardians();
+    } catch (error: any) {
+      setMessage(error.message || "Не удалось объединить родителей");
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  function duplicateReasonLabel(reason: string) {
+    switch (reason) {
+      case "same_phone_normalized": return "телефон";
+      case "same_email_normalized": return "email";
+      case "same_name_phone": return "ФИО + телефон";
+      case "same_name_children": return "ФИО + дети";
+      default: return reason;
+    }
   }
 
   return (
@@ -195,6 +249,7 @@ export default function CrmGuardiansPage() {
                 </td>
                 <td style={{ padding: 14 }}>
                   <span className={guardian.status === "archived" ? "badge badge-gray" : "badge badge-green"}>{guardian.status === "archived" ? "Архив" : "Активен"}</span>
+                  {guardian.isPossibleDuplicate && <div style={{ marginTop: 6 }}><span className="badge badge-amber">дубль</span></div>}
                 </td>
               </tr>
             ))}
@@ -234,11 +289,45 @@ export default function CrmGuardiansPage() {
             </section>
 
             <section style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><Users size={16} /> Детей: {selected.childCount}</div>
               <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><ShieldCheck size={16} /> ЛК: {selected.portalStatus === "active" ? "активен" : "не выдан"}</div>
               <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><MessageCircle size={16} /> MAX: {selected.maxStatus === "linked" ? "привязан" : "не привязан"}</div>
               <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><CreditCard size={16} /> Активных счетов: {selected.activeInvoiceCount}</div>
+              <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><CreditCard size={16} /> Долг: {selected.debtAmount.toLocaleString("ru-RU")} ₽</div>
+              <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><CreditCard size={16} /> Последний платёж: {selected.lastPayment?.paid_at ? new Date(selected.lastPayment.paid_at).toLocaleDateString("ru-RU") : "нет"}</div>
               <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)" }}><Archive size={16} /> Статус: {selected.status === "archived" ? "архив" : "активен"}</div>
             </section>
+
+            {selected.isPossibleDuplicate && (
+              <section style={{ marginTop: 28, display: "grid", gap: 12 }}>
+                <h3 style={{ margin: 0 }}>Возможный дубль</h3>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {selected.duplicateReasons.map((reason) => <span key={reason} className="badge badge-amber">{duplicateReasonLabel(reason)}</span>)}
+                </div>
+                <div className="card-crm" style={{ padding: 14, background: "var(--color-bg)", display: "grid", gap: 10 }}>
+                  <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+                    Master guardian
+                    <select className="form-input" value={mergeMasterId} onChange={(event) => setMergeMasterId(event.target.value)}>
+                      {guardians.filter((guardian) => guardian.status !== "archived").map((guardian) => (
+                        <option key={guardian.id} value={guardian.id}>{guardian.fullName} · {guardian.phone || guardian.email || guardian.id}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+                    Duplicate guardian
+                    <select className="form-input" value={mergeDuplicateId} onChange={(event) => setMergeDuplicateId(event.target.value)}>
+                      <option value="">Выберите дубль для переноса</option>
+                      {guardians.filter((guardian) => guardian.id !== mergeMasterId && guardian.status !== "archived").map((guardian) => (
+                        <option key={guardian.id} value={guardian.id}>{guardian.fullName} · {guardian.phone || guardian.email || guardian.id}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button type="button" variant="primary-crm" onClick={mergeGuardians} disabled={merging}>
+                    {merging ? "Объединяем..." : "Объединить безопасно"}
+                  </Button>
+                </div>
+              </section>
+            )}
 
             <section style={{ marginTop: 28 }}>
               <h3 style={{ margin: "0 0 12px" }}>Аудит</h3>

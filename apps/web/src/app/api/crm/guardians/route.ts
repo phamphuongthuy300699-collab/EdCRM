@@ -21,6 +21,10 @@ function duplicateWarning(row: any) {
   };
 }
 
+function sameName(a: string | null | undefined, b: string | null | undefined) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
 export async function GET() {
   const access = await requireCrmStaff(new Set(["owner", "admin", "manager", "accountant"]));
   if (!access.ok) return access.response;
@@ -84,11 +88,44 @@ export async function GET() {
   }
 
   const payableStatuses = new Set(["draft", "issued", "partially_paid", "overdue"]);
-  const rows = (guardians || []).map((guardian: any) => {
+  const baseRows = guardians || [];
+  const duplicateReasonsByGuardian = new Map<string, string[]>();
+  const addDuplicateReason = (guardianId: string, reason: string) => {
+    const next = new Set([...(duplicateReasonsByGuardian.get(guardianId) || []), reason]);
+    duplicateReasonsByGuardian.set(guardianId, Array.from(next));
+  };
+
+  for (let index = 0; index < baseRows.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < baseRows.length; otherIndex += 1) {
+      const a = baseRows[index];
+      const b = baseRows[otherIndex];
+      const aLinks = linksByGuardian.get(a.id) || [];
+      const bLinks = linksByGuardian.get(b.id) || [];
+      const aChildren = new Set(aLinks.map((link) => link.student_id));
+      const bChildren = new Set(bLinks.map((link) => link.student_id));
+      const hasSameChild = Array.from(aChildren).some((studentId) => bChildren.has(studentId));
+      const reasons: string[] = [];
+      if (a.phone_normalized && a.phone_normalized === b.phone_normalized) reasons.push("same_phone_normalized");
+      if (a.email_normalized && a.email_normalized === b.email_normalized) reasons.push("same_email_normalized");
+      if (sameName(a.full_name, b.full_name) && a.phone_normalized && a.phone_normalized === b.phone_normalized) reasons.push("same_name_phone");
+      if (sameName(a.full_name, b.full_name) && hasSameChild) reasons.push("same_name_children");
+      for (const reason of reasons) {
+        addDuplicateReason(a.id, reason);
+        addDuplicateReason(b.id, reason);
+      }
+    }
+  }
+
+  const rows = baseRows.map((guardian: any) => {
     const guardianLinks = linksByGuardian.get(guardian.id) || [];
     const guardianInvoices = invoicesByGuardian.get(guardian.id) || [];
     const activeInvoices = guardianInvoices.filter((invoice) => payableStatuses.has(invoice.status));
     const debt = activeInvoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+    const guardianPayments = paymentsByGuardian.get(guardian.id) || [];
+    const lastPayment = guardianPayments
+      .filter((payment) => payment.paid_at || payment.status === "paid")
+      .sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || "")))[0] || null;
+    const duplicateReasons = duplicateReasonsByGuardian.get(guardian.id) || [];
     return {
       id: guardian.id,
       fullName: guardian.full_name,
@@ -112,7 +149,10 @@ export async function GET() {
       activeInvoiceCount: activeInvoices.length,
       debtAmount: debt,
       invoices: guardianInvoices,
-      payments: paymentsByGuardian.get(guardian.id) || [],
+      payments: guardianPayments,
+      lastPayment,
+      duplicateReasons,
+      isPossibleDuplicate: duplicateReasons.length > 0,
     };
   });
 

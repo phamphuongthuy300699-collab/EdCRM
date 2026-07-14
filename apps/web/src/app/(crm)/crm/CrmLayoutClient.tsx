@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
@@ -31,6 +31,9 @@ export default function CrmLayout({
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [globalResults, setGlobalResults] = useState<Record<string, any[]>>({});
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -53,6 +56,32 @@ export default function CrmLayout({
     { name: "Сайт", path: "/crm/site", icon: Globe },
     { name: "Настройки", path: "/crm/settings", icon: Settings },
   ];
+
+  useEffect(() => {
+    const query = globalSearch.trim();
+    if (query.length < 2) {
+      setGlobalResults({});
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/crm/search?q=${encodeURIComponent(query)}`);
+        const payload = await response.json();
+        setGlobalResults(payload.ok ? payload.results || {} : {});
+        setSearchOpen(true);
+      } catch {
+        setGlobalResults({});
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [globalSearch]);
+
+  const groupedSearchResults = useMemo(() => [
+    ["students", "Ученики"],
+    ["guardians", "Родители"],
+    ["invoices", "Счета"],
+    ["groups", "Группы"],
+  ].map(([key, label]) => ({ key, label, items: globalResults[key] || [] })), [globalResults]);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--color-bg)" }}>
@@ -213,14 +242,42 @@ export default function CrmLayout({
             <input 
               type="text" 
               className="form-input" 
+              value={globalSearch}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(event) => setGlobalSearch(event.target.value)}
               style={{
                 height: "40px",
                 borderRadius: "8px",
                 paddingLeft: "40px",
                 fontSize: "var(--font-small)"
               }}
-              placeholder="Поиск по ученикам, группам..." 
+              placeholder="Поиск по CRM..." 
             />
+            {searchOpen && globalSearch.trim().length >= 2 && (
+              <div style={{ position: "absolute", top: 46, left: 0, width: 420, maxWidth: "80vw", background: "#fff", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 16px 40px rgba(15,23,42,.14)", zIndex: 80, padding: 10 }}>
+                {groupedSearchResults.every((group) => group.items.length === 0) ? (
+                  <div style={{ padding: 10, color: "var(--color-text-muted)", fontSize: 13 }}>Ничего не найдено</div>
+                ) : groupedSearchResults.map((group) => group.items.length > 0 && (
+                  <div key={group.key} style={{ display: "grid", gap: 4, marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: "var(--color-text-muted)", textTransform: "uppercase" }}>{group.label}</div>
+                    {group.items.map((item: any) => (
+                      <Link
+                        key={`${group.key}-${item.id}`}
+                        href={item.href}
+                        onClick={() => {
+                          setSearchOpen(false);
+                          setGlobalSearch("");
+                        }}
+                        style={{ display: "grid", gap: 2, padding: "8px 10px", borderRadius: 6, textDecoration: "none", color: "var(--color-text)" }}
+                      >
+                        <strong style={{ fontSize: 13 }}>{item.title}</strong>
+                        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{item.subtitle}</span>
+                      </Link>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Actions & Notifications */}
