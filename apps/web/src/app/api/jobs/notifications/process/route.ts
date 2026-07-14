@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   let query = (admin.from("notification_outbox") as any)
     .select("*")
     .eq("status", "pending")
+    .eq("channel", "max")
     .order("created_at", { ascending: true })
     .limit(20);
 
@@ -24,7 +25,6 @@ export async function POST(request: Request) {
 
   for (const item of items || []) {
     try {
-      if (item.channel !== "max") continue;
       const { data: settings } = await (admin.from("bot_settings") as any)
         .select("bot_token_secret, is_enabled")
         .eq("organization_id", item.organization_id)

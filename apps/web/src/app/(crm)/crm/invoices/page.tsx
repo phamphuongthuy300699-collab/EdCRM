@@ -32,6 +32,9 @@ export default function CrmInvoicesPage() {
 
   // Form State
   const [newStudentId, setNewStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedGuardianId, setSelectedGuardianId] = useState("");
+  const [publishAfterCreate, setPublishAfterCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
   const [newAmount, setNewAmount] = useState("4500");
   const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
@@ -112,6 +115,13 @@ export default function CrmInvoicesPage() {
     return () => { cancelled = true; };
   }, [newStudentId]);
 
+  useEffect(() => {
+    const student = students.find((item) => item.id === newStudentId);
+    const links = student?.student_guardians || [];
+    const billing = links.find((link: any) => link.is_billing_contact);
+    setSelectedGuardianId(billing?.guardian_id || "");
+  }, [newStudentId, students]);
+
   const initialInvoices = [
     { id: "i1", studentName: "Игорь Петров", parentName: "Анна Петрова", groupName: "LEGO Start 1", amount: 4500, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" },
     { id: "i2", studentName: "Данил Соловьев", parentName: "Михаил С.", groupName: "LEGO Start 1", amount: 4500, dueDate: "25.06.2026", status: "paid", title: "Абонемент на Июнь" },
@@ -143,10 +153,37 @@ export default function CrmInvoicesPage() {
           }
         }
 
-        // Fetch students for dropdown selection
+        // Fetch students for explicit invoice recipient selection
         const { data: studentsData } = await supabase
           .from("students")
-          .select("id, full_name");
+          .select(`
+            id,
+            full_name,
+            status,
+            archived_at,
+            anonymized_at,
+            enrollments (
+              status,
+              groups (
+                title
+              )
+            ),
+            student_guardians (
+              guardian_id,
+              relation,
+              is_primary,
+              is_billing_contact,
+              guardians (
+                id,
+                full_name,
+                phone,
+                email
+              )
+            )
+          `)
+          .in("status", ["active", "paused"])
+          .is("archived_at", null)
+          .is("anonymized_at", null);
         if (studentsData) setStudents(studentsData);
 
         // Fetch invoices
@@ -512,35 +549,16 @@ export default function CrmInvoicesPage() {
         return;
       }
 
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Организация не найдена");
-
-      // Fetch primary guardian and active enrollment
-      const { data: studentInfo } = await supabase
-        .from("students")
-        .select(`
-          enrollments (
-            id,
-            status,
-            groups (
-              title
-            )
-          ),
-          student_guardians (
-            guardian_id,
-            is_primary,
-            guardians (
-              full_name
-            )
-          )
-        `)
-        .eq("id", newStudentId)
-        .single() as any;
+      const studentInfo = students.find((student) => student.id === newStudentId);
+      const guardianLinks = studentInfo?.student_guardians || [];
+      if (!selectedGuardianId) {
+        throw new Error(guardianLinks.length > 1 ? "Выберите получателя счёта" : "У ученика нет выбранного получателя счёта");
+      }
+      const selectedGuardianLink = guardianLinks.find((link: any) => link.guardian_id === selectedGuardianId);
+      if (!selectedGuardianLink) throw new Error("Выбранный родитель не связан с учеником");
 
       const activeEnrollment = studentInfo?.enrollments?.find((e: any) => e.status === "active");
-      const primaryGuardianLink = studentInfo?.student_guardians?.find((sg: any) => sg.is_primary) || studentInfo?.student_guardians?.[0];
-      
-      const parentName = primaryGuardianLink?.guardians?.full_name || "Не указан";
+      const parentName = selectedGuardianLink.guardians?.full_name || "Не указан";
       const groupTitle = activeEnrollment?.groups?.title || "Без группы";
 
       const invoiceAmounts = calculateDiscountedInvoiceAmount(newAmount, discountInfo?.percent || 0);
@@ -548,41 +566,26 @@ export default function CrmInvoicesPage() {
         throw new Error("Сумма счёта должна быть больше 0");
       }
 
-      const insertData: any = {
-        organization_id: orgRes.data.id,
-        student_id: newStudentId,
-        guardian_id: primaryGuardianLink?.guardian_id || null,
-        enrollment_id: activeEnrollment?.id || null,
-        title: newTitle,
-        description: newTitle,
-        amount: invoiceAmounts.finalAmount,
-        currency: "RUB",
-        status: "issued" as const,
-        due_date: newDueDate,
-        issued_at: new Date().toISOString()
-      };
-
-      if (discountInfo) {
-        insertData.discount_amount = invoiceAmounts.discountAmount;
-        insertData.discount_title = discountInfo.title;
-        insertData.discount_percent = discountInfo.percent;
-      }
-
-      const { data, error } = await (supabase.from("invoices") as any).insert(insertData).select().single();
-      if (error) throw error;
-
-      // Insert discount record if applicable
-      if (discountInfo && data?.id) {
-        const { error: discountInsertError } = await (supabase.from("invoice_discounts") as any).insert({
-          organization_id: orgRes.data.id,
-          invoice_id: data.id,
-          discount_assignment_id: (discountInfo as any).discount_assignment_id || null,
-          title: discountInfo.title,
-          percent: discountInfo.percent,
-          amount: invoiceAmounts.discountAmount
-        });
-        if (discountInsertError) throw discountInsertError;
-      }
+      const response = await fetch("/api/crm/invoices/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          studentId: newStudentId,
+          guardianId: selectedGuardianId,
+          title: newTitle,
+          amount: newAmount,
+          dueDate: newDueDate,
+          publishNow: publishAfterCreate,
+          discount: discountInfo ? {
+            title: discountInfo.title,
+            percent: discountInfo.percent,
+            discountAssignmentId: discountInfo.discount_assignment_id,
+          } : null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось создать счёт");
+      const data = payload.invoice;
 
       const newInvObj = {
         id: data.id,
@@ -598,9 +601,12 @@ export default function CrmInvoicesPage() {
       setInvoices([newInvObj, ...invoices]);
       setShowAddModal(false);
       setNewStudentId("");
+      setSelectedGuardianId("");
+      setStudentSearch("");
+      setPublishAfterCreate(false);
       setNewTitle("Абонемент на 8 занятий");
       setNewAmount("4500");
-      alert("Счет успешно выставлен!");
+      alert(publishAfterCreate ? "Счёт создан и подготовлен к отправке родителю!" : "Счет успешно выставлен!");
     } catch (err: any) {
       console.error(err);
       alert("Не удалось создать счет: " + err.message);
@@ -630,6 +636,18 @@ export default function CrmInvoicesPage() {
 
     return matchesTab && matchesSearch && matchesStartDate && matchesEndDate;
   });
+
+  const invoiceStudentOptions = students.filter((student) => {
+    const q = studentSearch.trim().toLowerCase();
+    if (!q) return true;
+    const guardianText = (student.student_guardians || [])
+      .map((link: any) => `${link.guardians?.full_name || ""} ${link.guardians?.phone || ""} ${link.guardians?.email || ""}`)
+      .join(" ");
+    const groupText = (student.enrollments || []).map((enrollment: any) => enrollment.groups?.title || "").join(" ");
+    return `${student.full_name} ${guardianText} ${groupText}`.toLowerCase().includes(q);
+  });
+  const selectedInvoiceStudent = students.find((student) => student.id === newStudentId);
+  const selectedInvoiceGuardianLinks = selectedInvoiceStudent?.student_guardians || [];
 
   // Guard access for teacher role
   if (userRole === "teacher") {
@@ -1022,18 +1040,81 @@ export default function CrmInvoicesPage() {
             <form onSubmit={handleCreateInvoice} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Ученик *</label>
-                <select 
-                  className="form-input" 
-                  required 
-                  value={newStudentId}
-                  onChange={(e) => setNewStudentId(e.target.value)}
-                >
-                  <option value="">Выберите ученика</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.full_name}</option>
-                  ))}
-                </select>
+                <input
+                  className="form-input"
+                  required
+                  value={studentSearch}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    setNewStudentId("");
+                  }}
+                  placeholder="Поиск: ученик, родитель, телефон, email, группа"
+                />
+                <div style={{ maxHeight: 150, overflow: "auto", border: "1px solid var(--color-border)", borderRadius: 8, marginTop: 8 }}>
+                  {invoiceStudentOptions.map((s) => {
+                    const activeEnroll = s.enrollments?.find((item: any) => item.status === "active");
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setNewStudentId(s.id);
+                          setStudentSearch(s.full_name);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          textAlign: "left",
+                          border: 0,
+                          borderBottom: "1px solid var(--color-border)",
+                          background: newStudentId === s.id ? "var(--color-primary-soft)" : "#fff",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <strong>{s.full_name}</strong>
+                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                          {activeEnroll?.groups?.title || "Без группы"} · {(s.student_guardians || []).map((link: any) => link.guardians?.full_name).filter(Boolean).join(", ") || "нет родителей"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {newStudentId && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Получатель счёта *</label>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {selectedInvoiceGuardianLinks.map((link: any) => {
+                      const phoneDigits = String(link.guardians?.phone || "").replace(/\D/g, "");
+                      return (
+                        <label key={link.guardian_id} style={{
+                          display: "grid",
+                          gridTemplateColumns: "20px 1fr",
+                          gap: 8,
+                          alignItems: "start",
+                          padding: 10,
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 8,
+                          background: selectedGuardianId === link.guardian_id ? "var(--color-primary-soft)" : "#fff",
+                        }}>
+                          <input type="radio" name="invoiceGuardian" value={link.guardian_id} checked={selectedGuardianId === link.guardian_id} onChange={() => setSelectedGuardianId(link.guardian_id)} />
+                          <span>
+                            <strong>{link.guardians?.full_name || "Родитель"}</strong>
+                            {link.is_billing_contact && <span className="badge badge-blue" style={{ marginLeft: 8 }}>плательщик</span>}
+                            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                              ЛК/MAX см. в карточке родителя · тел. {phoneDigits ? phoneDigits.slice(-4) : "нет"} · {link.guardians?.email || "email нет"}
+                            </div>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {selectedInvoiceGuardianLinks.length === 0 && (
+                      <div style={{ color: "var(--color-danger)", fontSize: 13 }}>У ученика нет связанного родителя.</div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Назначение платежа *</label>
@@ -1094,6 +1175,11 @@ export default function CrmInvoicesPage() {
                   Скидки не найдены
                 </div>
               )}
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700 }}>
+                <input type="checkbox" checked={publishAfterCreate} onChange={(e) => setPublishAfterCreate(e.target.checked)} />
+                После создания сразу выставить родителю
+              </label>
 
               <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 

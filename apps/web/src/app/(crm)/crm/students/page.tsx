@@ -57,8 +57,20 @@ export default function CrmStudentsPage() {
   const [newParentName, setNewParentName] = useState("");
   const [newParentPhone, setNewParentPhone] = useState("");
   const [newParentEmail, setNewParentEmail] = useState("");
+  const [newParentRelation, setNewParentRelation] = useState("Родитель");
+  const [newGuardianMode, setNewGuardianMode] = useState<"new" | "existing">("new");
+  const [selectedExistingGuardianId, setSelectedExistingGuardianId] = useState("");
+  const [secondGuardianMode, setSecondGuardianMode] = useState<"none" | "new" | "existing">("none");
+  const [secondExistingGuardianId, setSecondExistingGuardianId] = useState("");
+  const [secondParentName, setSecondParentName] = useState("");
+  const [secondParentPhone, setSecondParentPhone] = useState("");
+  const [secondParentEmail, setSecondParentEmail] = useState("");
+  const [secondParentRelation, setSecondParentRelation] = useState("Родитель");
+  const [primaryGuardianSlot, setPrimaryGuardianSlot] = useState<"primary" | "second">("primary");
+  const [billingGuardianSlot, setBillingGuardianSlot] = useState<"primary" | "second">("primary");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
+  const [guardianOptions, setGuardianOptions] = useState<any[]>([]);
 
   // Drawer details state
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -111,10 +123,15 @@ export default function CrmStudentsPage() {
     async function loadData() {
       try {
         setLoading(true);
-        // Get org
-        const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-        if (!orgRes.data) throw new Error("Organization not found");
-        setOrgId(orgRes.data.id);
+        const { data: { session } } = await supabase.auth.getSession();
+        const { data: membership } = await (supabase.from("org_memberships") as any)
+          .select("organization_id")
+          .eq("user_id", session?.user?.id || "")
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!membership?.organization_id && !isDemoMode()) throw new Error("Organization not found");
+        const organizationId = membership?.organization_id || "demo-org";
+        setOrgId(organizationId);
 
         // Fetch groups
         const { data: groupsData } = await supabase
@@ -122,6 +139,15 @@ export default function CrmStudentsPage() {
           .select("id, title, status")
           .eq("status", "active");
         if (groupsData) setGroups(groupsData);
+
+        const { data: guardianOptionsData } = await supabase
+          .from("guardians")
+          .select("id, full_name, phone, email, status")
+          .eq("organization_id", organizationId)
+          .is("deleted_at", null)
+          .is("anonymized_at", null)
+          .order("full_name", { ascending: true });
+        if (guardianOptionsData) setGuardianOptions(guardianOptionsData);
 
         // Fetch students along with guardians details
         const { data: studentsData } = await supabase
@@ -151,13 +177,13 @@ export default function CrmStudentsPage() {
               )
             )
           `)
-          .eq("organization_id", orgRes.data.id);
+          .eq("organization_id", organizationId);
 
         // Fetch attendance
         const { data: attendanceData } = await supabase
           .from("attendance")
           .select("student_id, is_present")
-          .eq("organization_id", orgRes.data.id);
+          .eq("organization_id", organizationId);
 
         const demo = isDemoMode();
 
@@ -368,11 +394,6 @@ export default function CrmStudentsPage() {
     e.preventDefault();
     try {
       setLoading(true);
-      // Get org
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Organization not found");
-      const organizationId = orgRes.data.id;
-
       if (selectedGroupId) {
         const selGroup = groups.find(g => g.id === selectedGroupId);
         if (selGroup && Number(selGroup.capacity || 0) > 0 && Number(selGroup.enrolled || 0) >= Number(selGroup.capacity || 0)) {
@@ -380,35 +401,55 @@ export default function CrmStudentsPage() {
         }
       }
 
-      // 1. Create Student
-      const { data: student, error: stError } = await (supabase.from("students") as any).insert({
-        organization_id: organizationId,
-        full_name: newStudentName,
-        birth_date: newBirthDate || null,
-        status: "active",
-        notes: newNotes || null
-      }).select().single();
+      const guardianPayloads: any[] = [{
+        guardianId: newGuardianMode === "existing" ? selectedExistingGuardianId : null,
+        fullName: newGuardianMode === "new" ? newParentName : null,
+        phone: newGuardianMode === "new" ? newParentPhone : null,
+        email: newGuardianMode === "new" ? newParentEmail : null,
+        relation: newParentRelation,
+        isPrimary: primaryGuardianSlot === "primary",
+        isBillingContact: billingGuardianSlot === "primary",
+      }];
 
-      if (stError) throw stError;
+      if (secondGuardianMode !== "none") {
+        guardianPayloads.push({
+          guardianId: secondGuardianMode === "existing" ? secondExistingGuardianId : null,
+          fullName: secondGuardianMode === "new" ? secondParentName : null,
+          phone: secondGuardianMode === "new" ? secondParentPhone : null,
+          email: secondGuardianMode === "new" ? secondParentEmail : null,
+          relation: secondParentRelation,
+          isPrimary: primaryGuardianSlot === "second",
+          isBillingContact: billingGuardianSlot === "second",
+        });
+      }
 
-      // 2. Create Guardian
-      const { data: guardian, error: gError } = await (supabase.from("guardians") as any).insert({
-        organization_id: organizationId,
-        full_name: newParentName,
-        phone: newParentPhone,
-        email: newParentEmail || null
-      }).select().single();
+      if (newGuardianMode === "existing" && !selectedExistingGuardianId) throw new Error("Выберите существующего родителя");
+      if (secondGuardianMode === "existing" && !secondExistingGuardianId) throw new Error("Выберите второго родителя");
+      if (billingGuardianSlot === "second" && secondGuardianMode === "none") throw new Error("Добавьте второго родителя или назначьте плательщиком первого");
+      if (primaryGuardianSlot === "second" && secondGuardianMode === "none") throw new Error("Добавьте второго родителя или назначьте основным первого");
 
-      if (gError) throw gError;
-
-      // 3. Link them
-      await (supabase.from("student_guardians") as any).insert({
-        organization_id: organizationId,
-        student_id: student.id,
-        guardian_id: guardian.id,
-        relation: "Родитель",
-        is_primary: true
+      const response = await fetch("/api/crm/students/manage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fullName: newStudentName,
+          birthDate: newBirthDate || null,
+          notes: newNotes || null,
+          groupId: selectedGroupId || null,
+          guardians: guardianPayloads,
+        }),
       });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось создать ученика");
+
+      const selectedGuardian = guardianOptions.find((guardian) => guardian.id === selectedExistingGuardianId);
+      const guardian = {
+        id: payload.result?.guardians?.[0]?.guardian_id || selectedExistingGuardianId,
+        full_name: newGuardianMode === "existing" ? selectedGuardian?.full_name : newParentName,
+        phone: newGuardianMode === "existing" ? selectedGuardian?.phone : newParentPhone,
+        email: newGuardianMode === "existing" ? selectedGuardian?.email : newParentEmail,
+      };
+      const student = { id: payload.result?.student_id, full_name: newStudentName, notes: newNotes };
 
       // 4. Enroll in group if group selected
       let groupTitle = "Без группы";
@@ -418,13 +459,6 @@ export default function CrmStudentsPage() {
         groupTitle = selGroup ? selGroup.title : "Без группы";
         level = "Активный ученик";
 
-        await (supabase.from("enrollments") as any).insert({
-          organization_id: organizationId,
-          student_id: student.id,
-          group_id: selectedGroupId,
-          status: "active",
-          started_on: new Date().toISOString().split("T")[0]
-        });
       }
 
       // 5. Append student to local state list
@@ -456,7 +490,19 @@ export default function CrmStudentsPage() {
       setNewParentName("");
       setNewParentPhone("");
       setNewParentEmail("");
+      setNewParentRelation("Родитель");
+      setNewGuardianMode("new");
+      setSelectedExistingGuardianId("");
+      setSecondGuardianMode("none");
+      setSecondExistingGuardianId("");
+      setSecondParentName("");
+      setSecondParentPhone("");
+      setSecondParentEmail("");
+      setSecondParentRelation("Родитель");
+      setPrimaryGuardianSlot("primary");
+      setBillingGuardianSlot("primary");
       setSelectedGroupId("");
+      setReloadKey((value) => value + 1);
     } catch (err: any) {
       console.error(err);
       alert("Не удалось создать ученика: " + err.message);
@@ -914,39 +960,99 @@ export default function CrmStudentsPage() {
                 </span>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">ФИО Родителя *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="Анна Петрова" 
-                  required 
-                  value={newParentName}
-                  onChange={(e) => setNewParentName(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Телефон *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="+7 (905) 555-12-34" 
-                    required 
-                    value={newParentPhone}
-                    onChange={(e) => setNewParentPhone(e.target.value)}
-                  />
+                  <label className="form-label">Первый родитель</label>
+                  <select className="form-input" value={newGuardianMode} onChange={(e) => setNewGuardianMode(e.target.value as "new" | "existing")}>
+                    <option value="new">Новый родитель</option>
+                    <option value="existing">Выбрать из CRM</option>
+                  </select>
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Email</label>
-                  <input 
-                    type="email" 
-                    className="form-input" 
-                    placeholder="parent@mail.ru" 
-                    value={newParentEmail}
-                    onChange={(e) => setNewParentEmail(e.target.value)}
-                  />
+                  <label className="form-label">Relation</label>
+                  <input className="form-input" value={newParentRelation} onChange={(e) => setNewParentRelation(e.target.value)} />
+                </div>
+              </div>
+
+              {newGuardianMode === "existing" && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Существующий родитель *</label>
+                  <select className="form-input" required value={selectedExistingGuardianId} onChange={(e) => setSelectedExistingGuardianId(e.target.value)}>
+                    <option value="">Выберите родителя</option>
+                    {guardianOptions.map((guardian) => (
+                      <option key={guardian.id} value={guardian.id}>
+                        {guardian.full_name} {guardian.phone ? `· ${guardian.phone}` : ""} {guardian.email ? `· ${guardian.email}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {newGuardianMode === "new" && (
+                <>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">ФИО Родителя *</label>
+                    <input type="text" className="form-input" placeholder="Анна Петрова" required value={newParentName} onChange={(e) => setNewParentName(e.target.value)} />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "12px" }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Телефон *</label>
+                      <input type="text" className="form-input" placeholder="+7 (905) 555-12-34" required value={newParentPhone} onChange={(e) => setNewParentPhone(e.target.value)} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Email</label>
+                      <input type="email" className="form-input" placeholder="parent@mail.ru" value={newParentEmail} onChange={(e) => setNewParentEmail(e.target.value)} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "12px", display: "grid", gap: "12px" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Второй родитель</label>
+                  <select className="form-input" value={secondGuardianMode} onChange={(e) => setSecondGuardianMode(e.target.value as "none" | "new" | "existing")}>
+                    <option value="none">Не добавлять</option>
+                    <option value="existing">Выбрать из CRM</option>
+                    <option value="new">Создать нового</option>
+                  </select>
+                </div>
+                {secondGuardianMode === "existing" && (
+                  <select className="form-input" value={secondExistingGuardianId} onChange={(e) => setSecondExistingGuardianId(e.target.value)}>
+                    <option value="">Выберите второго родителя</option>
+                    {guardianOptions.map((guardian) => (
+                      <option key={guardian.id} value={guardian.id}>{guardian.full_name} {guardian.phone ? `· ${guardian.phone}` : ""}</option>
+                    ))}
+                  </select>
+                )}
+                {secondGuardianMode === "new" && (
+                  <>
+                    <input className="form-input" value={secondParentName} onChange={(e) => setSecondParentName(e.target.value)} placeholder="ФИО второго родителя" />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <input className="form-input" value={secondParentPhone} onChange={(e) => setSecondParentPhone(e.target.value)} placeholder="Телефон" />
+                      <input className="form-input" value={secondParentEmail} onChange={(e) => setSecondParentEmail(e.target.value)} placeholder="Email" />
+                    </div>
+                  </>
+                )}
+                {secondGuardianMode !== "none" && (
+                  <input className="form-input" value={secondParentRelation} onChange={(e) => setSecondParentRelation(e.target.value)} placeholder="Relation второго родителя" />
+                )}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Основной представитель</label>
+                  <select className="form-input" value={primaryGuardianSlot} onChange={(e) => setPrimaryGuardianSlot(e.target.value as "primary" | "second")}>
+                    <option value="primary">Первый</option>
+                    <option value="second">Второй</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Получатель счёта</label>
+                  <select className="form-input" value={billingGuardianSlot} onChange={(e) => setBillingGuardianSlot(e.target.value as "primary" | "second")}>
+                    <option value="primary">Первый</option>
+                    <option value="second">Второй</option>
+                  </select>
                 </div>
               </div>
 

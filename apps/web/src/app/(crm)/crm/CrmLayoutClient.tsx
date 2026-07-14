@@ -42,6 +42,7 @@ export default function CrmLayout({
     { name: "Дашборд", path: "/crm", icon: LayoutDashboard },
     { name: "Заявки (Лиды)", path: "/crm/leads", icon: Inbox },
     { name: "Ученики", path: "/crm/students", icon: Users },
+    { name: "Родители", path: "/crm/guardians", icon: User },
     { name: "Группы", path: "/crm/groups", icon: GraduationCap },
     { name: "Счета (Invoices)", path: "/crm/invoices", icon: CreditCard },
     { name: "Платежи (Payments)", path: "/crm/payments", icon: Receipt },

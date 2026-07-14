@@ -345,9 +345,12 @@ export interface Database {
           organization_id: string;
           full_name: string;
           phone: string | null;
+          phone_normalized: string | null;
           email: string | null;
+          email_normalized: string | null;
           telegram_username: string | null;
           max_contact: string | null;
+          status: string;
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -357,9 +360,12 @@ export interface Database {
           organization_id: string;
           full_name: string;
           phone?: string | null;
+          phone_normalized?: string | null;
           email?: string | null;
+          email_normalized?: string | null;
           telegram_username?: string | null;
           max_contact?: string | null;
+          status?: string;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -369,9 +375,12 @@ export interface Database {
           organization_id?: string;
           full_name?: string;
           phone?: string | null;
+          phone_normalized?: string | null;
           email?: string | null;
+          email_normalized?: string | null;
           telegram_username?: string | null;
           max_contact?: string | null;
+          status?: string;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -385,6 +394,7 @@ export interface Database {
           guardian_id: string;
           relation: string | null;
           is_primary: boolean;
+          is_billing_contact: boolean;
           created_at: string;
         };
         Insert: {
@@ -394,6 +404,7 @@ export interface Database {
           guardian_id: string;
           relation?: string | null;
           is_primary?: boolean;
+          is_billing_contact?: boolean;
           created_at?: string;
         };
         Update: {
@@ -403,6 +414,7 @@ export interface Database {
           guardian_id?: string;
           relation?: string | null;
           is_primary?: boolean;
+          is_billing_contact?: boolean;
           created_at?: string;
         };
       };
