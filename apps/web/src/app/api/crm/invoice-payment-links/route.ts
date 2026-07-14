@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createOrReuseInvoicePaymentLink } from "@/lib/payments/invoice-payment-links";
+import { publishInvoiceForParent } from "@/lib/payments/publish-invoice";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
@@ -43,67 +43,25 @@ export async function POST(request: NextRequest) {
       return jsonError("Недостаточно прав для выставления счета", 403, "FORBIDDEN");
     }
 
-    if (["paid", "cancelled"].includes(invoice.status)) {
-      return jsonError("Оплаченный или отмененный счет нельзя выставить повторно", 409, "INVOICE_NOT_PAYABLE");
-    }
-
-    if (invoice.status !== "issued") {
-      const { error: updateError } = await (admin.from("invoices") as any)
-        .update({ status: "issued", issued_at: new Date().toISOString() })
-        .eq("id", invoice.id);
-      if (updateError) return jsonError("Не удалось выставить счет", 500, "INVOICE_ISSUE_FAILED");
-    }
-
-    const link = await createOrReuseInvoicePaymentLink(invoice.id, {
+    const published = await publishInvoiceForParent({
+      invoiceId: invoice.id,
       origin: request.nextUrl.origin,
       regenerate: parsed.data.regenerate === true,
-      metadata: { source: "crm_publish_action", actorId: user.id },
-    });
-
-    const message = `Робокс: выставлен счёт ${invoice.title} на сумму ${Number(invoice.amount).toLocaleString("ru-RU")} ₽. Оплатить: ${link.payUrl}`;
-    const { data: maxSettings } = await (admin.from("bot_settings") as any)
-      .select("is_enabled")
-      .eq("organization_id", invoice.organization_id)
-      .eq("provider", "max")
-      .maybeSingle();
-    const { data: maxAccount } = invoice.guardian_id
-      ? await (admin.from("guardian_messenger_accounts") as any)
-        .select("id")
-        .eq("organization_id", invoice.organization_id)
-        .eq("guardian_id", invoice.guardian_id)
-        .eq("provider", "max")
-        .eq("is_verified", true)
-        .maybeSingle()
-      : { data: null };
-    const outboxChannel = maxSettings?.is_enabled && maxAccount ? "max" : "manual";
-
-    await (admin.from("notification_outbox") as any).insert({
-      organization_id: invoice.organization_id,
-      guardian_id: invoice.guardian_id || null,
-      invoice_id: invoice.id,
-      channel: outboxChannel,
-      destination: null,
-      template_key: "invoice_payment_link",
-      payload: {
-        invoiceId: invoice.id,
-        payUrl: link.payUrl,
-        publicId: link.publicId,
-        amount: Number(invoice.amount),
-        title: invoice.title,
-      },
+      source: "crm_publish_action",
+      actorId: user.id,
     });
 
     return NextResponse.json({
       ok: true,
-      invoiceId: invoice.id,
-      guardianId: invoice.guardian_id || null,
-      payUrl: link.payUrl,
-      publicId: link.publicId,
-      reused: link.reused,
+      invoiceId: published.invoiceId,
+      guardianId: published.guardianId,
+      payUrl: published.payUrl,
+      publicId: published.publicId,
+      reused: published.reused,
       regenerated: parsed.data.regenerate === true,
-      channel: outboxChannel,
-      maxLinked: outboxChannel === "max",
-      message,
+      channel: published.channel,
+      maxLinked: published.maxLinked,
+      message: published.message,
     });
   } catch (error: any) {
     return jsonError(error.message || "Не удалось создать ссылку для родителя", 500);

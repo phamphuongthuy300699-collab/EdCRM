@@ -44,7 +44,7 @@ describe("guardian CRM management", () => {
     const page = read("apps/web/src/app/(crm)/crm/invoices/page.tsx");
 
     expect(route).toContain("guardianId: z.string().uuid()");
-    expect(route).toContain("Выбранный родитель не связан с учеником");
+    expect(route).toContain("crm_create_invoice_with_discount");
     expect(page).toContain("selectedGuardianId");
     expect(page).toContain("Выберите получателя счёта");
     expect(page).toContain("/api/crm/invoices/create");

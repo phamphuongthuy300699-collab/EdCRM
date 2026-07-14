@@ -34,10 +34,26 @@ describe("guardian duplicate management", () => {
     expect(migration).toContain("masterGuardianId");
   });
 
+  it("locks SECURITY DEFINER RPC and adds integrity guards in hotfix migration", () => {
+    const migration = read("supabase/migrations/20260714000003_guardian_security_and_integrity.sql");
+
+    expect(migration.toLowerCase()).toContain("revoke all on function");
+    expect(migration.toLowerCase()).toContain("from authenticated");
+    expect(migration.toLowerCase()).toContain("grant execute");
+    expect(migration).toContain("exactly_one_primary_required");
+    expect(migration).toContain("exactly_one_billing_contact_required");
+    expect(migration).toContain("group_not_found_or_cross_org");
+    expect(migration).toContain("group_capacity_exceeded");
+    expect(migration).toContain("crm_create_invoice_with_discount");
+    expect(migration).toContain("guardians_status_check");
+    expect(migration).toContain("trg_normalize_guardian_contacts");
+  });
+
   it("guards merge against cross-organization access on the server", () => {
     const source = read("apps/web/src/app/api/crm/guardians/merge/route.ts");
 
     expect(source).toContain("requireCrmStaff");
+    expect(source).toContain("owner\", \"admin");
     expect(source).toContain(".eq(\"organization_id\", access.organizationId)");
     expect(source).toContain(".in(\"id\", [input.masterGuardianId, input.duplicateGuardianId])");
     expect(source).toContain("Родители не найдены в вашей организации");
@@ -51,6 +67,7 @@ describe("guardian duplicate management", () => {
     expect(page).toContain("/api/crm/guardians/merge");
     expect(page).toContain("Master guardian");
     expect(page).toContain("Duplicate guardian");
+    expect(page).toContain("ОБЪЕДИНИТЬ");
   });
 
   it("adds debounced grouped global CRM search", () => {

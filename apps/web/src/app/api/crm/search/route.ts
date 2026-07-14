@@ -16,25 +16,24 @@ export async function GET(request: Request) {
   const admin = crmAdmin();
   const pattern = like(q);
   const org = access.organizationId;
+  const canSeeFinance = ["owner", "admin", "manager", "accountant"].includes(access.role);
+  const canSeeGuardians = ["owner", "admin", "manager", "accountant"].includes(access.role);
 
   const [students, guardians, invoices, groups] = await Promise.all([
     (admin.from("students") as any)
       .select("id, full_name, status, student_guardians (guardians (full_name, phone, email)), enrollments (groups (title))")
       .eq("organization_id", org)
       .is("deleted_at", null)
-      .or(`full_name.ilike.${pattern},notes.ilike.${pattern}`)
-      .limit(8),
-    (admin.from("guardians") as any)
-      .select("id, full_name, phone, email, status")
+      .limit(50),
+    canSeeGuardians ? (admin.from("guardians") as any)
+      .select("id, full_name, phone, email, status, student_guardians (students (full_name))")
       .eq("organization_id", org)
       .is("deleted_at", null)
-      .or(`full_name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern},phone_normalized.ilike.${pattern},email_normalized.ilike.${pattern}`)
-      .limit(8),
-    (admin.from("invoices") as any)
-      .select("id, title, number, status, amount, students (full_name), guardians (full_name)")
+      .limit(50) : Promise.resolve({ data: [], error: null }),
+    canSeeFinance ? (admin.from("invoices") as any)
+      .select("id, title, number, status, amount, students (full_name), guardians (full_name, phone, email)")
       .eq("organization_id", org)
-      .or(`title.ilike.${pattern},number.ilike.${pattern}`)
-      .limit(8),
+      .limit(50) : Promise.resolve({ data: [], error: null }),
     (admin.from("groups") as any)
       .select("id, title, status")
       .eq("organization_id", org)
@@ -47,12 +46,28 @@ export async function GET(request: Request) {
     if (result.error) return NextResponse.json({ ok: false, error: result.error.message }, { status: 500 });
   }
 
+  const lower = q.toLowerCase();
+  const includes = (value: unknown) => String(value || "").toLowerCase().includes(lower);
+  const studentRows = (students.data || []).filter((item: any) => {
+    const guardianText = (item.student_guardians || []).map((link: any) => {
+      if (access.role === "teacher") return link.guardians?.full_name || "";
+      return `${link.guardians?.full_name || ""} ${link.guardians?.phone || ""} ${link.guardians?.email || ""}`;
+    }).join(" ");
+    const groupText = (item.enrollments || []).map((enrollment: any) => enrollment.groups?.title || "").join(" ");
+    return includes(`${item.full_name} ${guardianText} ${groupText}`);
+  }).slice(0, 8);
+  const guardianRows = (guardians.data || []).filter((item: any) => {
+    const childText = (item.student_guardians || []).map((link: any) => link.students?.full_name || "").join(" ");
+    return includes(`${item.full_name} ${item.phone || ""} ${item.email || ""} ${childText}`);
+  }).slice(0, 8);
+  const invoiceRows = (invoices.data || []).filter((item: any) => includes(`${item.title || ""} ${item.number || ""} ${item.students?.full_name || ""} ${item.guardians?.full_name || ""}`)).slice(0, 8);
+
   return NextResponse.json({
     ok: true,
     results: {
-      students: (students.data || []).map((item: any) => ({ type: "student", id: item.id, title: item.full_name, subtitle: item.status, href: `/crm/students?student=${item.id}` })),
-      guardians: (guardians.data || []).map((item: any) => ({ type: "guardian", id: item.id, title: item.full_name, subtitle: [item.phone, item.email].filter(Boolean).join(" · "), href: `/crm/guardians?guardian=${item.id}` })),
-      invoices: (invoices.data || []).map((item: any) => ({ type: "invoice", id: item.id, title: item.title || item.number, subtitle: `${item.status} · ${Number(item.amount || 0).toLocaleString("ru-RU")} ₽`, href: `/crm/invoices?invoice=${item.id}` })),
+      students: studentRows.map((item: any) => ({ type: "student", id: item.id, title: item.full_name, subtitle: item.status, href: `/crm/students?student=${item.id}` })),
+      guardians: guardianRows.map((item: any) => ({ type: "guardian", id: item.id, title: item.full_name, subtitle: [item.phone, item.email].filter(Boolean).join(" · "), href: `/crm/guardians?guardian=${item.id}` })),
+      invoices: invoiceRows.map((item: any) => ({ type: "invoice", id: item.id, title: item.title || item.number, subtitle: `${item.status} · ${Number(item.amount || 0).toLocaleString("ru-RU")} ₽`, href: `/crm/invoices?invoice=${item.id}` })),
       groups: (groups.data || []).map((item: any) => ({ type: "group", id: item.id, title: item.title, subtitle: item.status, href: `/crm/groups?group=${item.id}` })),
     },
   });

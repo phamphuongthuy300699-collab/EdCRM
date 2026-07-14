@@ -34,7 +34,7 @@ export async function GET() {
 
   const [{ data: guardians, error: guardiansError }, { data: links }, { data: accounts }, { data: invoices }, { data: payments }, { data: portalLinks }] = await Promise.all([
     (admin.from("guardians") as any)
-      .select("id, full_name, phone, phone_normalized, email, email_normalized, status, notes, archived_at, deleted_at, anonymized_at")
+      .select("id, full_name, phone, phone_normalized, email, email_normalized, status, notes, archived_at, deleted_at, anonymized_at, merged_into_guardian_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("full_name", { ascending: true }),
@@ -99,6 +99,7 @@ export async function GET() {
     for (let otherIndex = index + 1; otherIndex < baseRows.length; otherIndex += 1) {
       const a = baseRows[index];
       const b = baseRows[otherIndex];
+      if (a.archived_at || b.archived_at || a.merged_into_guardian_id || b.merged_into_guardian_id || a.status === "archived" || b.status === "archived") continue;
       const aLinks = linksByGuardian.get(a.id) || [];
       const bLinks = linksByGuardian.get(b.id) || [];
       const aChildren = new Set(aLinks.map((link) => link.student_id));

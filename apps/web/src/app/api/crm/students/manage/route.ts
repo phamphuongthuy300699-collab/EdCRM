@@ -19,7 +19,14 @@ const createStudentSchema = z.object({
   notes: z.string().optional().nullable(),
   groupId: z.string().uuid().optional().nullable(),
   guardians: z.array(guardianInputSchema).min(1).max(4),
+  allowDuplicate: z.boolean().optional(),
 });
+
+function maskPhone(phone: string | null | undefined) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.length < 4) return phone || null;
+  return `***${digits.slice(-4)}`;
+}
 
 export async function POST(request: Request) {
   const access = await requireCrmStaff();
@@ -62,8 +69,22 @@ export async function POST(request: Request) {
       .select("id, full_name, phone, email")
       .eq("organization_id", access.organizationId)
       .is("deleted_at", null)
+      .is("anonymized_at", null)
       .or(duplicateKeys.join(","));
     warnings.push(...(duplicates || []));
+    if (warnings.length > 0 && !input.allowDuplicate) {
+      return NextResponse.json({
+        ok: false,
+        code: "DUPLICATE_GUARDIAN_FOUND",
+        error: "Найден похожий родитель. Выберите существующего или подтвердите создание отдельной карточки.",
+        candidates: warnings.map((item) => ({
+          id: item.id,
+          fullName: item.full_name,
+          maskedPhone: maskPhone(item.phone),
+          email: item.email || null,
+        })),
+      }, { status: 409 });
+    }
   }
 
   const { data, error } = await (admin.rpc("crm_create_student_with_guardians", {

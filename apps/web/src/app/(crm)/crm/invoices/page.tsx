@@ -35,6 +35,7 @@ export default function CrmInvoicesPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedGuardianId, setSelectedGuardianId] = useState("");
   const [publishAfterCreate, setPublishAfterCreate] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [newTitle, setNewTitle] = useState("Абонемент на 8 занятий");
   const [newAmount, setNewAmount] = useState("4500");
   const [newDueDate, setNewDueDate] = useState(() => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
@@ -194,7 +195,14 @@ export default function CrmInvoicesPage() {
             title,
             amount,
             status,
+            guardian_id,
             due_date,
+            guardians (
+              id,
+              full_name,
+              phone,
+              email
+            ),
             enrollments (
               groups (
                 title
@@ -224,13 +232,12 @@ export default function CrmInvoicesPage() {
         } else {
           if (invoicesData && invoicesData.length > 0) {
             const formatted = invoicesData.map((inv: any) => {
-              const firstGuardian = inv.students?.student_guardians?.[0]?.guardians;
               const activeEnroll = inv.students?.enrollments?.find((e: any) => e.groups) || null;
               const groupTitle = inv.enrollments?.groups?.title || activeEnroll?.groups?.title || "Без группы";
               return {
                 id: inv.id,
                 studentName: inv.students?.full_name || "Неизвестно",
-                parentName: firstGuardian?.full_name || "Не указан",
+                parentName: inv.guardians?.full_name || "Не указан",
                 groupName: groupTitle,
                 amount: parseFloat(inv.amount),
                 dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString("ru-RU") : "Не установлен",
@@ -239,6 +246,8 @@ export default function CrmInvoicesPage() {
               };
             });
             setInvoices(formatted);
+            const requestedInvoiceId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invoice") : null;
+            if (requestedInvoiceId) setSelectedInvoiceId(requestedInvoiceId);
           } else {
             setInvoices([]);
           }
@@ -576,11 +585,7 @@ export default function CrmInvoicesPage() {
           amount: newAmount,
           dueDate: newDueDate,
           publishNow: publishAfterCreate,
-          discount: discountInfo ? {
-            title: discountInfo.title,
-            percent: discountInfo.percent,
-            discountAssignmentId: discountInfo.discount_assignment_id,
-          } : null,
+          discountAssignmentId: discountInfo?.discount_assignment_id || null,
         }),
       });
       const payload = await response.json();
@@ -836,7 +841,8 @@ export default function CrmInvoicesPage() {
                 <tr key={inv.id} style={{
                   borderBottom: "1px solid var(--color-border)",
                   height: "64px",
-                  transition: "background 0.2s"
+                  transition: "background 0.2s",
+                  background: selectedInvoiceId === inv.id ? "var(--color-primary-soft)" : undefined,
                 }} className="table-row">
                   <td style={{ padding: "0 24px" }}>
                     <div style={{ fontWeight: 700 }}>{inv.studentName}</div>

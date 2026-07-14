@@ -46,6 +46,8 @@ export default function CrmGuardiansPage() {
   const [message, setMessage] = useState("");
   const [mergeMasterId, setMergeMasterId] = useState("");
   const [mergeDuplicateId, setMergeDuplicateId] = useState("");
+  const [mergeConfirmation, setMergeConfirmation] = useState("");
+  const [mergePreview, setMergePreview] = useState<Record<string, number> | null>(null);
   const [merging, setMerging] = useState(false);
 
   async function loadGuardians() {
@@ -75,6 +77,8 @@ export default function CrmGuardiansPage() {
     if (!selected) return;
     setMergeMasterId(selected.id);
     setMergeDuplicateId("");
+    setMergeConfirmation("");
+    setMergePreview(null);
     setForm({
       fullName: selected.fullName || "",
       phone: selected.phone || "",
@@ -143,7 +147,7 @@ export default function CrmGuardiansPage() {
       const response = await fetch("/api/crm/guardians/merge", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ masterGuardianId: mergeMasterId, duplicateGuardianId: mergeDuplicateId }),
+        body: JSON.stringify({ masterGuardianId: mergeMasterId, duplicateGuardianId: mergeDuplicateId, confirmation: mergeConfirmation }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось объединить родителей");
@@ -155,6 +159,19 @@ export default function CrmGuardiansPage() {
     } finally {
       setMerging(false);
     }
+  }
+
+  async function loadMergePreview(duplicateId: string) {
+    setMergeDuplicateId(duplicateId);
+    setMergePreview(null);
+    if (!mergeMasterId || !duplicateId) return;
+    const response = await fetch("/api/crm/guardians/merge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ masterGuardianId: mergeMasterId, duplicateGuardianId: duplicateId, previewOnly: true }),
+    });
+    const payload = await response.json();
+    if (payload.ok) setMergePreview(payload.preview || {});
   }
 
   function duplicateReasonLabel(reason: string) {
@@ -315,14 +332,27 @@ export default function CrmGuardiansPage() {
                   </label>
                   <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
                     Duplicate guardian
-                    <select className="form-input" value={mergeDuplicateId} onChange={(event) => setMergeDuplicateId(event.target.value)}>
+                    <select className="form-input" value={mergeDuplicateId} onChange={(event) => loadMergePreview(event.target.value)}>
                       <option value="">Выберите дубль для переноса</option>
-                      {guardians.filter((guardian) => guardian.id !== mergeMasterId && guardian.status !== "archived").map((guardian) => (
+                      {guardians.filter((guardian) => guardian.id !== mergeMasterId && guardian.status !== "archived" && guardian.isPossibleDuplicate).map((guardian) => (
                         <option key={guardian.id} value={guardian.id}>{guardian.fullName} · {guardian.phone || guardian.email || guardian.id}</option>
                       ))}
                     </select>
                   </label>
-                  <Button type="button" variant="primary-crm" onClick={mergeGuardians} disabled={merging}>
+                  {mergeMasterId && mergeDuplicateId && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div><strong>Master</strong><br />{guardians.find((guardian) => guardian.id === mergeMasterId)?.fullName}</div>
+                      <div><strong>Duplicate</strong><br />{guardians.find((guardian) => guardian.id === mergeDuplicateId)?.fullName}</div>
+                    </div>
+                  )}
+                  {mergePreview && (
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                      Будет перенесено: {Object.entries(mergePreview).map(([key, value]) => `${key}: ${value}`).join(", ")}
+                    </div>
+                  )}
+                  <input className="form-input" value={mergeConfirmation} onChange={(event) => setMergeConfirmation(event.target.value)} placeholder="Введите ОБЪЕДИНИТЬ" />
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-muted)" }}>Пустые телефон/email master будут заполнены из duplicate, существующие значения master сохраняются.</p>
+                  <Button type="button" variant="primary-crm" onClick={mergeGuardians} disabled={merging || mergeConfirmation !== "ОБЪЕДИНИТЬ"}>
                     {merging ? "Объединяем..." : "Объединить безопасно"}
                   </Button>
                 </div>

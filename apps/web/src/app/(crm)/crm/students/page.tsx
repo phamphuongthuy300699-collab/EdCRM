@@ -71,6 +71,8 @@ export default function CrmStudentsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
   const [guardianOptions, setGuardianOptions] = useState<any[]>([]);
+  const [duplicateGuardianCandidates, setDuplicateGuardianCandidates] = useState<any[]>([]);
+  const [allowDuplicateGuardian, setAllowDuplicateGuardian] = useState(false);
 
   // Drawer details state
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -236,6 +238,11 @@ export default function CrmStudentsPage() {
               };
             });
             setStudents(formatted);
+            const requestedStudentId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("student") : null;
+            const requestedStudent = requestedStudentId ? formatted.find((student: Student) => String(student.id) === requestedStudentId) : null;
+            if (requestedStudent) {
+              setSelectedStudent(requestedStudent);
+            }
           } else {
             setStudents([]);
           }
@@ -437,9 +444,14 @@ export default function CrmStudentsPage() {
           notes: newNotes || null,
           groupId: selectedGroupId || null,
           guardians: guardianPayloads,
+          allowDuplicate: allowDuplicateGuardian,
         }),
       });
       const payload = await response.json();
+      if (response.status === 409 && payload.code === "DUPLICATE_GUARDIAN_FOUND") {
+        setDuplicateGuardianCandidates(payload.candidates || []);
+        throw new Error(payload.error || "Найден похожий родитель");
+      }
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось создать ученика");
 
       const selectedGuardian = guardianOptions.find((guardian) => guardian.id === selectedExistingGuardianId);
@@ -501,6 +513,8 @@ export default function CrmStudentsPage() {
       setSecondParentRelation("Родитель");
       setPrimaryGuardianSlot("primary");
       setBillingGuardianSlot("primary");
+      setDuplicateGuardianCandidates([]);
+      setAllowDuplicateGuardian(false);
       setSelectedGroupId("");
       setReloadKey((value) => value + 1);
     } catch (err: any) {
@@ -1006,6 +1020,26 @@ export default function CrmStudentsPage() {
                     </div>
                   </div>
                 </>
+              )}
+
+              {duplicateGuardianCandidates.length > 0 && (
+                <div className="card-crm" style={{ padding: 12, background: "#FFFBEB", borderColor: "#F59E0B", display: "grid", gap: 8 }}>
+                  <strong>Найдены похожие родители</strong>
+                  {duplicateGuardianCandidates.map((candidate) => (
+                    <button key={candidate.id} type="button" onClick={() => {
+                      setNewGuardianMode("existing");
+                      setSelectedExistingGuardianId(candidate.id);
+                      setDuplicateGuardianCandidates([]);
+                      setAllowDuplicateGuardian(false);
+                    }} style={{ textAlign: "left", border: "1px solid var(--color-border)", borderRadius: 8, background: "#fff", padding: 8, cursor: "pointer" }}>
+                      Использовать: {candidate.fullName} · {candidate.maskedPhone || "телефон скрыт"} · {candidate.email || "email нет"}
+                    </button>
+                  ))}
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" checked={allowDuplicateGuardian} onChange={(event) => setAllowDuplicateGuardian(event.target.checked)} />
+                    Создать отдельного родителя после подтверждения
+                  </label>
+                </div>
               )}
 
               <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "12px", display: "grid", gap: "12px" }}>

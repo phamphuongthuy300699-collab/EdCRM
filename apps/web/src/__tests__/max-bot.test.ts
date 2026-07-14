@@ -132,12 +132,14 @@ describe("MAX bot MVP", () => {
 
   it("invoice publish creates MAX notification outbox when guardian is linked", () => {
     const endpoint = read("src/app/api/crm/invoice-payment-links/route.ts");
+    const helper = read("src/lib/payments/publish-invoice.ts");
 
-    expect(endpoint).toContain("guardian_messenger_accounts");
-    expect(endpoint).toContain("notification_outbox");
-    expect(endpoint).toContain('"max" : "manual"');
-    expect(endpoint).toContain("payUrl: link.payUrl");
-    expect(endpoint).toContain("publicId: link.publicId");
+    expect(endpoint).toContain("publishInvoiceForParent");
+    expect(helper).toContain("guardian_messenger_accounts");
+    expect(helper).toContain("notification_outbox");
+    expect(helper).toContain('"max" : "manual"');
+    expect(helper).toContain("payUrl: link.payUrl");
+    expect(helper).toContain("publicId: link.publicId");
   });
 
   it("notification worker sends /messages with inline_keyboard link button", () => {

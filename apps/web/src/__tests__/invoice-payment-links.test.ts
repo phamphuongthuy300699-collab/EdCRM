@@ -68,14 +68,16 @@ describe("invoice payment links workflow", () => {
   it("creates notification outbox without real bot integration", () => {
     const migration = read("../../supabase/migrations/20260709000003_notification_outbox.sql");
     const endpoint = read("src/app/api/crm/invoice-payment-links/route.ts");
+    const helper = read("src/lib/payments/publish-invoice.ts");
 
     expect(migration).toContain("create table if not exists public.notification_outbox");
     expect(migration).toContain("channel text not null");
     expect(migration).toContain("status text not null default 'pending'");
-    expect(endpoint).toContain("notification_outbox");
-    expect(endpoint).toContain("payUrl: link.payUrl");
-    expect(endpoint).toContain("publicId: link.publicId");
-    expect(endpoint).toContain("invoiceId: invoice.id");
+    expect(endpoint).toContain("publishInvoiceForParent");
+    expect(helper).toContain("notification_outbox");
+    expect(helper).toContain("payUrl: link.payUrl");
+    expect(helper).toContain("publicId: link.publicId");
+    expect(helper).toContain("invoiceId: invoice.id");
     expect(migration).not.toContain("telegram");
     expect(migration).not.toContain("max_api");
   });
