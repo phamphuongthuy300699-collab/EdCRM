@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildRequestContactMessage, sendMaxMessage } from "@/lib/bots/max/client";
-import { normalizeRuPhone, verifyMaxContactHash } from "@/lib/bots/max/utils";
+import {
+  findGuardianByVerifiedPhone,
+  normalizeMaxVcfInfo,
+  normalizeRuPhone,
+  parsePhoneFromMaxVcf,
+  verifyMaxContactHash,
+} from "@/lib/bots/max/utils";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 function pickUserId(update: any) {
@@ -8,7 +14,15 @@ function pickUserId(update: any) {
 }
 
 function pickChatId(update: any) {
-  return String(update?.chat?.chat_id || update?.chat?.id || update?.message?.chat?.chat_id || update?.message?.chat?.id || "");
+  return String(
+    update?.chat_id ||
+    update?.chat?.chat_id ||
+    update?.chat?.id ||
+    update?.message?.recipient?.chat_id ||
+    update?.message?.chat?.chat_id ||
+    update?.message?.chat?.id ||
+    "",
+  );
 }
 
 function pickContact(update: any) {
@@ -33,19 +47,25 @@ async function handleContact(admin: ReturnType<typeof createSupabaseAdminClient>
   const chatId = pickChatId(update);
   if (!contact || !externalUserId) return;
 
-  const vcfInfo = contact.vcf_info || contact.vcfInfo || contact.vcard || "";
-  const contactHash = contact.hash || contact.contact_hash || "";
+  const contactPayload = contact?.payload || contact;
+  const vcfInfo = normalizeMaxVcfInfo(contactPayload.vcf_info || contactPayload.vcfInfo || contactPayload.vcard || "");
+  const contactHash = contactPayload.hash || contactPayload.contact_hash || contact.hash || contact.contact_hash || "";
   if (!vcfInfo || !contactHash || !verifyMaxContactHash(settings.bot_token_secret, vcfInfo, contactHash)) {
     await sendMaxMessage(settings.bot_token_secret, { userId: externalUserId, chatId, text: "Не удалось проверить контакт. Отправьте телефон через кнопку ещё раз." });
     return;
   }
 
-  const phone = normalizeRuPhone(contact.phone || contact.phone_number || contact.phoneNumber || "");
-  const { data: guardian } = await (admin.from("guardians") as any)
+  const fallbackPhone = contactPayload.phone || contactPayload.phone_number || contactPayload.phoneNumber || "";
+  const phone = parsePhoneFromMaxVcf(vcfInfo) || (/\d/.test(fallbackPhone) ? normalizeRuPhone(fallbackPhone) : "");
+  if (!phone) {
+    await sendMaxMessage(settings.bot_token_secret, { userId: externalUserId, chatId, text: "Не удалось прочитать телефон из контакта MAX. Отправьте контакт через кнопку ещё раз или напишите администратору школы." });
+    return;
+  }
+
+  const { data: guardians } = await (admin.from("guardians") as any)
     .select("id, full_name, phone")
-    .eq("organization_id", settings.organization_id)
-    .or(`phone.eq.${phone},phone.eq.${phone.replace("+7", "8")}`)
-    .maybeSingle();
+    .eq("organization_id", settings.organization_id);
+  const guardian = findGuardianByVerifiedPhone(guardians, phone);
 
   if (!guardian) {
     await sendMaxMessage(settings.bot_token_secret, { userId: externalUserId, chatId, text: "Этот номер не найден в базе Робокс. Напишите администратору школы." });
@@ -60,7 +80,7 @@ async function handleContact(admin: ReturnType<typeof createSupabaseAdminClient>
       external_user_id: externalUserId,
       chat_id: chatId || null,
       phone_normalized: phone,
-      display_name: contact.name || guardian.full_name || null,
+      display_name: contactPayload.name || guardian.full_name || null,
       is_verified: true,
       verified_at: new Date().toISOString(),
       last_seen_at: new Date().toISOString(),

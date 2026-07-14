@@ -292,7 +292,7 @@ export default function CrmSettingsPage() {
     isEnabled: false,
     tokenConfigured: false,
     webhookSecret: "",
-    webhookUrl: "https://робокс48.рф/api/bots/max/webhook",
+    webhookUrl: "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook",
     botUsername: "",
     settings: {},
   });
@@ -464,7 +464,7 @@ export default function CrmSettingsPage() {
           isEnabled: Boolean(maxSettingsRes.settings?.isEnabled),
           tokenConfigured: Boolean(maxSettingsRes.settings?.tokenConfigured),
           webhookSecret: maxSettingsRes.settings?.webhookSecret || "",
-          webhookUrl: maxSettingsRes.settings?.webhookUrl || "https://робокс48.рф/api/bots/max/webhook",
+          webhookUrl: maxSettingsRes.settings?.webhookUrl || "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook",
           botUsername: maxSettingsRes.settings?.botUsername || "",
           settings: maxSettingsRes.settings?.settings || {},
         });

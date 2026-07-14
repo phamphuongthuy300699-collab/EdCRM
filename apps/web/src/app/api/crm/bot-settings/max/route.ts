@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { newWebhookSecret, requireBotStaff } from "@/lib/bots/max/utils";
 
-const DEFAULT_MAX_WEBHOOK_URL = "https://робокс48.рф/api/bots/max/webhook";
+const DEFAULT_MAX_WEBHOOK_URL = "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook";
 
 const payloadSchema = z.object({
   isEnabled: z.boolean(),

@@ -13,11 +13,39 @@ export function normalizeRuPhone(value: string | null | undefined) {
   return value ? `+${digits}` : "";
 }
 
+export function normalizeMaxVcfInfo(vcfInfo: string | null | undefined) {
+  return String(vcfInfo || "").replace(/\\r\\n/g, "\r\n");
+}
+
+export function parsePhoneFromMaxVcf(vcfInfo: string | null | undefined) {
+  const normalizedVcf = normalizeMaxVcfInfo(vcfInfo);
+  const telLine = normalizedVcf
+    .split(/\r\n|\n|\r/)
+    .find((line) => /^TEL(?:;[^:]*)?:/i.test(line.trim()));
+  if (!telLine) return "";
+
+  const rawValue = telLine.slice(telLine.indexOf(":") + 1).trim();
+  const phoneValue = rawValue.replace(/^tel:/i, "").replace(/;.*/, "");
+  if (!/\d/.test(phoneValue)) return "";
+  return normalizeRuPhone(phoneValue);
+}
+
 export function verifyMaxContactHash(botToken: string, vcfInfo: string, hash: string) {
   const expected = crypto.createHmac("sha256", botToken).update(vcfInfo).digest("hex");
   const expectedBuffer = Buffer.from(expected);
   const actualBuffer = Buffer.from(hash || "");
   return expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+export type GuardianPhoneMatch = {
+  id: string;
+  full_name?: string | null;
+  phone?: string | null;
+};
+
+export function findGuardianByVerifiedPhone<T extends GuardianPhoneMatch>(guardians: T[] | null | undefined, verifiedPhone: string) {
+  if (!verifiedPhone) return null;
+  return (guardians || []).find((guardian) => normalizeRuPhone(guardian.phone) === verifiedPhone) || null;
 }
 
 export function newWebhookSecret() {
