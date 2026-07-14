@@ -37,7 +37,12 @@ export type MaxMessageInput = {
   attachments?: any[];
   linkUrl?: string;
   linkText?: string;
+  inlineKeyboardButtons?: MaxInlineKeyboardButton[][];
 };
+
+export type MaxInlineKeyboardButton =
+  | { type: "link"; text: string; url: string }
+  | { type: "message"; text: string; payload: string };
 
 export class MaxBotError extends Error {
   status?: number;
@@ -204,6 +209,14 @@ export async function sendMaxMessage(token: string, input: MaxMessageInput) {
       type: "inline_keyboard",
       payload: {
         buttons: [[{ type: "link", text: input.linkText || "Открыть", url: input.linkUrl }]],
+      },
+    });
+  }
+  if (input.inlineKeyboardButtons?.length) {
+    attachments.push({
+      type: "inline_keyboard",
+      payload: {
+        buttons: input.inlineKeyboardButtons,
       },
     });
   }

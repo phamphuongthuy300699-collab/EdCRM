@@ -30,6 +30,10 @@ export function buildPublicPayUrl(publicId: string, origin?: string | null) {
   return new URL(`/pay/${publicId}`, configuredOrigin).toString();
 }
 
+export function isInvoicePayable(invoice: { status?: string | null }) {
+  return !["paid", "cancelled"].includes(String(invoice.status || ""));
+}
+
 async function loadInvoice(admin: ReturnType<typeof createSupabaseAdminClient>, invoiceId: string) {
   const { data: invoice, error } = await (admin.from("invoices") as any)
     .select("id, organization_id, guardian_id, student_id, title, description, amount, currency, status, due_date, number")
@@ -50,7 +54,7 @@ export async function createOrReuseInvoicePaymentLink(
   const admin = createSupabaseAdminClient();
   const invoice = await loadInvoice(admin, invoiceId);
 
-  if (["paid", "cancelled"].includes(invoice.status)) {
+  if (!isInvoicePayable(invoice)) {
     throw new Error("Нельзя выставить ссылку для оплаченного или отмененного счета");
   }
 
