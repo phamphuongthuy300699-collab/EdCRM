@@ -39,6 +39,9 @@ import {
   defaultHeaderLinks as defaultPublicHeaderLinks,
 } from "@/shared/utils/public-navigation";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { ImageCollectionEditor } from "@/features/site-editor/media/ImageCollectionEditor";
+import { normalizeImageCollection, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
+import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile } from "@/features/site-editor/media/types";
 
 type TabId = "home" | "branding" | "navigation" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -94,6 +97,14 @@ function toImageItem(value: any, index: number) {
   };
 }
 
+function blockItemsFromCollection(images: ImageCollectionItem[]) {
+  return images.map((image) => {
+    const item: Record<string, unknown> = { ...image, image: image.path };
+    delete item.path;
+    return item;
+  });
+}
+
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -115,28 +126,6 @@ const emptyReview = () => ({
   initials: "",
   text: "",
   rating: 5,
-  isActive: true,
-  sortOrder: 100,
-});
-
-const emptyProject = () => ({
-  id: makeId("project"),
-  title: "",
-  badge: "",
-  description: "",
-  image: "",
-  alt: "",
-  isActive: true,
-  sortOrder: 100,
-});
-
-const emptyLessonStep = () => ({
-  id: makeId("step"),
-  number: "",
-  title: "",
-  description: "",
-  image: "",
-  alt: "",
   isActive: true,
   sortOrder: 100,
 });
@@ -293,11 +282,13 @@ export default function CrmSitePage() {
   const [studentProjectsTitle, setStudentProjectsTitle] = useState("Проекты наших учеников");
   const [studentProjectsSubtitle, setStudentProjectsSubtitle] = useState("");
   const [studentProjectItems, setStudentProjectItems] = useState<any[]>([]);
+  const [studentProjectsLayout, setStudentProjectsLayout] = useState<ImageCollectionLayout>(() => normalizeImageLayout(undefined));
 
   const [lessonProcessEnabled, setLessonProcessEnabled] = useState(false);
   const [lessonProcessTitle, setLessonProcessTitle] = useState("Как проходит занятие: 5 этапов урока");
   const [lessonProcessSubtitle, setLessonProcessSubtitle] = useState("");
   const [lessonStepItems, setLessonStepItems] = useState<any[]>([]);
+  const [lessonProcessLayout, setLessonProcessLayout] = useState<ImageCollectionLayout>(() => normalizeImageLayout({ columnsDesktop: 5, columnsTablet: 3, columnsMobile: 1, gap: 24, aspectRatio: "4/3", objectFit: "cover" }));
 
   // Tab 8: Media Manager
   const [activeMediaFolder, setActiveMediaFolder] = useState("branding");
@@ -435,6 +426,7 @@ export default function CrmSitePage() {
           setStudentProjectsTitle(projects.content?.title || projects.title || "Проекты наших учеников");
           setStudentProjectsSubtitle(projects.content?.subtitle || projects.subtitle || "");
           setStudentProjectItems(Array.isArray(projects.content?.items) ? projects.content.items : []);
+          setStudentProjectsLayout(normalizeImageLayout(projects.content?.layout));
         }
 
         const lessonProcess = blocks.find((b: any) => b.block_key === "home.lesson_process");
@@ -443,6 +435,7 @@ export default function CrmSitePage() {
           setLessonProcessTitle(lessonProcess.content?.title || lessonProcess.title || "Как проходит занятие: 5 этапов урока");
           setLessonProcessSubtitle(lessonProcess.content?.subtitle || lessonProcess.subtitle || "");
           setLessonStepItems(Array.isArray(lessonProcess.content?.steps) ? lessonProcess.content.steps : []);
+          setLessonProcessLayout(normalizeImageLayout(lessonProcess.content?.layout || { columnsDesktop: 5, columnsTablet: 3, columnsMobile: 1, gap: 24, aspectRatio: "4/3", objectFit: "cover" }));
         }
       }
 
@@ -509,15 +502,16 @@ export default function CrmSitePage() {
   }, []);
 
   // Fetch media files list when active folder or media tab is selected
+  const loadMediaFolder = async (folder: string): Promise<MediaLibraryFile[]> => {
+    const res = await fetch(`/api/crm/media?folder=${encodeURIComponent(folder)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Не удалось загрузить медиатеку");
+    return data.files || [];
+  };
+
   const loadMediaFiles = async () => {
     try {
-      const res = await fetch(`/api/crm/media?folder=${activeMediaFolder}`);
-      const data = await res.json();
-      if (res.ok) {
-        setMediaFiles(data.files || []);
-      } else {
-        throw new Error(data.error);
-      }
+      setMediaFiles(await loadMediaFolder(activeMediaFolder));
     } catch (err: any) {
       console.error("Media load error:", err);
     }
@@ -623,13 +617,15 @@ export default function CrmSitePage() {
         enabled: studentProjectsEnabled,
         title: studentProjectsTitle,
         subtitle: studentProjectsSubtitle,
-        items: studentProjectItems
+        items: studentProjectItems,
+        layout: studentProjectsLayout,
       });
       await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
         enabled: lessonProcessEnabled,
         title: lessonProcessTitle,
         subtitle: lessonProcessSubtitle,
-        steps: lessonStepItems
+        steps: lessonStepItems,
+        layout: lessonProcessLayout,
       });
       setSuccessMsg("Изменения на Главной сохранены!");
     } catch (err: any) {
@@ -1087,18 +1083,12 @@ export default function CrmSitePage() {
     }
   };
 
-  // Tab 8: Upload file
-  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setUploadingFile(true);
-    try {
-      const uploadedFiles = [];
-
-      for (const file of files) {
+  const uploadFilesToMedia = async (files: File[], folder: string): Promise<MediaLibraryFile[]> => {
+    const uploadedFiles: MediaLibraryFile[] = [];
+    for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("folder", activeMediaFolder);
+        formData.append("folder", folder);
 
         const res = await fetch("/api/crm/media", {
           method: "POST",
@@ -1114,7 +1104,17 @@ export default function CrmSitePage() {
           url: data.url || getMediaUrl(relativePath),
           size: file.size
         });
-      }
+    }
+    return uploadedFiles;
+  };
+
+  // Tab 8: Upload file
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingFile(true);
+    try {
+      const uploadedFiles = await uploadFilesToMedia(files, activeMediaFolder);
 
       setSuccessMsg(files.length > 1 ? `${files.length} файлов успешно загружены!` : `Файл ${files[0].name} успешно загружен!`);
       await loadMediaFiles();
@@ -1701,27 +1701,35 @@ export default function CrmSitePage() {
                   <input className="form-input" placeholder="Заголовок" value={studentProjectsTitle} onChange={e => setStudentProjectsTitle(e.target.value)} />
                   <input className="form-input" placeholder="Подзаголовок" value={studentProjectsSubtitle} onChange={e => setStudentProjectsSubtitle(e.target.value)} />
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку student-projects и вставляйте storage path, например student-projects/project-1.jpg.</p>
                 {studentProjectItems.map((item, idx) => (
                   <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
+                    <div className="form-grid-2">
                       <input className="form-input" placeholder="Бейдж" value={item.badge || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, badge: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                      <textarea className="form-input" placeholder="Описание" value={item.description || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
                     </div>
-                    <textarea className="form-input" placeholder="Описание" value={item.description || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="student-projects/..." value={item.image || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
-                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
-                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
-                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
-                        Активен
-                      </label>
-                    </div>
-                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("проект", () => setStudentProjectItems(studentProjectItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
                   </div>
                 ))}
-                <Button type="button" variant="secondary-crm" onClick={() => setStudentProjectItems([...studentProjectItems, emptyProject()])}><Plus size={14} /> Добавить проект</Button>
+                <ImageCollectionEditor
+                  blockKey="home.student_projects"
+                  blockLabel="Проекты учеников"
+                  images={normalizeImageCollection(studentProjectItems)}
+                  layout={studentProjectsLayout}
+                  mediaFiles={mediaFiles}
+                  onChange={(images) => setStudentProjectItems(blockItemsFromCollection(images))}
+                  onLayoutChange={setStudentProjectsLayout}
+                  onLoadFolder={loadMediaFolder}
+                  onUpload={uploadFilesToMedia}
+                  onSave={async () => {
+                    await saveBlock("home.student_projects", studentProjectsTitle, studentProjectsSubtitle, {
+                      enabled: studentProjectsEnabled,
+                      title: studentProjectsTitle,
+                      subtitle: studentProjectsSubtitle,
+                      items: studentProjectItems,
+                      layout: studentProjectsLayout,
+                    });
+                    setSuccessMsg("Изменения опубликованы");
+                  }}
+                />
               </div>
 
               <div className="card-crm">
@@ -1734,27 +1742,35 @@ export default function CrmSitePage() {
                   <input className="form-input" placeholder="Заголовок" value={lessonProcessTitle} onChange={e => setLessonProcessTitle(e.target.value)} />
                   <input className="form-input" placeholder="Подзаголовок" value={lessonProcessSubtitle} onChange={e => setLessonProcessSubtitle(e.target.value)} />
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку lesson-process и вставляйте storage path, например lesson-process/step-1.jpg.</p>
                 {lessonStepItems.map((item, idx) => (
                   <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
-                    <div className="form-grid-3">
+                    <div className="form-grid-2">
                       <input className="form-input" placeholder="Номер" value={item.number || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, number: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                      <textarea className="form-input" placeholder="Описание этапа" value={item.description || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
                     </div>
-                    <textarea className="form-input" placeholder="Описание этапа" value={item.description || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="lesson-process/..." value={item.image || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
-                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
-                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
-                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
-                        Активен
-                      </label>
-                    </div>
-                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("этап", () => setLessonStepItems(lessonStepItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
                   </div>
                 ))}
-                <Button type="button" variant="secondary-crm" onClick={() => setLessonStepItems([...lessonStepItems, emptyLessonStep()])}><Plus size={14} /> Добавить этап</Button>
+                <ImageCollectionEditor
+                  blockKey="home.lesson_process"
+                  blockLabel="Как проходит занятие"
+                  images={normalizeImageCollection(lessonStepItems)}
+                  layout={lessonProcessLayout}
+                  mediaFiles={mediaFiles}
+                  onChange={(images) => setLessonStepItems(blockItemsFromCollection(images))}
+                  onLayoutChange={setLessonProcessLayout}
+                  onLoadFolder={loadMediaFolder}
+                  onUpload={uploadFilesToMedia}
+                  onSave={async () => {
+                    await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
+                      enabled: lessonProcessEnabled,
+                      title: lessonProcessTitle,
+                      subtitle: lessonProcessSubtitle,
+                      steps: lessonStepItems,
+                      layout: lessonProcessLayout,
+                    });
+                    setSuccessMsg("Изменения опубликованы");
+                  }}
+                />
               </div>
 
               <div>

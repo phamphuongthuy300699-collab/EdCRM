@@ -7,6 +7,8 @@ import { RoboAssistant } from "@/shared/ui/robo-assistant";
 import Link from "next/link";
 import { getMediaUrl } from "@/shared/utils/media";
 import { buildYandexStaticMapUrl, publicMapBranches, resolveBranchMapMarkers } from "@/shared/utils/public-map";
+import { ImageCollectionGrid } from "@/features/site-editor/media/ImageCollectionGrid";
+import { activeCollectionImages, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
 import { 
   Users, 
   Layers, 
@@ -251,9 +253,11 @@ export default function LandingPageClient({
 
   const studentProjectsBlock = getBlock('home.student_projects');
   const studentProjectsContent = studentProjectsBlock?.content || {};
+  const studentProjectsLayout = normalizeImageLayout(studentProjectsContent.layout);
   const projectsToRender = studentProjectsContent.enabled === true
-    ? sortedActiveItems(studentProjectsContent.items).map((project: any, idx: number) => ({
-        img: mediaPath(project.image) ? getMediaUrl(mediaPath(project.image)) : "",
+    ? activeCollectionImages(studentProjectsContent.items).map((project: any, idx: number) => ({
+        ...project,
+        img: project.path ? getMediaUrl(project.path) : "",
         tag: project.badge || "Проект ученика",
         tagColor: idx % 2 === 0 ? "badge-amber" : "badge-purple",
         title: project.title || "Проект ученика",
@@ -265,12 +269,14 @@ export default function LandingPageClient({
 
   const lessonProcessBlock = getBlock('home.lesson_process');
   const lessonProcessContent = lessonProcessBlock?.content || {};
+  const lessonProcessLayout = normalizeImageLayout(lessonProcessContent.layout || { columnsDesktop: 5, columnsTablet: 3, columnsMobile: 1, gap: 24, aspectRatio: "4/3", objectFit: "cover" });
   const stepsToRender = lessonProcessContent.enabled === true
-    ? sortedActiveItems(lessonProcessContent.steps).map((step: any, idx: number) => ({
+    ? activeCollectionImages(lessonProcessContent.steps).map((step: any, idx: number) => ({
+        ...step,
         num: step.number || String(idx + 1).padStart(2, "0"),
         title: step.title || "Этап занятия",
         text: step.description || "",
-        img: mediaPath(step.image) ? getMediaUrl(mediaPath(step.image)) : "",
+        img: step.path ? getMediaUrl(step.path) : "",
         alt: step.alt || step.title || "Этап занятия",
       }))
     : [];
@@ -851,15 +857,16 @@ export default function LandingPageClient({
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "32px" }}>
-            {projectsToRender.map((proj: any, idx: number) => (
-              <div key={idx} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                <div style={{ height: "240px", position: "relative" }}>
+          <ImageCollectionGrid images={projectsToRender} layout={studentProjectsLayout} renderItem={(project) => {
+            const proj = project as any;
+            return (
+              <div key={String(proj.id || proj.path)} className="card-site" style={{ padding: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ aspectRatio: studentProjectsLayout.aspectRatio, position: "relative" }}>
                   {proj.img ? (
                     <img
                       src={proj.img}
                       alt={proj.alt || proj.title}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{ width: "100%", height: "100%", objectFit: studentProjectsLayout.objectFit, objectPosition: proj.objectPosition }}
                     />
                   ) : (
                     <div style={{ width: "100%", height: "100%", background: "var(--color-surface-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "12px", fontWeight: 700 }}>
@@ -875,8 +882,8 @@ export default function LandingPageClient({
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          }} />
         </div>
       </section>
       )}
@@ -894,25 +901,10 @@ export default function LandingPageClient({
             </p>
           </div>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "24px",
-            position: "relative"
-          }}>
-            <div style={{
-              position: "absolute",
-              top: "40px",
-              left: "40px",
-              right: "40px",
-              height: "2px",
-              borderTop: "2px dashed rgba(37,99,235,0.15)",
-              zIndex: 1,
-              pointerEvents: "none"
-            }} />
-
-            {stepsToRender.map((step, idx) => (
-              <div key={idx} style={{
+          <ImageCollectionGrid images={stepsToRender} layout={lessonProcessLayout} renderItem={(image) => {
+            const step = image as any;
+            return (
+              <div key={String(step.id || step.path)} style={{
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
@@ -925,14 +917,14 @@ export default function LandingPageClient({
                 boxShadow: "0 8px 20px rgba(0,0,0,0.02)"
               }}>
                 <div style={{
-                  height: "90px",
+                  aspectRatio: lessonProcessLayout.aspectRatio,
                   borderRadius: "8px",
                   overflow: "hidden",
                   position: "relative",
                   background: "var(--color-surface-soft)"
                 }}>
                   {step.img ? (
-                    <img src={step.img} alt={step.alt || step.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={step.img} alt={step.alt || step.title} style={{ width: "100%", height: "100%", objectFit: lessonProcessLayout.objectFit, objectPosition: step.objectPosition }} />
                   ) : (
                     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "11px", fontWeight: 700 }}>
                       Этап
@@ -966,8 +958,8 @@ export default function LandingPageClient({
                   <p style={{ fontSize: "11px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: 0 }}>{step.text}</p>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          }} />
         </div>
       </section>
       )}

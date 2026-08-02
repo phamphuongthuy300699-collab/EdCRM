@@ -279,6 +279,30 @@ describe("Media API Endpoint Security", () => {
     expect(json.usages).toEqual(["Блок сайта: Hero"]);
   });
 
+  it("does not expose personal names when a staff image blocks deletion", async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }) },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: "org-id", role: "admin" } }),
+      }),
+    } as any);
+
+    vi.mocked(createSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: table === "profiles" ? [{ full_name: "Персональное Имя" }] : [],
+        }),
+      })),
+    } as any);
+
+    const response = await DELETE(new NextRequest("http://localhost:3000/api/crm/media?path=teachers/avatar.jpg", { method: "DELETE" }));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ usages: ["Фото сотрудника"] });
+  });
+
   it("deletes unused local media inside the configured media root and writes audit log", async () => {
     const originalMediaDriver = process.env.MEDIA_DRIVER;
     const originalNextPublicMediaDriver = process.env.NEXT_PUBLIC_MEDIA_DRIVER;
