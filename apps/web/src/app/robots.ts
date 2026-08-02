@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { publicSiteUrl } from "@/shared/config/public-site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -19,6 +20,6 @@ export default function robots(): MetadataRoute.Robots {
         "/api/",
       ],
     },
-    sitemap: "https://робокс48.рф/sitemap.xml",
+    sitemap: publicSiteUrl("/sitemap.xml"),
   };
 }

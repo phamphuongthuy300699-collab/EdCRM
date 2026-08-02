@@ -1,18 +1,21 @@
 import React from "react";
-import { Metadata } from "next";
+import { buildPublicMetadata } from "@/shared/seo/public-metadata";
 import Link from "next/link";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { Users, ArrowRight, BookOpen, Star } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
+import { getPublicSiteConfig, publicSiteUrl } from "@/shared/config/public-site";
+import { safeJsonLdStringify } from "@/shared/seo/public-metadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Наши преподаватели | Робокс Липецк",
   description:
     "Команда опытных педагогов школы робототехники и программирования Робокс в Липецке. Индивидуальный подход, малые группы, вовлечённость каждого ребёнка.",
-};
+  path: "/teachers",
+});
 
 type TeacherProfile = {
   id: string;
@@ -32,7 +35,7 @@ export default async function TeachersPage() {
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {
@@ -82,7 +85,7 @@ export default async function TeachersPage() {
           name: "Робокс",
         },
         url: t.slug
-          ? `https://robotics-lipetsk.ru/teachers/${t.slug}`
+          ? publicSiteUrl(`/teachers/${t.slug}`)
           : undefined,
         description: t.public_bio || undefined,
       },
@@ -93,7 +96,7 @@ export default async function TeachersPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLd) }}
       />
 
       <section

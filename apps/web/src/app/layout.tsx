@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Geologica } from "next/font/google";
 import "./globals.css";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
+import { buildPublicMetadata, DEFAULT_HOME_DESCRIPTION, DEFAULT_HOME_TITLE } from "@/shared/seo/public-metadata";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -12,29 +14,10 @@ const geologica = Geologica({
   subsets: ["latin", "cyrillic"],
 });
 
+const publicSite = getPublicSiteConfig();
 export const metadata: Metadata = {
-  metadataBase: new URL("https://robotics-lipetsk.ru"),
-  title: {
-    default: "Робототехника и программирование для детей в Липецке | Робокс",
-    template: "%s | Робокс Липецк"
-  },
-  description: "Школа инженерного мышления и программирования для детей 6–14 лет в Липецке. Практические занятия в мини-группах до 8 человек. Запишитесь на бесплатный пробный урок!",
-  alternates: {
-    canonical: "./",
-  },
-  openGraph: {
-    title: "Робототехника и программирование для детей в Липецке | Робокс",
-    description: "Развиваем инженерное мышление у детей 6–14 лет. Сборка роботов, программирование игр и микроконтроллеров. Запись на бесплатное пробное занятие!",
-    url: "https://robotics-lipetsk.ru",
-    siteName: "Робокс Липецк",
-    locale: "ru_RU",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Робототехника и программирование для детей в Липецке | Робокс",
-    description: "Развиваем инженерное мышление у детей 6–14 лет. Сборка роботов, программирование игр и микроконтроллеров.",
-  }
+  ...buildPublicMetadata({ title: DEFAULT_HOME_TITLE, description: DEFAULT_HOME_DESCRIPTION }),
+  metadataBase: new URL(publicSite.origin),
 };
 
 export default function RootLayout({

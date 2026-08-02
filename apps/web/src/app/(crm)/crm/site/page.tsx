@@ -42,6 +42,8 @@ import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { ImageCollectionEditor } from "@/features/site-editor/media/ImageCollectionEditor";
 import { normalizeImageCollection, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
 import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile } from "@/features/site-editor/media/types";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
+import { brandedPublicTitle } from "@/shared/seo/public-metadata";
 
 type TabId = "home" | "branding" | "navigation" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -303,6 +305,7 @@ export default function CrmSitePage() {
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoH1, setSeoH1] = useState("");
+  const [seoImage, setSeoImage] = useState("");
 
   // Load All Site Data
   const loadData = async () => {
@@ -374,6 +377,7 @@ export default function CrmSitePage() {
         setSeoTitle(seoBlock?.title || "");
         setSeoDescription(seoBlock?.subtitle || "");
         setSeoH1(seoBlock?.content?.h1 || "");
+        setSeoImage(seoBlock?.content?.ogImage || seoBlock?.content?.socialImage || "");
 
         // Footer block
         const fBlock = blocks.find((b: any) => b.block_key === "site.footer");
@@ -606,7 +610,16 @@ export default function CrmSitePage() {
         balance: portalBalance,
         teacherNote: portalTeacherNote
       });
-      await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1 });
+      await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1, ogImage: normalizeSiteMediaPath(seoImage) });
+      await saveBlock("site.branding", brandName, "Настройки брендинга", {
+        logo: brandLogo,
+        favicon: normalizeSiteMediaPath(brandFavicon),
+        primaryColor: brandPrimaryColor,
+        accentColor: brandAccentColor,
+        gradient: brandGradient,
+        logoDisplay: brandLogoDisplay,
+        logoAlt: brandLogoAlt,
+      });
       await saveBlock("home.testimonials", testimonialsTitle, testimonialsSubtitle, {
         enabled: testimonialsEnabled,
         title: testimonialsTitle,
@@ -1636,18 +1649,46 @@ export default function CrmSitePage() {
               </div>
 
               <div className="card-crm">
-                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>SEO параметры главной</h3>
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>SEO и реклама</h3>
                 <div className="form-group">
-                  <label className="form-label">Meta Title (Заголовок вкладки)</label>
-                  <input type="text" className="form-input" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} required />
+                  <label className="form-label">Заголовок страницы</label>
+                  <input type="text" className="form-input" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} />
+                  <span className="form-hint">{seoTitle.length} символов. Бренд «Робокс» добавляется автоматически один раз.</span>
+                  {/Робокс/i.test(seoTitle) && <span style={{ color: "#B45309", fontSize: "11px", fontWeight: 700 }}>Уберите бренд из поля, чтобы предпросмотр был понятнее: система всё равно устранит повтор.</span>}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Meta Description</label>
-                  <input type="text" className="form-input" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} required />
+                  <label className="form-label">Описание страницы</label>
+                  <textarea className="form-input" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} style={{ minHeight: 84 }} />
+                  <span className="form-hint">{seoDescription.length} символов. Поисковая система может сформировать собственный текст сниппета.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Заголовок H1 на сайте</label>
                   <input type="text" className="form-input" value={seoH1} onChange={e => setSeoH1(e.target.value)} required />
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Изображение для соцсетей и рекламы</label>
+                    <input type="text" className="form-input" value={seoImage} onChange={e => setSeoImage(normalizeSiteMediaPath(e.target.value))} placeholder="branding/social-card.webp" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Favicon</label>
+                    <input type="text" className="form-input" value={brandFavicon} onChange={e => setBrandFavicon(normalizeSiteMediaPath(e.target.value))} placeholder="branding/favicon.ico" />
+                    <span className="form-hint">Favicon также доступен в разделе «Бренд и логотип».</span>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Фактический canonical URL</label>
+                  <input type="text" className="form-input" value={getPublicSiteConfig().origin} readOnly />
+                </div>
+                {(!seoTitle.trim() || !seoDescription.trim()) && <div style={{ padding: "10px 12px", borderRadius: 8, background: "#FEF3C7", color: "#92400E", fontSize: 12, fontWeight: 700 }}>Заполните title и description. Пустые поля будут заменены безопасными значениями по умолчанию.</div>}
+                <div style={{ padding: 16, border: "1px solid var(--color-border)", borderRadius: 12, background: "white", display: "grid", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <img src={brandFavicon ? getMediaUrl(brandFavicon) : "/favicon.ico"} alt="" width="20" height="20" style={{ borderRadius: 4 }} />
+                    <span style={{ color: "#166534", fontSize: 13 }}>{getPublicSiteConfig().hostname}</span>
+                  </div>
+                  <strong style={{ color: "#1A0DAB", fontSize: 18 }}>{brandedPublicTitle(seoTitle)}</strong>
+                  <span style={{ color: "#4B5563", fontSize: 13 }}>{seoDescription || "Описание страницы будет подставлено из безопасного значения по умолчанию."}</span>
+                  <span className="form-hint">Предпросмотр ориентировочный: Яндекс может изменить заголовок и описание.</span>
                 </div>
               </div>
 

@@ -1,20 +1,19 @@
 import React from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { Calendar, ArrowLeft } from "lucide-react";
+import { publicSiteUrl, getPublicSiteConfig } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Расписание занятий по робототехнике в Липецке",
   description: "Расписание учебных групп школы робототехники и программирования Робокс Липецк. Группы по возрастам для детей от 6 до 15 лет.",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/raspisanie",
-  },
-};
+  path: "/raspisanie",
+});
 
 export default async function RaspisaniePage() {
   const jsonLdBreadcrumb = {
@@ -25,13 +24,13 @@ export default async function RaspisaniePage() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Расписание",
-        "item": "https://robotics-lipetsk.ru/raspisanie"
+        "item": publicSiteUrl("/raspisanie")
       }
     ]
   };
@@ -43,7 +42,7 @@ export default async function RaspisaniePage() {
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {
@@ -129,7 +128,7 @@ export default async function RaspisaniePage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
 
       <section className="bg-grid-blueprint" style={{ padding: "80px 0", borderBottom: "1px solid var(--color-border)" }}>

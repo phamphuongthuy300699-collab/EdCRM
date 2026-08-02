@@ -1,16 +1,15 @@
 import React from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { Code, ArrowLeft, Check, Compass } from "lucide-react";
+import { publicSiteUrl } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Курсы Python для детей в Липецке | Обучение программированию",
   description: "Курсы программирования на Python для детей и подростков 10–14 лет в Липецке. Практика написания кода, разработка чат-ботов и логических программ с нуля.",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/python-dlya-detey-lipetsk",
-  },
-};
+  path: "/python-dlya-detey-lipetsk",
+});
 
 export default function PythonPage() {
   const jsonLdCourse = {
@@ -21,7 +20,7 @@ export default function PythonPage() {
     "provider": {
       "@type": "EducationalOrganization",
       "name": "Робокс Липецк",
-      "sameAs": "https://robotics-lipetsk.ru"
+      "sameAs": publicSiteUrl("/")
     }
   };
 
@@ -33,13 +32,13 @@ export default function PythonPage() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Python",
-        "item": "https://robotics-lipetsk.ru/python-dlya-detey-lipetsk"
+        "item": publicSiteUrl("/python-dlya-detey-lipetsk")
       }
     ]
   };
@@ -48,11 +47,11 @@ export default function PythonPage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdCourse) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdCourse) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
 
       {/* Header Info */}

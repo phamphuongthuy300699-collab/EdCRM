@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
 
 type SiteBlock = {
   block_key: string;
@@ -85,7 +86,7 @@ export async function getPublicLegalData(): Promise<PublicLegalData> {
         short_legal_name, full_legal_name, legal_address,
         bank_name, bank_inn, bik, account_number, correspondent_account, bank_address
       `)
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (!org) return fallback;
@@ -170,7 +171,7 @@ export async function getDynamicPageBlock(
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {

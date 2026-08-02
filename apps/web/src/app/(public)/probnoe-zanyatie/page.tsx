@@ -1,23 +1,22 @@
 import React from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { Smile, ArrowLeft, Check } from "lucide-react";
+import { publicSiteUrl } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Бесплатное пробное занятие по робототехнике в Липецке",
   description: "Запишитесь на бесплатное пробное занятие 90 минут по робототехнике и программированию в Липецке. Ребенок соберет первого робота на первом уроке!",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/probnoe-zanyatie",
-  },
-};
+  path: "/probnoe-zanyatie",
+});
 
 export default function ProbnoeZanyatiePage() {
   const jsonLdOrg = {
     "@context": "https://schema.org",
     "@type": "EducationalOrganization",
     "name": "Робокс Липецк",
-    "url": "https://robotics-lipetsk.ru",
+    "url": publicSiteUrl("/"),
     "description": "Бесплатное ознакомительное занятие по робототехнике и программированию для детей в Липецке."
   };
 
@@ -29,13 +28,13 @@ export default function ProbnoeZanyatiePage() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Пробное занятие",
-        "item": "https://robotics-lipetsk.ru/probnoe-zanyatie"
+        "item": publicSiteUrl("/probnoe-zanyatie")
       }
     ]
   };
@@ -44,11 +43,11 @@ export default function ProbnoeZanyatiePage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdOrg) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
 
       <section className="bg-grid-blueprint" style={{ padding: "80px 0", borderBottom: "1px solid var(--color-border)" }}>
