@@ -32,47 +32,6 @@ function formatScheduleRules(rules: any[]) {
     .join(", ");
 }
 
-function getNextClass(scheduleRules: any[]) {
-  if (!scheduleRules || scheduleRules.length === 0) return "Не определено";
-  
-  const now = new Date();
-  const currentDay = now.getDay(); // 0 is Sunday, 1-6 are Mon-Sat
-  const currentDayMapped = currentDay === 0 ? 7 : currentDay;
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  
-  let minDiff = 8;
-  let nextRule = null;
-  
-  for (const rule of scheduleRules) {
-    let diff = rule.weekday - currentDayMapped;
-    if (diff < 0) {
-      diff += 7;
-    } else if (diff === 0) {
-      const [sh, sm] = rule.starts_at.split(":").map(Number);
-      if (currentHour > sh || (currentHour === sh && currentMinute >= sm)) {
-        diff = 7;
-      }
-    }
-    
-    if (diff < minDiff) {
-      minDiff = diff;
-      nextRule = rule;
-    }
-  }
-  
-  if (!nextRule) return "Не определено";
-  
-  const startsShort = nextRule.starts_at.slice(0, 5);
-  if (minDiff === 0) {
-    return `Сегодня, ${startsShort}`;
-  } else if (minDiff === 1) {
-    return `Завтра, ${startsShort}`;
-  } else {
-    return `${daysMap[nextRule.weekday]}, ${startsShort}`;
-  }
-}
-
 export default function ParentDashboard() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
@@ -85,6 +44,8 @@ export default function ParentDashboard() {
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState("");
   const [accessMessage, setAccessMessage] = useState("");
+  const [scheduleByChild, setScheduleByChild] = useState<Record<string, any>>({});
+  const [requestingMakeup, setRequestingMakeup] = useState<string | null>(null);
 
   // Demo Fallback Data (Anna Petrova & Igor Petrov)
   const demoData = {
@@ -223,7 +184,29 @@ export default function ParentDashboard() {
       .then((res) => res.json())
       .then((data) => setOnlinePaymentEnabled(Boolean(data.onlinePaymentEnabled)))
       .catch(() => setOnlinePaymentEnabled(false));
+
+    if (!isDemoMode()) {
+      fetch("/api/parent/schedule")
+        .then((response) => response.json())
+        .then((data) => setScheduleByChild(Object.fromEntries((data.children || []).map((child: any) => [child.studentId, child]))))
+        .catch(() => setScheduleByChild({}));
+    }
   }, []);
+
+  const requestMakeup = async (attendanceId: string) => {
+    try {
+      setRequestingMakeup(attendanceId);
+      const response = await fetch("/api/parent/schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request_makeup", attendanceId }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось запросить отработку");
+      alert("Запрос на отработку отправлен администратору");
+      window.location.reload();
+    } catch (error: any) {
+      alert(error.message || "Не удалось запросить отработку");
+    } finally {
+      setRequestingMakeup(null);
+    }
+  };
 
   const handleRequestPaymentLink = async (invoiceId?: string) => {
     if (!invoiceId) {
@@ -541,6 +524,8 @@ export default function ParentDashboard() {
           {childrenList.map((kid) => {
             const hasOverdue = kid.invoices.some((inv: any) => inv.status === "overdue");
             const hasPending = kid.invoices.some((inv: any) => inv.status === "issued" || inv.status === "draft");
+            const childSchedule = scheduleByChild[kid.id] || { sessions: [], attendance: kid.attendance || [], makeups: [] };
+            const upcomingLessons = childSchedule.sessions.filter((item: any) => new Date(item.starts_at) >= new Date() || item.status === "cancelled" || item.status === "moved");
             
             return (
               <div key={kid.id} style={{
@@ -615,8 +600,21 @@ export default function ParentDashboard() {
                         <Sparkles size={16} style={{ color: "var(--color-primary)" }} />
                         <div>
                           <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>Ближайшее занятие</div>
-                          <div style={{ fontWeight: 600 }}>{getNextClass(kid.group?.group_schedule_rules)}</div>
+                          <div style={{ fontWeight: 600 }}>{upcomingLessons.find((item: any) => item.status === "planned") ? new Date(upcomingLessons.find((item: any) => item.status === "planned").starts_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Уточняется"}</div>
                         </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 20 }}>
+                      <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Ближайшие занятия</h4>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {upcomingLessons.slice(0, 5).map((lesson: any) => (
+                          <div key={lesson.id} style={{ border: "1px solid var(--color-border)", borderRadius: 9, padding: 10, display: "flex", justifyContent: "space-between", gap: 12, opacity: lesson.status === "cancelled" || lesson.status === "moved" ? .65 : 1 }}>
+                            <div><strong style={{ fontSize: 12 }}>{new Date(lesson.starts_at).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</strong><div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 3 }}>{lesson.groups?.title} · {lesson.rooms?.name || "Кабинет уточняется"}</div>{lesson.change_reason && <div style={{ fontSize: 11, marginTop: 3 }}>Причина: {lesson.change_reason}</div>}</div>
+                            <span className={`badge ${lesson.status === "cancelled" ? "badge-red" : lesson.status === "moved" || lesson.session_kind === "makeup" ? "badge-amber" : "badge-blue"}`}>{lesson.status === "cancelled" ? "Отменено" : lesson.status === "moved" ? "Перенесено" : lesson.session_kind === "makeup" ? "Отработка" : "Запланировано"}</span>
+                          </div>
+                        ))}
+                        {!upcomingLessons.length && <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Конкретные занятия пока не сформированы администратором.</span>}
                       </div>
                     </div>
 
@@ -625,29 +623,34 @@ export default function ParentDashboard() {
                       <h4 style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-text)", marginBottom: "10px" }}>
                         Посещаемость занятий
                       </h4>
-                      {kid.attendance.length === 0 ? (
+                      {childSchedule.attendance.length === 0 ? (
                         <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>Отметок о посещаемости пока нет</p>
                       ) : (
                         <div style={{ display: "flex", gap: "10px" }}>
-                          {kid.attendance.map((att: any, idx: number) => (
+                          {childSchedule.attendance.map((att: any, idx: number) => {
+                            const makeup = childSchedule.makeups.find((item: any) => item.source_attendance_id === att.id && item.status !== "cancelled");
+                            const status = att.attendance_status || (att.is_present ? "present" : "absent_unexcused");
+                            return (
                             <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
                               <div style={{
                                 width: "32px",
                                 height: "32px",
                                 borderRadius: "50%",
-                                background: att.is_present ? "var(--color-success-soft)" : "var(--color-danger-soft)",
-                                color: att.is_present ? "var(--color-success)" : "var(--color-danger)",
+                                background: status === "present" || status === "late" ? "var(--color-success-soft)" : "var(--color-danger-soft)",
+                                color: status === "present" || status === "late" ? "var(--color-success)" : "var(--color-danger)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center"
                               }}>
-                                {att.is_present ? <CheckCircle size={18} /> : <XCircle size={18} />}
+                                {status === "present" || status === "late" ? <CheckCircle size={18} /> : <XCircle size={18} />}
                               </div>
                               <span style={{ fontSize: "9px", color: "var(--color-text-muted)" }}>
                                 {new Date(att.lesson_date).toLocaleDateString("ru-RU", { month: "numeric", day: "numeric" })}
                               </span>
+                              {status === "absent_excused" && !makeup && <button disabled={requestingMakeup === att.id} onClick={() => void requestMakeup(att.id)} style={{ border: 0, background: "none", color: "var(--color-primary)", fontSize: 9, fontWeight: 700, cursor: "pointer" }}>Отработка</button>}
+                              {makeup && <span style={{ fontSize: 9, color: "var(--color-warning-dark)" }}>{makeup.status === "scheduled" ? "Отработка назначена" : "Отработка запрошена"}</span>}
                             </div>
-                          ))}
+                          );})}
                         </div>
                       )}
                     </div>

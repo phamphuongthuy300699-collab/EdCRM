@@ -12,8 +12,6 @@ import {
   Calendar, 
   Users, 
   Eye, 
-  Check, 
-  X,
   Plus,
   AlertCircle
 } from "lucide-react";
@@ -21,6 +19,8 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { AttendanceRoster, type AttendanceRosterRow } from "@/features/scheduling/AttendanceRoster";
+import type { AttendanceStatus } from "@/features/scheduling/domain";
 
 interface LessonSession {
   id: string;
@@ -51,12 +51,15 @@ interface LessonSession {
 interface Student {
   id: string;
   full_name: string;
+  isMakeup?: boolean;
 }
 
 interface AttendanceRecord {
   student_id: string;
   is_present: boolean;
+  attendance_status: AttendanceStatus;
   comment: string;
+  absence_reason?: string;
   id?: string; // If already exists
 }
 
@@ -155,7 +158,16 @@ export default function LessonConductPage() {
           .eq("group_id", currentSession.group_id)
           .eq("status", "active");
 
-        const activeStudents = enrollmentData?.map((e: any) => e.students).filter(Boolean) || [];
+        const activeStudents: Student[] = enrollmentData?.map((e: any) => ({ ...e.students, isMakeup: false })).filter((student: any) => student.id) || [];
+        const { data: makeupRows } = await (supabase.from("makeup_assignments") as any)
+          .select("student_id, students(id, full_name)")
+          .eq("target_session_id", sessionId)
+          .eq("status", "scheduled");
+        for (const makeup of makeupRows || []) {
+          if (!activeStudents.some((student) => student.id === makeup.student_id)) {
+            activeStudents.push({ id: makeup.students?.id || makeup.student_id, full_name: makeup.students?.full_name || "Ученик на отработке", isMakeup: true });
+          }
+        }
         setStudents(activeStudents);
 
         // Fetch existing attendance
@@ -169,7 +181,8 @@ export default function LessonConductPage() {
         activeStudents.forEach((student: any) => {
           attendanceMap[student.id] = {
             student_id: student.id,
-            is_present: true, // Default to present
+            is_present: false,
+            attendance_status: "unmarked",
             comment: ""
           };
         });
@@ -180,6 +193,8 @@ export default function LessonConductPage() {
             id: att.id,
             student_id: att.student_id,
             is_present: att.is_present,
+            attendance_status: att.attendance_status || (att.is_present ? "present" : "absent_unexcused"),
+            absence_reason: att.absence_reason || "",
             comment: att.comment || ""
           };
         });
@@ -216,52 +231,26 @@ export default function LessonConductPage() {
     loadData();
   }, [sessionId]);
 
-  const handleToggleAttendance = (studentId: string) => {
-    setAttendance(prev => {
-      const current = prev[studentId];
-      return {
-        ...prev,
-        [studentId]: {
-          ...current,
-          is_present: !current.is_present
-        }
-      };
-    });
-  };
-
-  const handleAttendanceCommentChange = (studentId: string, comment: string) => {
-    setAttendance(prev => {
-      const current = prev[studentId];
-      return {
-        ...prev,
-        [studentId]: {
-          ...current,
-          comment
-        }
-      };
-    });
-  };
-
   const handleSaveAttendance = async () => {
     if (!session) return;
     try {
       setSavingAttendance(true);
-      const recordsToUpsert = Object.values(attendance).map(record => ({
-        ...(record.id ? { id: record.id } : {}),
-        organization_id: orgId,
-        group_id: session.group_id,
-        student_id: record.student_id,
-        lesson_date: new Date(session.starts_at).toISOString().split("T")[0],
-        is_present: record.is_present,
-        comment: record.comment,
-        lesson_session_id: session.id
-      }));
-
-      const { error } = await (supabase
-        .from("attendance") as any)
-        .upsert(recordsToUpsert);
-
-      if (error) throw error;
+      const response = await fetch("/api/crm/schedule", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "save_attendance",
+          sessionId: session.id,
+          records: Object.values(attendance).map((record) => ({
+            studentId: record.student_id,
+            status: record.attendance_status,
+            comment: record.comment,
+            absenceReason: record.absence_reason || "",
+          })),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось сохранить посещаемость");
       alert("Посещаемость успешно сохранена!");
     } catch (err) {
       console.error("Error saving attendance:", err);
@@ -572,80 +561,28 @@ export default function LessonConductPage() {
               )}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {students.map((student) => {
-                const record = attendance[student.id] || { student_id: student.id, is_present: true, comment: "" };
-
-                return (
-                  <div 
-                    key={student.id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      padding: "16px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "10px",
-                      background: record.is_present ? "white" : "var(--color-danger-soft)",
-                      transition: "all 0.2s",
-                      gap: "10px"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: "var(--font-small)" }}>
-                        {student.full_name}
-                      </span>
-                      
-                      <button
-                        onClick={() => handleToggleAttendance(student.id)}
-                        disabled={session.status === "completed"}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          padding: "6px 12px",
-                          borderRadius: "8px",
-                          border: "none",
-                          cursor: session.status === "completed" ? "default" : "pointer",
-                          background: record.is_present ? "var(--color-success-soft)" : "var(--color-danger)",
-                          color: record.is_present ? "var(--color-success)" : "white",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        {record.is_present ? (
-                          <>
-                            <Check size={12} />
-                            <span>Был на уроке</span>
-                          </>
-                        ) : (
-                          <>
-                            <X size={12} />
-                            <span>Пропустил</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <input 
-                      type="text"
-                      className="form-input"
-                      placeholder="Комментарий (активность, успехи, поведение)..."
-                      style={{ height: "36px", padding: "0 12px", borderRadius: "8px", fontSize: "12px" }}
-                      value={record.comment}
-                      onChange={e => handleAttendanceCommentChange(student.id, e.target.value)}
-                      disabled={session.status === "completed"}
-                    />
-                  </div>
-                );
+            <AttendanceRoster
+              disabled={session.status === "completed"}
+              rows={students.map((student): AttendanceRosterRow => {
+                const record = attendance[student.id];
+                return {
+                  studentId: student.id,
+                  studentName: student.full_name,
+                  status: record?.attendance_status || "unmarked",
+                  comment: record?.comment || "",
+                  absenceReason: record?.absence_reason || "",
+                  isMakeup: student.isMakeup,
+                };
               })}
-
-              {students.length === 0 && (
-                <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--font-small)", border: "1px dashed var(--color-border)", borderRadius: "10px" }}>
-                  В этой группе нет активных учеников. Добавьте учеников в группу.
-                </div>
-              )}
-            </div>
+              onChange={(rows) => setAttendance(Object.fromEntries(rows.map((row) => [row.studentId, {
+                student_id: row.studentId,
+                is_present: row.status === "present" || row.status === "late",
+                attendance_status: row.status,
+                comment: row.comment,
+                absence_reason: row.absenceReason,
+                id: attendance[row.studentId]?.id,
+              }])))}
+            />
           </div>
         </div>
 

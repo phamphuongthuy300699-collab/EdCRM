@@ -805,6 +805,7 @@ export default function CrmGroupsPage() {
                   value={newSchedule}
                   onChange={(e) => setNewSchedule(e.target.value)}
                 />
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Это шаблон повторения. Конкретные занятия формируются в разделе «Расписание».</span>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1060,6 +1061,7 @@ export default function CrmGroupsPage() {
                   value={editSchedule}
                   onChange={(e) => setEditSchedule(e.target.value)}
                 />
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Изменение шаблона не переносит уже созданные занятия. Переносите конкретную дату в разделе «Расписание».</span>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>

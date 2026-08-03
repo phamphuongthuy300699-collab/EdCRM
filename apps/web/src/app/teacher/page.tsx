@@ -16,12 +16,17 @@ import {
 import { Button } from "@robotics-crm/ui";
 import { useRouter } from "next/navigation";
 import { isDemoMode } from "@/shared/utils/demo";
+import { AttendanceRoster, type AttendanceRosterRow } from "@/features/scheduling/AttendanceRoster";
+import type { AttendanceStatus } from "@/features/scheduling/domain";
 
 interface StudentAttendance {
   studentId: string;
   studentName: string;
   isPresent: boolean;
+  status: AttendanceStatus;
   comment: string;
+  absenceReason?: string;
+  isMakeup?: boolean;
   attendanceId?: string;
 }
 
@@ -34,12 +39,13 @@ export default function TeacherDashboard() {
   const [teacherProfile, setTeacherProfile] = useState<any>(null);
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [lessonDate, setLessonDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [lessonDate, setLessonDate] = useState<string>(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
   const [studentsAttendance, setStudentsAttendance] = useState<StudentAttendance[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
 
   // Lesson Session States
   const [session, setSession] = useState<any>(null);
+  const [daySessions, setDaySessions] = useState<any[]>([]);
   const [loadingSession, setLoadingSession] = useState(false);
   const [startingLesson, setStartingLesson] = useState(false);
   const [endingLesson, setEndingLesson] = useState(false);
@@ -149,20 +155,16 @@ export default function TeacherDashboard() {
             status: "planned",
             materials_unlocked: false
           });
+          setDaySessions([]);
           return;
         }
 
-        const { data: sess, error } = await (supabase
-          .from("lesson_sessions") as any)
-          .select("*")
-          .eq("group_id", selectedGroupId)
-          .eq("lesson_date", lessonDate)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error loading session:", error);
-        }
-        setSession(sess || null);
+        const response = await fetch(`/api/crm/schedule?dateFrom=${lessonDate}&dateTo=${lessonDate}&groupId=${selectedGroupId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Не удалось загрузить занятия");
+        const actual = (data.sessions || []).filter((item: any) => item.status !== "moved");
+        setDaySessions(actual);
+        setSession(actual[0] || null);
       } catch (err) {
         console.error(err);
       } finally {
@@ -188,6 +190,7 @@ export default function TeacherDashboard() {
             studentId: student.id,
             studentName: student.full_name,
             isPresent: true,
+            status: "present" as const,
             comment: ""
           }));
           setStudentsAttendance(mapped);
@@ -205,8 +208,21 @@ export default function TeacherDashboard() {
 
         const studentsList = (enrollments as any[])?.map((e: any) => ({
           id: e.students?.id || e.student_id,
-          full_name: e.students?.full_name || "Неизвестный ученик"
+          full_name: e.students?.full_name || "Неизвестный ученик",
+          isMakeup: false,
         })) || [];
+
+        if (session?.id) {
+          const { data: makeupRows } = await (supabase.from("makeup_assignments") as any)
+            .select("student_id, students(id, full_name)")
+            .eq("target_session_id", session.id)
+            .eq("status", "scheduled");
+          for (const makeup of makeupRows || []) {
+            if (!studentsList.some((student: any) => student.id === makeup.student_id)) {
+              studentsList.push({ id: makeup.students?.id || makeup.student_id, full_name: makeup.students?.full_name || "Ученик на отработке", isMakeup: true });
+            }
+          }
+        }
 
         if (studentsList.length === 0) {
           setStudentsAttendance([]);
@@ -214,10 +230,9 @@ export default function TeacherDashboard() {
         }
 
         // 2. Fetch attendance marks for this group & date
-        const { data: attendanceData } = await (supabase.from("attendance") as any)
-          .select("*")
-          .eq("group_id", selectedGroupId)
-          .eq("lesson_date", lessonDate);
+        let attendanceQuery = (supabase.from("attendance") as any).select("*");
+        attendanceQuery = session?.id ? attendanceQuery.eq("lesson_session_id", session.id) : attendanceQuery.eq("group_id", selectedGroupId).eq("lesson_date", lessonDate);
+        const { data: attendanceData } = await attendanceQuery;
 
         const attendanceMap = new Map();
         (attendanceData as any[])?.forEach(a => {
@@ -230,8 +245,11 @@ export default function TeacherDashboard() {
           return {
             studentId: student.id,
             studentName: student.full_name,
-            isPresent: mark ? mark.is_present : true, // default present
+            isPresent: mark ? mark.is_present : false,
+            status: (mark?.attendance_status || (mark ? (mark.is_present ? "present" : "absent_unexcused") : "unmarked")) as AttendanceStatus,
             comment: mark ? (mark.comment || "") : "",
+            absenceReason: mark?.absence_reason || "",
+            isMakeup: student.isMakeup,
             attendanceId: mark?.id
           };
         });
@@ -243,7 +261,7 @@ export default function TeacherDashboard() {
     }
 
     loadAttendanceForGroup();
-  }, [selectedGroupId, lessonDate]);
+  }, [selectedGroupId, lessonDate, session?.id]);
 
   const handleTogglePresent = (studentId: string) => {
     setStudentsAttendance(prev => 
@@ -273,27 +291,18 @@ export default function TeacherDashboard() {
         return;
       }
 
-      // Fetch organization ID
-      const currentGroup = groups.find(g => g.id === selectedGroupId);
-      if (!currentGroup) throw new Error("Группа не найдена");
-      const organizationId = currentGroup.organization_id;
-
-      // Map rows for database insertion
-      const rows = studentsAttendance.map(row => ({
-        ...(row.attendanceId ? { id: row.attendanceId } : {}),
-        organization_id: organizationId,
-        group_id: selectedGroupId,
-        student_id: row.studentId,
-        lesson_date: lessonDate,
-        is_present: row.isPresent,
-        comment: row.comment || null
-      }));
-
-      const { error } = await (supabase.from("attendance") as any).upsert(rows, {
-        onConflict: "group_id,student_id,lesson_date"
+      if (!session?.id) throw new Error("Сначала выберите или начните конкретное занятие");
+      const response = await fetch("/api/crm/schedule", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "save_attendance",
+          sessionId: session.id,
+          records: studentsAttendance.map((row) => ({ studentId: row.studentId, status: row.status, comment: row.comment, absenceReason: row.absenceReason || "" })),
+        }),
       });
-
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось сохранить посещаемость");
       alert("Журнал посещаемости и отзывы успешно сохранены!");
     } catch (err: any) {
       console.error(err);
@@ -349,20 +358,19 @@ export default function TeacherDashboard() {
         status: "live" as const,
         materials_unlocked: true,
         started_at: new Date().toISOString(),
-        starts_at: new Date().toISOString(),
+        starts_at: new Date(`${lessonDate}T${new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Moscow", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date())}+03:00`).toISOString(),
         teacher_id: user.id
       };
 
       const { data, error } = await (supabase
         .from("lesson_sessions") as any)
-        .upsert(sessionData, {
-          onConflict: "group_id,lesson_date"
-        })
+        .insert(sessionData)
         .select()
         .single();
 
       if (error) throw error;
       setSession(data);
+      setDaySessions((previous) => [...previous, data]);
       alert("Урок успешно запущен! Материалы урока разблокированы для учеников на сегодня.");
     } catch (err: any) {
       console.error(err);
@@ -515,6 +523,13 @@ export default function TeacherDashboard() {
                 onChange={(e) => setLessonDate(e.target.value)}
                 style={{ borderRadius: "8px", height: "40px" }}
               />
+              {daySessions.length > 0 && (
+                <label style={{ display: "grid", gap: 5, marginTop: 12, fontSize: 11, color: "var(--color-text-muted)" }}>Конкретное занятие
+                  <select className="form-input" value={session?.id || ""} onChange={(event) => setSession(daySessions.find((item) => item.id === event.target.value) || null)} style={{ height: 40 }}>
+                    {daySessions.map((item) => <option key={item.id} value={item.id}>{new Date(item.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })} · {item.session_kind === "makeup" ? "Отработка" : item.status === "cancelled" ? "Отменено" : "Занятие"}</option>)}
+                  </select>
+                </label>
+              )}
             </div>
 
             {/* Lesson Control Card */}
@@ -597,104 +612,11 @@ export default function TeacherDashboard() {
                 </Button>
               </div>
 
-              {/* Students List */}
-              {studentsAttendance.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                  <p style={{ color: "var(--color-text-muted)" }}>Нет учеников в этой группе</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {studentsAttendance.map((row) => (
-                    <div 
-                      key={row.studentId}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1.2fr 1fr 2fr",
-                        gap: "20px",
-                        alignItems: "center",
-                        padding: "16px",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "10px",
-                        background: row.isPresent ? "white" : "rgba(239, 68, 68, 0.02)"
-                      }}
-                    >
-                      {/* Name */}
-                      <div>
-                        <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{row.studentName}</span>
-                      </div>
-
-                      {/* Presence Toggle */}
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                          onClick={() => handleTogglePresent(row.studentId)}
-                          style={{
-                            flex: 1,
-                            height: "36px",
-                            borderRadius: "6px",
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                            fontSize: "12px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "4px",
-                            background: row.isPresent ? "var(--color-success-soft)" : "var(--color-bg)",
-                            color: row.isPresent ? "var(--color-success)" : "var(--color-text-muted)"
-                          }}
-                        >
-                          <CheckCircle size={14} />
-                          Был
-                        </button>
-                        <button
-                          onClick={() => handleTogglePresent(row.studentId)}
-                          style={{
-                            flex: 1,
-                            height: "36px",
-                            borderRadius: "6px",
-                            border: "none",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                            fontSize: "12px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "4px",
-                            background: !row.isPresent ? "var(--color-danger-soft)" : "var(--color-bg)",
-                            color: !row.isPresent ? "var(--color-danger)" : "var(--color-text-muted)"
-                          }}
-                        >
-                          <XCircle size={14} />
-                          Н/Б
-                        </button>
-                      </div>
-
-                      {/* Feedback Comment */}
-                      <div style={{ position: "relative" }}>
-                        <MessageSquare size={14} style={{
-                          position: "absolute",
-                          left: "10px",
-                          top: "11px",
-                          color: "var(--color-text-muted)"
-                        }} />
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Например: Отличный робот-сумоист, сам настроил датчик!"
-                          value={row.comment}
-                          onChange={(e) => handleCommentChange(row.studentId, e.target.value)}
-                          style={{
-                            paddingLeft: "32px",
-                            fontSize: "var(--font-small)",
-                            height: "36px",
-                            borderRadius: "6px"
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <AttendanceRoster
+                rows={studentsAttendance.map((row): AttendanceRosterRow => ({ studentId: row.studentId, studentName: row.studentName, status: row.status, comment: row.comment, absenceReason: row.absenceReason, isMakeup: row.isMakeup }))}
+                disabled={session?.status === "completed"}
+                onChange={(rows) => setStudentsAttendance(rows.map((row) => ({ ...row, isPresent: row.status === "present" || row.status === "late", attendanceId: studentsAttendance.find((item) => item.studentId === row.studentId)?.attendanceId })))}
+              />
             </div>
           </div>
         </div>

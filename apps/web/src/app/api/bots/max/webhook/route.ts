@@ -35,7 +35,7 @@ type MaxWebhookLogContext = {
 type MaxSelfServiceLogContext = {
   requestId: string;
   updateType: string;
-  action: "menu" | "bills" | "help" | "contact";
+  action: "menu" | "bills" | "schedule" | "help" | "contact";
   accountLinked: boolean;
   invoiceCount?: number;
   result: string;
@@ -155,6 +155,7 @@ async function loadVerifiedAccount(admin: ReturnType<typeof createSupabaseAdminC
 
 function mainMenuButtons(): MaxInlineKeyboardButton[][] {
   return [
+    [{ type: "message", text: "Расписание", payload: "Расписание" }],
     [{ type: "message", text: "Мои счета", payload: "Мои счета" }],
     [{ type: "link", text: "Личный кабинет", url: `${PUBLIC_APP_URL}/parent` }],
     [{ type: "message", text: "Помощь", payload: "Помощь" }],
@@ -197,7 +198,7 @@ async function sendHelp(admin: ReturnType<typeof createSupabaseAdminClient>, set
   await sendMaxMessage(settings.bot_token_secret, {
     userId,
     chatId,
-    text: "Через бот Робокс можно:\n• проверить текущие счета;\n• перейти к оплате;\n• открыть личный кабинет.\n\nПо вопросам напишите администратору школы.",
+    text: "Через бот Робокс можно:\n• посмотреть ближайшие занятия и отработки;\n• проверить текущие счета;\n• перейти к оплате;\n• открыть личный кабинет.\n\nПо вопросам напишите администратору школы.",
     inlineKeyboardButtons: mainMenuButtons(),
   });
   logMaxSelfServiceEvent({ requestId, updateType, action: "help", accountLinked: true, result: "help_sent" });
@@ -275,8 +276,67 @@ async function sendBills(admin: ReturnType<typeof createSupabaseAdminClient>, se
   logMaxSelfServiceEvent({ requestId, updateType, action: "bills", accountLinked: true, invoiceCount: payableInvoices.length, result: "sent" });
 }
 
-function textAction(text: string): "menu" | "bills" | "help" | null {
+async function sendSchedule(admin: ReturnType<typeof createSupabaseAdminClient>, settings: any, update: any, requestId: string, updateType: string) {
+  const userId = pickUserId(update);
+  const chatId = pickChatId(update);
+  const account = await loadVerifiedAccount(admin, settings.organization_id, userId);
+  if (!account) {
+    await sendRequestContact(settings, update, requestId, updateType, "schedule");
+    return;
+  }
+  const { data: links, error: linksError } = await (admin.from("student_guardians") as any)
+    .select("student_id, students(full_name)")
+    .eq("organization_id", account.organization_id)
+    .eq("guardian_id", account.guardian_id);
+  if (linksError) throw new MaxWebhookDbError("Failed to load guardian students");
+  const studentIds = (links || []).map((link: any) => link.student_id);
+  if (!studentIds.length) {
+    await sendMaxMessage(settings.bot_token_secret, { userId, chatId, text: "К аккаунту пока не привязаны ученики.", inlineKeyboardButtons: mainMenuButtons() });
+    return;
+  }
+  const [{ data: enrollments }, { data: makeups }] = await Promise.all([
+    (admin.from("enrollments") as any).select("student_id, group_id").eq("organization_id", account.organization_id).eq("status", "active").in("student_id", studentIds),
+    (admin.from("makeup_assignments") as any).select("student_id, target_session_id").eq("organization_id", account.organization_id).eq("status", "scheduled").in("student_id", studentIds),
+  ]);
+  const groupIds = [...new Set((enrollments || []).map((item: any) => item.group_id))];
+  const targetIds = [...new Set((makeups || []).map((item: any) => item.target_session_id).filter(Boolean))];
+  const weekUntil = new Date(Date.now() + 7 * 86400000);
+  let sessionQuery = (admin.from("lesson_sessions") as any)
+    .select("id, group_id, starts_at, session_kind, groups(title)")
+    .eq("organization_id", account.organization_id)
+    .in("status", ["planned", "live"])
+    .gte("starts_at", new Date().toISOString())
+    .lte("starts_at", weekUntil.toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(20);
+  const audienceFilters = [groupIds.length ? `group_id.in.(${groupIds.join(",")})` : "", targetIds.length ? `id.in.(${targetIds.join(",")})` : ""].filter(Boolean);
+  if (audienceFilters.length) sessionQuery = sessionQuery.or(audienceFilters.join(","));
+  const { data: sessions, error: sessionsError } = groupIds.length || targetIds.length ? await sessionQuery : { data: [], error: null };
+  if (sessionsError) throw new MaxWebhookDbError("Failed to load lesson sessions");
+  const names = new Map((links || []).map((link: any) => [link.student_id, link.students?.full_name || "Ребёнок"]));
+  const lines: Array<{ startsAt: string; text: string }> = [];
+  for (const studentId of studentIds) {
+    const studentGroups = new Set((enrollments || []).filter((item: any) => item.student_id === studentId).map((item: any) => item.group_id));
+    const studentTargets = new Set((makeups || []).filter((item: any) => item.student_id === studentId).map((item: any) => item.target_session_id));
+    for (const session of sessions || []) {
+      if (!studentGroups.has(session.group_id) && !studentTargets.has(session.id)) continue;
+      const when = new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(session.starts_at));
+      lines.push({ startsAt: session.starts_at, text: `• ${names.get(studentId)}: ${when}, ${session.groups?.title || "группа"}${studentTargets.has(session.id) ? " — отработка" : ""}` });
+    }
+  }
+  lines.sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+  await sendMaxMessage(settings.bot_token_secret, {
+    userId,
+    chatId,
+    text: lines.length ? `Расписание на ближайшие 7 дней:\n${lines.slice(0, 20).map((line) => line.text).join("\n")}` : "На ближайшие 7 дней занятия пока не сформированы. Уточните расписание у администратора.",
+    inlineKeyboardButtons: mainMenuButtons(),
+  });
+  logMaxSelfServiceEvent({ requestId, updateType, action: "schedule", accountLinked: true, result: lines.length ? "sent" : "empty" });
+}
+
+function textAction(text: string): "menu" | "bills" | "schedule" | "help" | null {
   if (["мои счета", "счета", "оплатить", "/bills"].includes(text)) return "bills";
+  if (["расписание", "занятия", "/schedule"].includes(text)) return "schedule";
   if (["меню", "start"].includes(text)) return "menu";
   if (text === "помощь") return "help";
   return null;
@@ -392,6 +452,8 @@ export async function POST(request: NextRequest) {
       const action = textAction(pickMessageText(update));
       if (action === "bills") {
         await sendBills(admin, settings, update, requestId, updateType);
+      } else if (action === "schedule") {
+        await sendSchedule(admin, settings, update, requestId, updateType);
       } else if (action === "menu") {
         await sendMainMenu(admin, settings, update, requestId, updateType);
       } else if (action === "help") {

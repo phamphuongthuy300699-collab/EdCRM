@@ -3,5 +3,11 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm --workspace apps/web run build",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": "apps/web/.next",
+  "crons": [
+    {
+      "path": "/api/jobs/notifications/process",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
