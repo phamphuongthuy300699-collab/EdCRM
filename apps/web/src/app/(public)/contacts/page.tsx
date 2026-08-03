@@ -30,7 +30,7 @@ function uniqueMediaItems(values: any[]) {
   const seen = new Set<string>();
   return values.filter((item) => {
     const path = mediaPath(item);
-    if (!path || seen.has(path)) return false;
+    if (!path || seen.has(path) || (typeof item === "object" && item?.isActive === false)) return false;
     seen.add(path);
     return true;
   });

@@ -84,9 +84,9 @@ export default function CrmLayout({
   ].map(([key, label]) => ({ key, label, items: globalResults[key] || [] })), [globalResults]);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--color-bg)" }}>
+    <div className="crm-shell" style={{ display: "flex", minHeight: "100vh", background: "var(--color-bg)" }}>
       {/* Sidebar */}
-      <aside style={{
+      <aside className="crm-shell-sidebar" style={{
         width: "260px",
         background: "white",
         borderRight: "1px solid var(--color-border)",
@@ -216,10 +216,10 @@ export default function CrmLayout({
       </aside>
 
       {/* Main Content Area */}
-      <div style={{ marginLeft: "260px", flex: 1, display: "flex", flexDirection: "column" }}>
+      <div className="crm-shell-main" style={{ marginLeft: "260px", flex: 1, display: "flex", flexDirection: "column" }}>
         
         {/* Topbar */}
-        <header style={{
+        <header className="crm-shell-topbar" style={{
           height: "64px",
           background: "white",
           borderBottom: "1px solid var(--color-border)",
@@ -232,7 +232,7 @@ export default function CrmLayout({
           zIndex: 30
         }}>
           {/* Search bar */}
-          <div style={{ position: "relative", width: "300px" }}>
+          <div className="crm-shell-search" style={{ position: "relative", width: "300px" }}>
             <Search size={18} style={{
               position: "absolute",
               left: "12px",
@@ -281,7 +281,7 @@ export default function CrmLayout({
           </div>
 
           {/* Quick Actions & Notifications */}
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <div className="crm-shell-actions" style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <button style={{
               background: "none",
               border: "none",
@@ -301,7 +301,7 @@ export default function CrmLayout({
                 borderRadius: "50%"
               }} />
             </button>
-            <div style={{
+            <div className="crm-shell-org" style={{
               fontSize: "var(--font-small)",
               fontWeight: 700,
               color: "var(--color-text)",
@@ -316,11 +316,54 @@ export default function CrmLayout({
         </header>
 
         {/* Content Viewport */}
-        <main style={{ padding: "32px", flex: 1 }}>
+        <main className="crm-shell-content" style={{ padding: "32px", flex: 1 }}>
           {children}
         </main>
 
       </div>
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          .crm-shell-sidebar {
+            width: 64px !important;
+            padding: 16px 8px !important;
+            overflow-y: auto;
+          }
+          .crm-shell-sidebar span {
+            display: none !important;
+          }
+          .crm-shell-sidebar nav a,
+          .crm-shell-sidebar > div:last-child > button,
+          .crm-shell-sidebar > div:first-child > a {
+            justify-content: center !important;
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          .crm-shell-main {
+            margin-left: 64px !important;
+            min-width: 0 !important;
+            width: calc(100% - 64px);
+          }
+          .crm-shell-topbar {
+            padding: 0 12px !important;
+            gap: 8px;
+          }
+          .crm-shell-search {
+            width: auto !important;
+            min-width: 0 !important;
+            flex: 1;
+          }
+          .crm-shell-actions {
+            gap: 8px !important;
+          }
+          .crm-shell-org {
+            display: none !important;
+          }
+          .crm-shell-content {
+            min-width: 0 !important;
+            padding: 16px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

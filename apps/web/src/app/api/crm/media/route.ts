@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 import { isDemoMode } from "@/shared/utils/demo";
+import { resolveMediaUsages } from "./media-usages";
 
 const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
 const WHITELIST_FOLDERS = [
@@ -101,7 +102,10 @@ export async function GET(req: NextRequest) {
           };
         });
 
-      return NextResponse.json({ files: list });
+      const usages = (auth as any).organizationId
+        ? await resolveMediaUsages(createSupabaseAdminClient(), (auth as any).organizationId, list.map((file) => file.path))
+        : {};
+      return NextResponse.json({ files: list.map((file) => ({ ...file, usages: usages[file.path] || [] })) });
     } else {
       // Supabase storage
       const supabase = createSupabaseAdminClient();
@@ -123,7 +127,10 @@ export async function GET(req: NextRequest) {
           updatedAt: f.updated_at
         }));
 
-      return NextResponse.json({ files: list });
+      const usages = (auth as any).organizationId
+        ? await resolveMediaUsages(supabase, (auth as any).organizationId, list.map((file) => file.path))
+        : {};
+      return NextResponse.json({ files: list.map((file) => ({ ...file, usages: usages[file.path] || [] })) });
     }
   } catch (err: any) {
     console.error("List files error:", err);
@@ -210,24 +217,8 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createSupabaseAdminClient();
   const organizationId = (auth as any).organizationId;
-  const usages: string[] = [];
-
-  const { data: blocks } = await (admin.from("site_content_blocks") as any)
-    .select("block_key, title, content")
-    .eq("organization_id", organizationId);
-  (blocks || [])
-    .filter((block: any) => JSON.stringify(block.content || {}).includes(mediaPath))
-    .forEach((block: any) => usages.push(`Блок сайта: ${block.title || block.block_key}`));
-
-  const { data: profiles } = await (admin.from("profiles") as any)
-    .select("id")
-    .eq("avatar_url", mediaPath);
-  (profiles || []).forEach(() => usages.push("Фото сотрудника"));
-
-  const { data: courses } = await (admin.from("courses") as any)
-    .select("title")
-    .eq("card_image_url", mediaPath);
-  (courses || []).forEach((course: any) => usages.push(`Фон курса: ${course.title || "без названия"}`));
+  const usageMap = await resolveMediaUsages(admin, organizationId, [mediaPath]);
+  const usages = (usageMap[mediaPath] || []).map((usage) => usage.label);
 
   if (usages.length > 0) {
     return NextResponse.json({

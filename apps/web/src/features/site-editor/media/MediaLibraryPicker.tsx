@@ -52,7 +52,7 @@ export function MediaLibraryPicker({
 
   const filteredFiles = useMemo(() => files.filter((file) => {
     const matchesQuery = `${file.name || ""} ${file.path}`.toLocaleLowerCase("ru").includes(query.trim().toLocaleLowerCase("ru"));
-    const isUsed = usedPaths.includes(file.path);
+    const isUsed = usedPaths.includes(file.path) || Boolean(file.usages?.length);
     const matchesUsage = usageFilter === "all" || (usageFilter === "used" ? isUsed : !isUsed);
     return matchesQuery && matchesUsage;
   }), [files, query, usageFilter, usedPaths]);
@@ -84,7 +84,7 @@ export function MediaLibraryPicker({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Выбор изображения из медиатеки" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,.55)", display: "grid", placeItems: "center", padding: "20px" }}>
-      <div style={{ width: "min(1040px, 100%)", maxHeight: "90vh", overflow: "auto", background: "white", borderRadius: "16px", padding: "20px", display: "grid", gap: "16px" }}>
+      <div className="site-media-picker-panel" style={{ width: "min(1040px, 100%)", maxHeight: "90vh", overflow: "auto", background: "white", borderRadius: "16px", padding: "20px", display: "grid", gap: "16px" }}>
         <header style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "18px" }}>Медиатека</h3>
@@ -95,7 +95,7 @@ export function MediaLibraryPicker({
           <button type="button" aria-label="Закрыть медиатеку" onClick={requestClose} style={{ border: 0, background: "transparent", cursor: "pointer" }}><X size={20} /></button>
         </header>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 220px) 1fr auto", gap: "10px" }}>
+        <div className="site-media-picker-tools" style={{ display: "grid", gridTemplateColumns: "minmax(160px, 220px) 1fr auto", gap: "10px" }}>
           <select className="form-input" value={folder} onChange={(event) => void loadFolder(event.target.value)}>
             {folders.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
@@ -119,7 +119,10 @@ export function MediaLibraryPicker({
                   <Image src={file.url || getMediaUrl(file.path)} alt={file.name || file.path} fill unoptimized sizes="180px" style={{ objectFit: "cover" }} />
                 </div>
                 <strong style={{ display: "block", marginTop: 7, fontSize: 11, overflowWrap: "anywhere" }}>{file.name || file.path.split("/").pop()}</strong>
-                <span style={{ fontSize: 10, color: usedPaths.includes(file.path) ? "#166534" : "var(--color-text-muted)" }}>{usedPaths.includes(file.path) ? "Используется" : "Не используется"}</span>
+                <span style={{ fontSize: 10, color: file.usages?.length || usedPaths.includes(file.path) ? "#166534" : "var(--color-text-muted)" }}>
+                  {file.usages?.length ? `Используется в ${file.usages.length} ${file.usages.length === 1 ? "месте" : "местах"}` : usedPaths.includes(file.path) ? "Используется в этом блоке" : "Не используется"}
+                </span>
+                {file.usages?.map((usage) => <span key={`${usage.kind}-${usage.label}`} style={{ display: "block", marginTop: 3, fontSize: 9, color: "var(--color-text-muted)" }}>{usage.label}</span>)}
               </button>
             );
           })}
@@ -155,6 +158,12 @@ export function MediaLibraryPicker({
             </Button>
           </div>
         </footer>
+        <style jsx>{`
+          @media (max-width: 700px) {
+            .site-media-picker-panel { padding: 14px !important; max-height: 94vh !important; }
+            .site-media-picker-tools { grid-template-columns: 1fr !important; }
+          }
+        `}</style>
       </div>
     </div>
   );

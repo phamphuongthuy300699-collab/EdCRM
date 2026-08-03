@@ -23,6 +23,23 @@ export type MediaLibraryFile = {
   url?: string;
   size?: number;
   updatedAt?: string;
+  usages?: Array<{
+    kind: "site_block" | "staff" | "course";
+    label: string;
+  }>;
 };
 
 export type PreviewViewport = "desktop" | "tablet" | "mobile";
+
+export type SingleImageValue = {
+  path: string;
+  title: string;
+  alt: string;
+  objectPosition: string;
+};
+
+export type SiteMediaSlotDraft = {
+  image?: SingleImageValue | null;
+  images?: ImageCollectionItem[];
+  layout?: ImageCollectionLayout;
+};

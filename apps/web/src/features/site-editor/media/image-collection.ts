@@ -71,6 +71,12 @@ export function removeCollectionImage(images: ImageCollectionItem[], index: numb
   return normalizeImageCollection(images.filter((_image, imageIndex) => imageIndex !== index));
 }
 
+export function restoreCollectionImage(images: ImageCollectionItem[], image: ImageCollectionItem, index: number) {
+  const normalized = normalizeImageCollection(images);
+  normalized.splice(Math.min(Math.max(index, 0), normalized.length), 0, image);
+  return normalized.map((item, itemIndex) => ({ ...item, sortOrder: (itemIndex + 1) * 10 }));
+}
+
 export function moveCollectionImage(images: ImageCollectionItem[], fromIndex: number, toIndex: number) {
   const normalized = normalizeImageCollection(images);
   if (!normalized[fromIndex] || toIndex < 0 || toIndex >= normalized.length || fromIndex === toIndex) return normalized;

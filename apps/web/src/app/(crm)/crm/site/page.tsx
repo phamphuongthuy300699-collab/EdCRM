@@ -39,9 +39,11 @@ import {
   defaultHeaderLinks as defaultPublicHeaderLinks,
 } from "@/shared/utils/public-navigation";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
-import { ImageCollectionEditor } from "@/features/site-editor/media/ImageCollectionEditor";
 import { normalizeImageCollection, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
-import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile } from "@/features/site-editor/media/types";
+import { SiteMediaBlocksEditor } from "@/features/site-editor/media/SiteMediaBlocksEditor";
+import { createSiteMediaDrafts, type SiteMediaSlot } from "@/features/site-editor/media/site-media-slots";
+import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile, SiteMediaSlotDraft } from "@/features/site-editor/media/types";
+import { hasUnsavedMedia, setMediaSlotDirty, type DirtyMediaSlots } from "@/features/site-editor/media/unsaved-media";
 import { getPublicSiteConfig } from "@/shared/config/public-site";
 import { brandedPublicTitle } from "@/shared/seo/public-metadata";
 
@@ -294,12 +296,43 @@ export default function CrmSitePage() {
 
   // Tab 8: Media Manager
   const [activeMediaFolder, setActiveMediaFolder] = useState("branding");
-  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [mediaView, setMediaView] = useState<"blocks" | "library">("blocks");
+  const [mediaFiles, setMediaFiles] = useState<MediaLibraryFile[]>([]);
+  const [siteBlocks, setSiteBlocks] = useState<any[]>([]);
+  const [siteMediaDrafts, setSiteMediaDrafts] = useState<Record<string, SiteMediaSlotDraft>>({});
+  const [dirtyMediaSlots, setDirtyMediaSlots] = useState<DirtyMediaSlots>({});
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedFilePathSet = new Set(selectedFilePaths);
   const selectedMediaFiles = mediaFiles.filter((file) => selectedFilePathSet.has(mediaPath(file)));
   const selectedMediaCount = selectedFilePaths.length;
+  const hasUnsavedMediaChanges = hasUnsavedMedia(dirtyMediaSlots);
+
+  const requestActiveTabChange = async (nextTab: TabId) => {
+    if (nextTab === activeTab) return;
+    if (hasUnsavedMediaChanges) {
+      const allowed = await askAction({
+        title: "Есть несохранённые изменения",
+        description: "Изменения изображений не сохранены. Если уйти из раздела сейчас, их нужно будет проверить и сохранить позже.",
+        dangerLevel: "warning",
+        confirmText: "Уйти без сохранения",
+      });
+      if (!allowed) return;
+    }
+    setActiveTab(nextTab);
+    setSuccessMsg("");
+    setErrorMsg("");
+  };
+
+  useEffect(() => {
+    if (!hasUnsavedMediaChanges) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedMediaChanges]);
 
   // General SEO Tab (merged into SEO section)
   const [seoTitle, setSeoTitle] = useState("");
@@ -344,6 +377,8 @@ export default function CrmSitePage() {
         .eq("organization_id", org.id);
 
       if (blocks) {
+        setSiteBlocks(blocks);
+        setSiteMediaDrafts(createSiteMediaDrafts(blocks));
         // Hero
         const hero = blocks.find((b: any) => b.block_key === "home.hero");
         setHeroTitle(hero?.title || "");
@@ -585,6 +620,40 @@ export default function CrmSitePage() {
         onConflict: "organization_id,page_slug,block_key"
       });
     if (error) throw error;
+    setSiteBlocks((current) => {
+      const next = { organization_id: orgId, page_slug: pageSlug, block_key: key, title, subtitle, content };
+      return current.some((block: any) => block.block_key === key)
+        ? current.map((block: any) => block.block_key === key ? { ...block, ...next } : block)
+        : [...current, next];
+    });
+  };
+
+  const handleSaveSiteMediaSlot = async (slot: SiteMediaSlot, draft: SiteMediaSlotDraft) => {
+    const existing = siteBlocks.find((block: any) => block.block_key === slot.blockKey);
+    const content = { ...(existing?.content || {}) };
+    if (slot.mode === "single") {
+      content[slot.field] = draft.image?.path || "";
+    } else {
+      const images = draft.images || [];
+      content[slot.field] = slot.field === "items" || slot.field === "steps" ? blockItemsFromCollection(images) : images;
+      if (slot.showLayoutSettings !== false) content.layout = normalizeImageLayout(draft.layout || slot.layout);
+    }
+
+    await saveBlock(slot.blockKey, existing?.title || slot.title, existing?.subtitle || slot.subtitle, content);
+    setSiteBlocks((current) => {
+      const next = { ...(existing || {}), block_key: slot.blockKey, title: existing?.title || slot.title, subtitle: existing?.subtitle || slot.subtitle, content };
+      return current.some((block: any) => block.block_key === slot.blockKey)
+        ? current.map((block: any) => block.block_key === slot.blockKey ? next : block)
+        : [...current, next];
+    });
+
+    if (slot.id === "student-projects") setStudentProjectItems(content.items || []);
+    if (slot.id === "lesson-process") setLessonStepItems(content.steps || []);
+    if (slot.id === "brand-logo") setBrandLogo(draft.image?.path || "");
+    if (slot.id === "brand-favicon") setBrandFavicon(draft.image?.path || "");
+    if (slot.id === "seo-social") setSeoImage(draft.image?.path || "");
+    setDirtyMediaSlots((current) => setMediaSlotDirty(current, slot.id, false));
+    setSuccessMsg(`Изображения блока «${slot.label}» сохранены`);
   };
 
   // Tab 1: Save Home/Hero
@@ -640,6 +709,11 @@ export default function CrmSitePage() {
         steps: lessonStepItems,
         layout: lessonProcessLayout,
       });
+      setSiteMediaDrafts((current) => ({
+        ...current,
+        "student-projects": { images: normalizeImageCollection(studentProjectItems), layout: studentProjectsLayout },
+        "lesson-process": { images: normalizeImageCollection(lessonStepItems), layout: lessonProcessLayout },
+      }));
       setSuccessMsg("Изменения на Главной сохранены!");
     } catch (err: any) {
       setErrorMsg(err.message || "Не удалось сохранить");
@@ -1198,6 +1272,20 @@ export default function CrmSitePage() {
   const renderMediaApplyActions = () => {
     if (!selectedFile) return null;
 
+    const entityMediaFolders: string[] = ["teachers"];
+    if (!entityMediaFolders.includes(activeMediaFolder)) {
+      return (
+        <div style={{ display: "grid", gap: 10, padding: 12, borderRadius: 10, background: "#F8FAFC", border: "1px solid var(--color-border)" }}>
+          <span style={{ fontSize: 11, color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+            Назначение изображения выполняется в редакторе блоков: там видны текущее состояние, порядок и предпросмотр.
+          </span>
+          <Button type="button" variant="primary-crm" onClick={() => setMediaView("blocks")}>
+            Открыть изображения блоков
+          </Button>
+        </div>
+      );
+    }
+
     const actionButtonStyle: React.CSSProperties = { width: "100%", fontSize: "11px", minHeight: "32px", justifyContent: "center" };
 
     if (activeMediaFolder === "branding") {
@@ -1408,7 +1496,7 @@ export default function CrmSitePage() {
         .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
         .site-editor-shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
         .site-editor-nav { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 16px; }
-        .site-editor-panel { display: flex; flex-direction: column; gap: 24px; }
+        .site-editor-panel { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
         .site-tab-nav-mobile { display: none; }
         @media (max-width: 768px) {
           .site-editor-shell { grid-template-columns: 1fr !important; gap: 16px !important; }
@@ -1460,7 +1548,7 @@ export default function CrmSitePage() {
       <div className="site-tab-nav-mobile">
         <select
           value={activeTab}
-          onChange={(e) => setActiveTab(e.target.value as TabId)}
+          onChange={(e) => void requestActiveTabChange(e.target.value as TabId)}
           className="form-input"
           style={{
             height: "44px",
@@ -1508,11 +1596,7 @@ export default function CrmSitePage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => {
-                  setActiveTab(tab.id as TabId);
-                  setSuccessMsg("");
-                  setErrorMsg("");
-                }}
+                onClick={() => void requestActiveTabChange(tab.id as TabId)}
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
@@ -1665,16 +1749,12 @@ export default function CrmSitePage() {
                   <label className="form-label">Заголовок H1 на сайте</label>
                   <input type="text" className="form-input" value={seoH1} onChange={e => setSeoH1(e.target.value)} required />
                 </div>
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Изображение для соцсетей и рекламы</label>
-                    <input type="text" className="form-input" value={seoImage} onChange={e => setSeoImage(normalizeSiteMediaPath(e.target.value))} placeholder="branding/social-card.webp" />
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: 12, borderRadius: 10, background: "#F8FAFC", border: "1px solid var(--color-border)", flexWrap: "wrap" }}>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <strong style={{ fontSize: 12 }}>Изображение для соцсетей и favicon</strong>
+                    <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Редактируются с предпросмотром в едином разделе медиа.</span>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Favicon</label>
-                    <input type="text" className="form-input" value={brandFavicon} onChange={e => setBrandFavicon(normalizeSiteMediaPath(e.target.value))} placeholder="branding/favicon.ico" />
-                    <span className="form-hint">Favicon также доступен в разделе «Бренд и логотип».</span>
-                  </div>
+                  <Button type="button" variant="secondary-crm" onClick={() => { setActiveTab("media"); setMediaView("blocks"); }}>Открыть изображения</Button>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Фактический canonical URL</label>
@@ -1750,27 +1830,10 @@ export default function CrmSitePage() {
                     </div>
                   </div>
                 ))}
-                <ImageCollectionEditor
-                  blockKey="home.student_projects"
-                  blockLabel="Проекты учеников"
-                  images={normalizeImageCollection(studentProjectItems)}
-                  layout={studentProjectsLayout}
-                  mediaFiles={mediaFiles}
-                  onChange={(images) => setStudentProjectItems(blockItemsFromCollection(images))}
-                  onLayoutChange={setStudentProjectsLayout}
-                  onLoadFolder={loadMediaFolder}
-                  onUpload={uploadFilesToMedia}
-                  onSave={async () => {
-                    await saveBlock("home.student_projects", studentProjectsTitle, studentProjectsSubtitle, {
-                      enabled: studentProjectsEnabled,
-                      title: studentProjectsTitle,
-                      subtitle: studentProjectsSubtitle,
-                      items: studentProjectItems,
-                      layout: studentProjectsLayout,
-                    });
-                    setSuccessMsg("Изменения опубликованы");
-                  }}
-                />
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: 12, borderRadius: 10, background: "#F8FAFC", border: "1px solid var(--color-border)", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Изображения, порядок и сетка редактируются в едином разделе медиа.</span>
+                  <Button type="button" variant="secondary-crm" onClick={() => { setActiveTab("media"); setMediaView("blocks"); }}>Открыть изображения блока</Button>
+                </div>
               </div>
 
               <div className="card-crm">
@@ -1791,27 +1854,10 @@ export default function CrmSitePage() {
                     </div>
                   </div>
                 ))}
-                <ImageCollectionEditor
-                  blockKey="home.lesson_process"
-                  blockLabel="Как проходит занятие"
-                  images={normalizeImageCollection(lessonStepItems)}
-                  layout={lessonProcessLayout}
-                  mediaFiles={mediaFiles}
-                  onChange={(images) => setLessonStepItems(blockItemsFromCollection(images))}
-                  onLayoutChange={setLessonProcessLayout}
-                  onLoadFolder={loadMediaFolder}
-                  onUpload={uploadFilesToMedia}
-                  onSave={async () => {
-                    await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
-                      enabled: lessonProcessEnabled,
-                      title: lessonProcessTitle,
-                      subtitle: lessonProcessSubtitle,
-                      steps: lessonStepItems,
-                      layout: lessonProcessLayout,
-                    });
-                    setSuccessMsg("Изменения опубликованы");
-                  }}
-                />
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: 12, borderRadius: 10, background: "#F8FAFC", border: "1px solid var(--color-border)", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Изображения, порядок и сетка редактируются в едином разделе медиа.</span>
+                  <Button type="button" variant="secondary-crm" onClick={() => { setActiveTab("media"); setMediaView("blocks"); }}>Открыть изображения блока</Button>
+                </div>
               </div>
 
               <div>
@@ -1836,15 +1882,14 @@ export default function CrmSitePage() {
                 <div className="form-group">
                   <label className="form-label">Логотип (путь в хранилище)</label>
                   <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                    <input type="text" className="form-input" value={brandLogo} onChange={e => setBrandLogo(e.target.value)} required />
+                    <input type="text" className="form-input" value={brandLogo} readOnly />
                     <div style={{ width: "80px", height: "40px", border: "1px solid var(--color-border)", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflow: "hidden" }}>
                       <img src={getMediaUrl(brandLogo)} alt="Preview Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                     </div>
                   </div>
                   <div style={{ marginTop: "6px" }}>
-                    <input type="file" id="logo-quick-uploader" accept=".svg,.png,.jpg,.jpeg" style={{ display: "none" }} onChange={(e) => handleQuickUpload(e, "logo")} />
-                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => document.getElementById("logo-quick-uploader")?.click()}>
-                      Загрузить новый логотип
+                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => { setActiveTab("media"); setMediaView("blocks"); }}>
+                      Изменить в редакторе изображений
                     </Button>
                   </div>
                 </div>
@@ -1852,15 +1897,14 @@ export default function CrmSitePage() {
                 <div className="form-group">
                   <label className="form-label">Favicon / Иконка (путь в хранилище)</label>
                   <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                    <input type="text" className="form-input" value={brandFavicon} onChange={e => setBrandFavicon(e.target.value)} required />
+                    <input type="text" className="form-input" value={brandFavicon} readOnly />
                     <div style={{ width: "40px", height: "40px", border: "1px solid var(--color-border)", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflow: "hidden" }}>
                       <img src={getMediaUrl(brandFavicon)} alt="Preview Favicon" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                     </div>
                   </div>
                   <div style={{ marginTop: "6px" }}>
-                    <input type="file" id="favicon-quick-uploader" accept=".ico,.png,.svg" style={{ display: "none" }} onChange={(e) => handleQuickUpload(e, "favicon")} />
-                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => document.getElementById("favicon-quick-uploader")?.click()}>
-                      Загрузить новую иконку
+                    <Button type="button" variant="secondary-crm" style={{ fontSize: "11px", padding: "4px 8px" }} onClick={() => { setActiveTab("media"); setMediaView("blocks"); }}>
+                      Изменить в редакторе изображений
                     </Button>
                   </div>
                 </div>
@@ -2638,19 +2682,35 @@ export default function CrmSitePage() {
           {/* TAB 8: MEDIA MANAGER */}
           {activeTab === "media" && (
             <div className="card-crm" style={{ gap: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", borderBottom: "1px solid var(--color-border)", paddingBottom: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", borderBottom: "1px solid var(--color-border)", paddingBottom: "16px", flexWrap: "wrap" }}>
                 <div>
                   <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>Медиа для сайта</h3>
-                  <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>Загрузите фото и сразу примените их к нужному блоку: первый экран, контакты, проекты, оборудование или преподаватели.</p>
+                  <p style={{ margin: "6px 0 0", fontSize: "13px", color: "var(--color-text-muted)" }}>{mediaView === "blocks" ? "Редактируйте изображения по месту их использования на сайте." : "Просматривайте, загружайте и удаляйте файлы в media storage."}</p>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <Button type="button" variant={mediaView === "blocks" ? "primary-crm" : "secondary-crm"} onClick={() => setMediaView("blocks")}>Изображения блоков</Button>
+                  <Button type="button" variant={mediaView === "library" ? "primary-crm" : "secondary-crm"} onClick={() => setMediaView("library")}>Медиатека</Button>
                   <input type="file" ref={fileInputRef} onChange={handleUploadFile} multiple style={{ display: "none" }} />
-                  <Button variant="primary-crm" disabled={uploadingFile} onClick={() => fileInputRef.current?.click()}>
+                  {mediaView === "library" && <Button variant="secondary-crm" disabled={uploadingFile} onClick={() => fileInputRef.current?.click()}>
                     <Upload size={14} /> {uploadingFile ? "Загрузка..." : "Загрузить файлы"}
-                  </Button>
+                  </Button>}
                 </div>
               </div>
 
+              {mediaView === "blocks" && (
+                <SiteMediaBlocksEditor
+                  drafts={siteMediaDrafts}
+                  dirtySlots={dirtyMediaSlots}
+                  mediaFolders={mediaFolders}
+                  onDraftChange={(slotId, draft) => setSiteMediaDrafts((current) => ({ ...current, [slotId]: draft }))}
+                  onDirtyChange={(slotId, dirty) => setDirtyMediaSlots((current) => setMediaSlotDirty(current, slotId, dirty))}
+                  onLoadFolder={loadMediaFolder}
+                  onUpload={uploadFilesToMedia}
+                  onSave={handleSaveSiteMediaSlot}
+                />
+              )}
+
+              {mediaView === "library" && (
               <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0, 1fr)", gap: "20px", alignItems: "start" }} className="media-manager-layout">
                 {/* 1. Left side: Directories list */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -2769,6 +2829,9 @@ export default function CrmSitePage() {
                         <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
                           {(Number(file.size || 0) / 1024).toFixed(1)} KB
                         </div>
+                        <div style={{ fontSize: "10px", fontWeight: 700, color: file.usages?.length ? "#166534" : "var(--color-text-muted)" }}>
+                          {file.usages?.length ? `Используется: ${file.usages.length}` : "Не используется"}
+                        </div>
                       </div>
                     );
                   })}
@@ -2844,6 +2907,13 @@ export default function CrmSitePage() {
                         </div>
                       </div>
 
+                      <div style={{ display: "grid", gap: 7, padding: "12px", borderRadius: 10, background: "#F8FAFC", border: "1px solid var(--color-border)" }}>
+                        <strong style={{ fontSize: 12 }}>Использование файла</strong>
+                        {selectedFile.usages?.length ? selectedFile.usages.map((usage: { kind: string; label: string }) => (
+                          <span key={`${usage.kind}-${usage.label}`} style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{usage.label}</span>
+                        )) : <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Файл нигде не используется</span>}
+                      </div>
+
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "12px" }}>
                         <Button
                           type="button"
@@ -2890,6 +2960,7 @@ export default function CrmSitePage() {
                   )}
                 </div>
               </div>
+              )}
             </div>
           )}
 

@@ -170,7 +170,7 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
   });
 
   it("renders editable homepage blocks from site_content_blocks content", () => {
-    render(
+    const { container } = render(
       <LandingPageClient
         initialBlocks={[
           {
@@ -243,6 +243,8 @@ describe("LandingPageClient dynamic data rendering and fallbacks", () => {
     expect(screen.getByText("Стартуем с CRM")).toBeInTheDocument();
     expect(screen.getByText("Отзывы из CRM")).toBeInTheDocument();
     expect(screen.getByText("Анна из CRM")).toBeInTheDocument();
+    expect(container.querySelector('[data-public-media-card="student-project"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-public-media-card="lesson-step"]')).toBeInTheDocument();
     expect(screen.queryByText("Ольга Николаева")).not.toBeInTheDocument();
     expect(screen.queryByText("Робот для соревнований «Сумо»")).not.toBeInTheDocument();
   });

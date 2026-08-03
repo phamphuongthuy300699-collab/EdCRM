@@ -169,6 +169,63 @@ describe("Media API Endpoint Security", () => {
     }
   });
 
+  it("returns every safe usage location with listed media files", async () => {
+    const originalMediaDriver = process.env.MEDIA_DRIVER;
+    const originalMediaLocalDir = process.env.MEDIA_LOCAL_DIR;
+    const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-usages-"));
+    const heroDir = path.join(tempMediaDir, "hero");
+    fs.mkdirSync(heroDir, { recursive: true });
+    fs.writeFileSync(path.join(heroDir, "main.jpg"), "image");
+    process.env.MEDIA_DRIVER = "local";
+    process.env.MEDIA_LOCAL_DIR = tempMediaDir;
+
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }) },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: "org-id", role: "admin" } }),
+      }),
+    } as any);
+
+    vi.mocked(createSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({
+          data: table === "site_content_blocks"
+            ? [{ block_key: "home.media", title: "Первый экран", content: { heroImage: "hero/main.jpg" } }]
+            : table === "profiles"
+              ? [{ id: "private-staff-id", avatar_url: "hero/main.jpg" }]
+              : table === "courses"
+                ? [{ title: "Робототехника", card_image_url: "hero/main.jpg" }]
+                : [],
+        }),
+        then: table === "site_content_blocks"
+          ? (resolve: (value: unknown) => unknown) => resolve({ data: [{ block_key: "home.media", title: "Первый экран", content: { heroImage: "hero/main.jpg" } }] })
+          : undefined,
+      })),
+    } as any);
+
+    try {
+      const response = await GET(new NextRequest("http://localhost:3000/api/crm/media?folder=hero"));
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.files[0].usages).toEqual([
+        { kind: "site_block", label: "Блок сайта: Первый экран" },
+        { kind: "staff", label: "Фото сотрудника" },
+        { kind: "course", label: "Фон курса: Робототехника" },
+      ]);
+      expect(JSON.stringify(json.files[0].usages)).not.toContain("private-staff-id");
+    } finally {
+      if (originalMediaDriver === undefined) delete process.env.MEDIA_DRIVER;
+      else process.env.MEDIA_DRIVER = originalMediaDriver;
+      if (originalMediaLocalDir === undefined) delete process.env.MEDIA_LOCAL_DIR;
+      else process.env.MEDIA_LOCAL_DIR = originalMediaLocalDir;
+      fs.rmSync(tempMediaDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns local /media URLs and writes uploaded files to the local media root", async () => {
     const originalMediaDriver = process.env.MEDIA_DRIVER;
     const originalNextPublicMediaDriver = process.env.NEXT_PUBLIC_MEDIA_DRIVER;
@@ -264,9 +321,13 @@ describe("Media API Endpoint Security", () => {
             }),
           };
         }
+        if (table === "profiles") {
+          return { select: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [] }) };
+        }
         return {
           select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({ data: [] }),
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockResolvedValue({ data: [] }),
         };
       }),
     };
@@ -290,12 +351,11 @@ describe("Media API Endpoint Security", () => {
     } as any);
 
     vi.mocked(createSupabaseAdminClient).mockReturnValue({
-      from: vi.fn((table: string) => ({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({
-          data: table === "profiles" ? [{ full_name: "Персональное Имя" }] : [],
-        }),
-      })),
+      from: vi.fn((table: string) => {
+        if (table === "site_content_blocks") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ data: [] }) };
+        if (table === "profiles") return { select: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [{ avatar_url: "teachers/avatar.jpg" }] }) };
+        return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [] }) };
+      }),
     } as any);
 
     const response = await DELETE(new NextRequest("http://localhost:3000/api/crm/media?path=teachers/avatar.jpg", { method: "DELETE" }));
@@ -336,9 +396,16 @@ describe("Media API Endpoint Security", () => {
         if (table === "crm_audit_log") {
           return { insert: insertAudit };
         }
+        if (table === "site_content_blocks") {
+          return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ data: [] }) };
+        }
+        if (table === "profiles") {
+          return { select: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [] }) };
+        }
         return {
           select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockResolvedValue({ data: [] }),
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockResolvedValue({ data: [] }),
         };
       }),
     };
