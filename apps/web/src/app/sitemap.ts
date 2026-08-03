@@ -1,8 +1,7 @@
 import { MetadataRoute } from "next";
+import { publicSiteUrl } from "@/shared/config/public-site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://робокс48.рф";
-  
   const routes = [
     "",
     "/robototekhnika-dlya-detey-lipetsk",
@@ -14,15 +13,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/raspisanie",
     "/stoimost",
     "/contacts",
+    "/teachers",
     "/legal",
     "/privacy",
+    "/privacy-policy",
+    "/consent",
     "/offer",
     "/payment",
     "/refund",
   ];
 
   return routes.map((route) => ({
-    url: `${baseUrl}${route}`,
+    url: publicSiteUrl(route || "/"),
     lastModified: new Date(),
     changeFrequency: "weekly" as const,
     priority: route === "" ? 1.0 : 0.8,

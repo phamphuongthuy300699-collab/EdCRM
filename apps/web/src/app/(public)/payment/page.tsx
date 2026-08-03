@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/shared/seo/public-metadata";
 import { LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
 import { getDynamicPageBlock } from "../legal-data";
 import { getLegalPageDefault } from "@/shared/utils/legal-page-defaults";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Условия оплаты | Робокс Липецк",
   description: "Условия оплаты услуг школы робототехники и программирования Робокс банковской картой.",
-};
+  path: "/payment",
+});
 
 export default async function PaymentPage() {
   const fallback = getLegalPageDefault("legal.page.payment");

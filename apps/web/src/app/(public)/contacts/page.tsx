@@ -1,18 +1,20 @@
-import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/shared/seo/public-metadata";
 import Link from "next/link";
 import { InfoGrid, LegalPageShell, LegalSection, PlaceholderNotice } from "../LegalPageShell";
 import { getPublicLegalData } from "../legal-data";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Контакты | Робокс Липецк",
   description: "Контактная информация, адреса проведения занятий и юридические реквизиты школы Робокс в Липецке.",
-};
+  path: "/contacts",
+});
 
 function mediaPath(value: any) {
   return typeof value === "string" ? value : value?.path || "";
@@ -44,7 +46,7 @@ export default async function ContactsPage() {
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {

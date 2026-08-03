@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/shared/seo/public-metadata";
 import { InfoGrid, LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
 import { getPublicLegalData, getDynamicPageBlock } from "../legal-data";
 import { getLegalPageDefault } from "@/shared/utils/legal-page-defaults";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Публичная оферта | Робокс Липецк",
   description: "Публичная оферта на оказание развивающих услуг школы робототехники и программирования Робокс.",
-};
+  path: "/offer",
+});
 
 export default async function OfferPage() {
   const data = await getPublicLegalData();

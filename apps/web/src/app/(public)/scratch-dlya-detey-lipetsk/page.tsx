@@ -1,16 +1,15 @@
 import React from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { Gamepad2, ArrowLeft, Check, Compass } from "lucide-react";
+import { publicSiteUrl } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Обучение Scratch программированию детей в Липецке",
   description: "Курсы программирования Scratch для детей 7–11 лет в Липецке. Создание игр, мультфильмов и анимаций. Запишитесь на первое бесплатное пробное занятие!",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/scratch-dlya-detey-lipetsk",
-  },
-};
+  path: "/scratch-dlya-detey-lipetsk",
+});
 
 export default function ScratchPage() {
   const jsonLdCourse = {
@@ -21,7 +20,7 @@ export default function ScratchPage() {
     "provider": {
       "@type": "EducationalOrganization",
       "name": "Робокс Липецк",
-      "sameAs": "https://robotics-lipetsk.ru"
+      "sameAs": publicSiteUrl("/")
     }
   };
 
@@ -33,13 +32,13 @@ export default function ScratchPage() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Scratch",
-        "item": "https://robotics-lipetsk.ru/scratch-dlya-detey-lipetsk"
+        "item": publicSiteUrl("/scratch-dlya-detey-lipetsk")
       }
     ]
   };
@@ -48,11 +47,11 @@ export default function ScratchPage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdCourse) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdCourse) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
 
       {/* Header Info */}

@@ -39,6 +39,11 @@ import {
   defaultHeaderLinks as defaultPublicHeaderLinks,
 } from "@/shared/utils/public-navigation";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { ImageCollectionEditor } from "@/features/site-editor/media/ImageCollectionEditor";
+import { normalizeImageCollection, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
+import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile } from "@/features/site-editor/media/types";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
+import { brandedPublicTitle } from "@/shared/seo/public-metadata";
 
 type TabId = "home" | "branding" | "navigation" | "teachers" | "branches" | "prices" | "schedule" | "legal" | "footer" | "media";
 
@@ -94,6 +99,14 @@ function toImageItem(value: any, index: number) {
   };
 }
 
+function blockItemsFromCollection(images: ImageCollectionItem[]) {
+  return images.map((image) => {
+    const item: Record<string, unknown> = { ...image, image: image.path };
+    delete item.path;
+    return item;
+  });
+}
+
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -115,28 +128,6 @@ const emptyReview = () => ({
   initials: "",
   text: "",
   rating: 5,
-  isActive: true,
-  sortOrder: 100,
-});
-
-const emptyProject = () => ({
-  id: makeId("project"),
-  title: "",
-  badge: "",
-  description: "",
-  image: "",
-  alt: "",
-  isActive: true,
-  sortOrder: 100,
-});
-
-const emptyLessonStep = () => ({
-  id: makeId("step"),
-  number: "",
-  title: "",
-  description: "",
-  image: "",
-  alt: "",
   isActive: true,
   sortOrder: 100,
 });
@@ -293,11 +284,13 @@ export default function CrmSitePage() {
   const [studentProjectsTitle, setStudentProjectsTitle] = useState("Проекты наших учеников");
   const [studentProjectsSubtitle, setStudentProjectsSubtitle] = useState("");
   const [studentProjectItems, setStudentProjectItems] = useState<any[]>([]);
+  const [studentProjectsLayout, setStudentProjectsLayout] = useState<ImageCollectionLayout>(() => normalizeImageLayout(undefined));
 
   const [lessonProcessEnabled, setLessonProcessEnabled] = useState(false);
   const [lessonProcessTitle, setLessonProcessTitle] = useState("Как проходит занятие: 5 этапов урока");
   const [lessonProcessSubtitle, setLessonProcessSubtitle] = useState("");
   const [lessonStepItems, setLessonStepItems] = useState<any[]>([]);
+  const [lessonProcessLayout, setLessonProcessLayout] = useState<ImageCollectionLayout>(() => normalizeImageLayout({ columnsDesktop: 5, columnsTablet: 3, columnsMobile: 1, gap: 24, aspectRatio: "4/3", objectFit: "cover" }));
 
   // Tab 8: Media Manager
   const [activeMediaFolder, setActiveMediaFolder] = useState("branding");
@@ -312,6 +305,7 @@ export default function CrmSitePage() {
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoH1, setSeoH1] = useState("");
+  const [seoImage, setSeoImage] = useState("");
 
   // Load All Site Data
   const loadData = async () => {
@@ -383,6 +377,7 @@ export default function CrmSitePage() {
         setSeoTitle(seoBlock?.title || "");
         setSeoDescription(seoBlock?.subtitle || "");
         setSeoH1(seoBlock?.content?.h1 || "");
+        setSeoImage(seoBlock?.content?.ogImage || seoBlock?.content?.socialImage || "");
 
         // Footer block
         const fBlock = blocks.find((b: any) => b.block_key === "site.footer");
@@ -435,6 +430,7 @@ export default function CrmSitePage() {
           setStudentProjectsTitle(projects.content?.title || projects.title || "Проекты наших учеников");
           setStudentProjectsSubtitle(projects.content?.subtitle || projects.subtitle || "");
           setStudentProjectItems(Array.isArray(projects.content?.items) ? projects.content.items : []);
+          setStudentProjectsLayout(normalizeImageLayout(projects.content?.layout));
         }
 
         const lessonProcess = blocks.find((b: any) => b.block_key === "home.lesson_process");
@@ -443,6 +439,7 @@ export default function CrmSitePage() {
           setLessonProcessTitle(lessonProcess.content?.title || lessonProcess.title || "Как проходит занятие: 5 этапов урока");
           setLessonProcessSubtitle(lessonProcess.content?.subtitle || lessonProcess.subtitle || "");
           setLessonStepItems(Array.isArray(lessonProcess.content?.steps) ? lessonProcess.content.steps : []);
+          setLessonProcessLayout(normalizeImageLayout(lessonProcess.content?.layout || { columnsDesktop: 5, columnsTablet: 3, columnsMobile: 1, gap: 24, aspectRatio: "4/3", objectFit: "cover" }));
         }
       }
 
@@ -509,15 +506,16 @@ export default function CrmSitePage() {
   }, []);
 
   // Fetch media files list when active folder or media tab is selected
+  const loadMediaFolder = async (folder: string): Promise<MediaLibraryFile[]> => {
+    const res = await fetch(`/api/crm/media?folder=${encodeURIComponent(folder)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Не удалось загрузить медиатеку");
+    return data.files || [];
+  };
+
   const loadMediaFiles = async () => {
     try {
-      const res = await fetch(`/api/crm/media?folder=${activeMediaFolder}`);
-      const data = await res.json();
-      if (res.ok) {
-        setMediaFiles(data.files || []);
-      } else {
-        throw new Error(data.error);
-      }
+      setMediaFiles(await loadMediaFolder(activeMediaFolder));
     } catch (err: any) {
       console.error("Media load error:", err);
     }
@@ -612,7 +610,16 @@ export default function CrmSitePage() {
         balance: portalBalance,
         teacherNote: portalTeacherNote
       });
-      await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1 });
+      await saveBlock("home.seo", seoTitle, seoDescription, { h1: seoH1, ogImage: normalizeSiteMediaPath(seoImage) });
+      await saveBlock("site.branding", brandName, "Настройки брендинга", {
+        logo: brandLogo,
+        favicon: normalizeSiteMediaPath(brandFavicon),
+        primaryColor: brandPrimaryColor,
+        accentColor: brandAccentColor,
+        gradient: brandGradient,
+        logoDisplay: brandLogoDisplay,
+        logoAlt: brandLogoAlt,
+      });
       await saveBlock("home.testimonials", testimonialsTitle, testimonialsSubtitle, {
         enabled: testimonialsEnabled,
         title: testimonialsTitle,
@@ -623,13 +630,15 @@ export default function CrmSitePage() {
         enabled: studentProjectsEnabled,
         title: studentProjectsTitle,
         subtitle: studentProjectsSubtitle,
-        items: studentProjectItems
+        items: studentProjectItems,
+        layout: studentProjectsLayout,
       });
       await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
         enabled: lessonProcessEnabled,
         title: lessonProcessTitle,
         subtitle: lessonProcessSubtitle,
-        steps: lessonStepItems
+        steps: lessonStepItems,
+        layout: lessonProcessLayout,
       });
       setSuccessMsg("Изменения на Главной сохранены!");
     } catch (err: any) {
@@ -1087,18 +1096,12 @@ export default function CrmSitePage() {
     }
   };
 
-  // Tab 8: Upload file
-  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setUploadingFile(true);
-    try {
-      const uploadedFiles = [];
-
-      for (const file of files) {
+  const uploadFilesToMedia = async (files: File[], folder: string): Promise<MediaLibraryFile[]> => {
+    const uploadedFiles: MediaLibraryFile[] = [];
+    for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("folder", activeMediaFolder);
+        formData.append("folder", folder);
 
         const res = await fetch("/api/crm/media", {
           method: "POST",
@@ -1114,7 +1117,17 @@ export default function CrmSitePage() {
           url: data.url || getMediaUrl(relativePath),
           size: file.size
         });
-      }
+    }
+    return uploadedFiles;
+  };
+
+  // Tab 8: Upload file
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingFile(true);
+    try {
+      const uploadedFiles = await uploadFilesToMedia(files, activeMediaFolder);
 
       setSuccessMsg(files.length > 1 ? `${files.length} файлов успешно загружены!` : `Файл ${files[0].name} успешно загружен!`);
       await loadMediaFiles();
@@ -1636,18 +1649,46 @@ export default function CrmSitePage() {
               </div>
 
               <div className="card-crm">
-                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>SEO параметры главной</h3>
+                <h3 style={{ fontSize: "15px", fontWeight: 700, borderBottom: "1px solid var(--color-border)", paddingBottom: "8px", margin: 0 }}>SEO и реклама</h3>
                 <div className="form-group">
-                  <label className="form-label">Meta Title (Заголовок вкладки)</label>
-                  <input type="text" className="form-input" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} required />
+                  <label className="form-label">Заголовок страницы</label>
+                  <input type="text" className="form-input" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} />
+                  <span className="form-hint">{seoTitle.length} символов. Бренд «Робокс» добавляется автоматически один раз.</span>
+                  {/Робокс/i.test(seoTitle) && <span style={{ color: "#B45309", fontSize: "11px", fontWeight: 700 }}>Уберите бренд из поля, чтобы предпросмотр был понятнее: система всё равно устранит повтор.</span>}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Meta Description</label>
-                  <input type="text" className="form-input" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} required />
+                  <label className="form-label">Описание страницы</label>
+                  <textarea className="form-input" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} style={{ minHeight: 84 }} />
+                  <span className="form-hint">{seoDescription.length} символов. Поисковая система может сформировать собственный текст сниппета.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Заголовок H1 на сайте</label>
                   <input type="text" className="form-input" value={seoH1} onChange={e => setSeoH1(e.target.value)} required />
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Изображение для соцсетей и рекламы</label>
+                    <input type="text" className="form-input" value={seoImage} onChange={e => setSeoImage(normalizeSiteMediaPath(e.target.value))} placeholder="branding/social-card.webp" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Favicon</label>
+                    <input type="text" className="form-input" value={brandFavicon} onChange={e => setBrandFavicon(normalizeSiteMediaPath(e.target.value))} placeholder="branding/favicon.ico" />
+                    <span className="form-hint">Favicon также доступен в разделе «Бренд и логотип».</span>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Фактический canonical URL</label>
+                  <input type="text" className="form-input" value={getPublicSiteConfig().origin} readOnly />
+                </div>
+                {(!seoTitle.trim() || !seoDescription.trim()) && <div style={{ padding: "10px 12px", borderRadius: 8, background: "#FEF3C7", color: "#92400E", fontSize: 12, fontWeight: 700 }}>Заполните title и description. Пустые поля будут заменены безопасными значениями по умолчанию.</div>}
+                <div style={{ padding: 16, border: "1px solid var(--color-border)", borderRadius: 12, background: "white", display: "grid", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <img src={brandFavicon ? getMediaUrl(brandFavicon) : "/favicon.ico"} alt="" width="20" height="20" style={{ borderRadius: 4 }} />
+                    <span style={{ color: "#166534", fontSize: 13 }}>{getPublicSiteConfig().hostname}</span>
+                  </div>
+                  <strong style={{ color: "#1A0DAB", fontSize: 18 }}>{brandedPublicTitle(seoTitle)}</strong>
+                  <span style={{ color: "#4B5563", fontSize: 13 }}>{seoDescription || "Описание страницы будет подставлено из безопасного значения по умолчанию."}</span>
+                  <span className="form-hint">Предпросмотр ориентировочный: Яндекс может изменить заголовок и описание.</span>
                 </div>
               </div>
 
@@ -1701,27 +1742,35 @@ export default function CrmSitePage() {
                   <input className="form-input" placeholder="Заголовок" value={studentProjectsTitle} onChange={e => setStudentProjectsTitle(e.target.value)} />
                   <input className="form-input" placeholder="Подзаголовок" value={studentProjectsSubtitle} onChange={e => setStudentProjectsSubtitle(e.target.value)} />
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку student-projects и вставляйте storage path, например student-projects/project-1.jpg.</p>
                 {studentProjectItems.map((item, idx) => (
                   <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
+                    <div className="form-grid-2">
                       <input className="form-input" placeholder="Бейдж" value={item.badge || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, badge: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                      <textarea className="form-input" placeholder="Описание" value={item.description || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
                     </div>
-                    <textarea className="form-input" placeholder="Описание" value={item.description || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="student-projects/..." value={item.image || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
-                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
-                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
-                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setStudentProjectItems(studentProjectItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
-                        Активен
-                      </label>
-                    </div>
-                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("проект", () => setStudentProjectItems(studentProjectItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
                   </div>
                 ))}
-                <Button type="button" variant="secondary-crm" onClick={() => setStudentProjectItems([...studentProjectItems, emptyProject()])}><Plus size={14} /> Добавить проект</Button>
+                <ImageCollectionEditor
+                  blockKey="home.student_projects"
+                  blockLabel="Проекты учеников"
+                  images={normalizeImageCollection(studentProjectItems)}
+                  layout={studentProjectsLayout}
+                  mediaFiles={mediaFiles}
+                  onChange={(images) => setStudentProjectItems(blockItemsFromCollection(images))}
+                  onLayoutChange={setStudentProjectsLayout}
+                  onLoadFolder={loadMediaFolder}
+                  onUpload={uploadFilesToMedia}
+                  onSave={async () => {
+                    await saveBlock("home.student_projects", studentProjectsTitle, studentProjectsSubtitle, {
+                      enabled: studentProjectsEnabled,
+                      title: studentProjectsTitle,
+                      subtitle: studentProjectsSubtitle,
+                      items: studentProjectItems,
+                      layout: studentProjectsLayout,
+                    });
+                    setSuccessMsg("Изменения опубликованы");
+                  }}
+                />
               </div>
 
               <div className="card-crm">
@@ -1734,27 +1783,35 @@ export default function CrmSitePage() {
                   <input className="form-input" placeholder="Заголовок" value={lessonProcessTitle} onChange={e => setLessonProcessTitle(e.target.value)} />
                   <input className="form-input" placeholder="Подзаголовок" value={lessonProcessSubtitle} onChange={e => setLessonProcessSubtitle(e.target.value)} />
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-muted)" }}>Файлы загружайте в папку lesson-process и вставляйте storage path, например lesson-process/step-1.jpg.</p>
                 {lessonStepItems.map((item, idx) => (
                   <div key={item.id || idx} style={{ border: "1px solid var(--color-border)", borderRadius: "8px", padding: "12px", display: "grid", gap: "10px" }}>
-                    <div className="form-grid-3">
+                    <div className="form-grid-2">
                       <input className="form-input" placeholder="Номер" value={item.number || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, number: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Название" value={item.title || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, title: e.target.value } : v))} />
-                      <input className="form-input" placeholder="Сортировка" type="number" value={item.sortOrder ?? 100} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, sortOrder: Number(e.target.value) } : v))} />
+                      <textarea className="form-input" placeholder="Описание этапа" value={item.description || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
                     </div>
-                    <textarea className="form-input" placeholder="Описание этапа" value={item.description || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, description: e.target.value } : v))} />
-                    <div className="form-grid-3">
-                      <input className="form-input" placeholder="lesson-process/..." value={item.image || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, image: normalizeSiteMediaPath(e.target.value) } : v))} />
-                      <input className="form-input" placeholder="Alt" value={item.alt || ""} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, alt: e.target.value } : v))} />
-                      <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700 }}>
-                        <input type="checkbox" checked={item.isActive !== false} onChange={e => setLessonStepItems(lessonStepItems.map((v, i) => i === idx ? { ...v, isActive: e.target.checked } : v))} />
-                        Активен
-                      </label>
-                    </div>
-                    <Button type="button" variant="secondary-crm" onClick={() => removeContentItem("этап", () => setLessonStepItems(lessonStepItems.filter((_, i) => i !== idx)))} style={{ width: "fit-content", color: "#EF4444" }}><Trash2 size={14} /> Удалить</Button>
                   </div>
                 ))}
-                <Button type="button" variant="secondary-crm" onClick={() => setLessonStepItems([...lessonStepItems, emptyLessonStep()])}><Plus size={14} /> Добавить этап</Button>
+                <ImageCollectionEditor
+                  blockKey="home.lesson_process"
+                  blockLabel="Как проходит занятие"
+                  images={normalizeImageCollection(lessonStepItems)}
+                  layout={lessonProcessLayout}
+                  mediaFiles={mediaFiles}
+                  onChange={(images) => setLessonStepItems(blockItemsFromCollection(images))}
+                  onLayoutChange={setLessonProcessLayout}
+                  onLoadFolder={loadMediaFolder}
+                  onUpload={uploadFilesToMedia}
+                  onSave={async () => {
+                    await saveBlock("home.lesson_process", lessonProcessTitle, lessonProcessSubtitle, {
+                      enabled: lessonProcessEnabled,
+                      title: lessonProcessTitle,
+                      subtitle: lessonProcessSubtitle,
+                      steps: lessonStepItems,
+                      layout: lessonProcessLayout,
+                    });
+                    setSuccessMsg("Изменения опубликованы");
+                  }}
+                />
               </div>
 
               <div>

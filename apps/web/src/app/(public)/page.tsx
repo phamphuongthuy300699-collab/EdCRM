@@ -4,6 +4,13 @@ import LandingPageClient from "./LandingPageClient";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { getMediaUrl } from "@/shared/utils/media";
 import { publicMapBranches } from "@/shared/utils/public-map";
+import { getPublicSiteConfig, publicSiteUrl } from "@/shared/config/public-site";
+import {
+  buildOrganizationJsonLd,
+  buildPublicMetadata,
+  resolveHomeSeo,
+  safeJsonLdStringify,
+} from "@/shared/seo/public-metadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,46 +18,37 @@ export const revalidate = 0;
 export async function generateMetadata(): Promise<Metadata> {
   try {
     const supabase = createSupabaseAdminClient();
+    const publicSite = getPublicSiteConfig();
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", publicSite.organizationSlug)
       .single();
 
-    let title = "Робототехника и программирование для детей в Липецке | Робокс";
-    let description = "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.";
+    let seoBlock: any = null;
+    let brandingBlock: any = null;
 
     if (org) {
-      const { data: seoBlock } = await supabase
+      const { data } = await supabase
         .from("site_content_blocks")
-        .select("title, subtitle")
+        .select("block_key, title, subtitle, content")
         .eq("organization_id", org.id)
-        .eq("block_key", "home.seo")
+        .in("block_key", ["home.seo", "site.branding"])
         .eq("status", "published")
-        .single();
-      
-      if (seoBlock) {
-        if (seoBlock.title) title = seoBlock.title;
-        if (seoBlock.subtitle) description = seoBlock.subtitle;
-      }
+      seoBlock = data?.find((block: any) => block.block_key === "home.seo") || null;
+      brandingBlock = data?.find((block: any) => block.block_key === "site.branding") || null;
     }
 
-    return {
-      title,
-      description,
-      alternates: {
-        canonical: "https://robotics-lipetsk.ru",
-      },
-    };
+    const seo = resolveHomeSeo(seoBlock);
+    return buildPublicMetadata({
+      ...seo,
+      favicon: brandingBlock?.content?.favicon || seo.favicon,
+      path: "/",
+    });
   } catch (e) {
     console.error("Error generating metadata dynamically:", e);
-    return {
-      title: "Робототехника и программирование для детей в Липецке | Робокс",
-      description: "Курсы робототехники, Scratch, Python и Arduino для детей 6–14 лет в Липецке. Бесплатное пробное занятие 90 минут! Запись в мини-группы до 8 человек.",
-      alternates: {
-        canonical: "https://robotics-lipetsk.ru",
-      },
-    };
+    const seo = resolveHomeSeo(null);
+    return buildPublicMetadata({ ...seo, path: "/" });
   }
 }
 
@@ -61,17 +59,18 @@ export default async function Page() {
   let initialTeachers: any[] = [];
   let initialBranches: any[] = [];
   let initialTariffs: any[] = [];
-  let orgPhone = "+7-994-777-48-48";
-  let orgAddress = "ул. Артемова, д. 5а, оф. 126";
+  let orgPhone = "";
+  let orgAddress = "";
 
   let org: any = null;
 
   try {
     const supabase = createSupabaseAdminClient();
+    const publicSite = getPublicSiteConfig();
     const { data: orgData } = await supabase
       .from("organizations")
       .select("*")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", publicSite.organizationSlug)
       .single();
     
     org = orgData;
@@ -199,43 +198,16 @@ export default async function Page() {
     console.error("PUBLIC_DATA_LOAD_ERROR", e);
   }
 
-  const jsonLdOrg = {
-    "@context": "https://schema.org",
-    "@type": ["EducationalOrganization", "LocalBusiness"],
-    "@id": "https://robotics-lipetsk.ru/#organization",
-    "name": "Робокс — школа робототехники и программирования в Липецке",
-    "url": "https://robotics-lipetsk.ru",
-    "logo": "https://robotics-lipetsk.ru/favicon.ico",
-    "image": "https://robotics-lipetsk.ru/images/classroom_lipetsk.png",
-    "description": "Робокс — школа инженерного мышления и программирования для детей 6–14 лет в Липецке. Сборка роботов, разработка игр, Scratch, Python, Arduino в мини-группах.",
-    "telephone": orgPhone,
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": orgAddress,
-      "addressLocality": "Липецк",
-      "postalCode": "398000",
-      "addressCountry": "RU"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": "52.6088",
-      "longitude": "39.5992"
-    },
-    "openingHoursSpecification": {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday"
-      ],
-      "opens": "09:00",
-      "closes": "20:00"
-    },
-    "priceRange": "$$"
-  };
+  const brandingBlock = initialBlocks.find((block: any) => block.block_key === "site.branding");
+  const homeSeo = resolveHomeSeo(initialBlocks.find((block: any) => block.block_key === "home.seo"));
+  const jsonLdOrg = buildOrganizationJsonLd({
+    name: brandingBlock?.title || org?.name || "Робокс",
+    description: homeSeo.description,
+    phone: orgPhone || org?.phone || null,
+    address: orgAddress || org?.legal_address || null,
+    logo: brandingBlock?.content?.logo || "/favicon.svg",
+    image: homeSeo.image,
+  });
 
   const jsonLdBreadcrumb = {
     "@context": "https://schema.org",
@@ -245,7 +217,7 @@ export default async function Page() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       }
     ]
   };
@@ -254,11 +226,11 @@ export default async function Page() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdOrg) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
       <LandingPageClient 
         initialCourses={initialCourses}

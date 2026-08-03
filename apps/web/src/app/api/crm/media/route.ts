@@ -220,9 +220,9 @@ export async function DELETE(req: NextRequest) {
     .forEach((block: any) => usages.push(`Блок сайта: ${block.title || block.block_key}`));
 
   const { data: profiles } = await (admin.from("profiles") as any)
-    .select("full_name")
+    .select("id")
     .eq("avatar_url", mediaPath);
-  (profiles || []).forEach((profile: any) => usages.push(`Фото сотрудника: ${profile.full_name || "без имени"}`));
+  (profiles || []).forEach(() => usages.push("Фото сотрудника"));
 
   const { data: courses } = await (admin.from("courses") as any)
     .select("title")

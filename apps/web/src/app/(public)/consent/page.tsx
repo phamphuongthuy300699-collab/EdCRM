@@ -1,18 +1,16 @@
 import React from "react";
-import { Metadata } from "next";
+import { buildPublicMetadata } from "@/shared/seo/public-metadata";
 import { LegalPageShell, DynamicLegalSections } from "../LegalPageShell";
 import { getDynamicPageBlock, getPublicLegalData } from "../legal-data";
 import { getLegalPageDefault } from "@/shared/utils/legal-page-defaults";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Согласие на обработку персональных данных | Робокс Липецк",
   description: "Согласие на обработку персональных данных для родителей и учащихся школы Робокс Липецк.",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/consent",
-  },
-};
+  path: "/consent",
+});
 
 export default async function ConsentPage() {
   const data = await getPublicLegalData();

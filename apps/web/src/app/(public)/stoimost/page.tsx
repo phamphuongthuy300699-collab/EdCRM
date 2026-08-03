@@ -1,20 +1,19 @@
 import React from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { CreditCard, ArrowLeft, Check, Percent } from "lucide-react";
+import { publicSiteUrl, getPublicSiteConfig } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
+export const metadata = buildPublicMetadata({
   title: "Стоимость обучения робототехнике в Липецке | Цены кружка",
   description: "Тарифы и стоимость обучения робототехнике и программированию для детей в Липецке. Месячные абонементы от 4000 рублей. Все материалы включены.",
-  alternates: {
-    canonical: "https://robotics-lipetsk.ru/stoimost",
-  },
-};
+  path: "/stoimost",
+});
 
 export default async function StoimostPage() {
   const jsonLdBreadcrumb = {
@@ -25,13 +24,13 @@ export default async function StoimostPage() {
         "@type": "ListItem",
         "position": 1,
         "name": "Главная",
-        "item": "https://robotics-lipetsk.ru"
+        "item": publicSiteUrl("/")
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Стоимость",
-        "item": "https://robotics-lipetsk.ru/stoimost"
+        "item": publicSiteUrl("/stoimost")
       }
     ]
   };
@@ -44,7 +43,7 @@ export default async function StoimostPage() {
     const { data: org } = await supabase
       .from("organizations")
       .select("id")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {
@@ -82,7 +81,7 @@ export default async function StoimostPage() {
     <div style={{ fontFamily: "var(--font-inter), sans-serif", color: "var(--color-text)", paddingBottom: "100px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLdBreadcrumb) }}
       />
 
       <section className="bg-grid-blueprint" style={{ padding: "80px 0", borderBottom: "1px solid var(--color-border)" }}>

@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { ArrowLeft, Award, BookOpen, Users } from "lucide-react";
 import { getMediaUrl } from "@/shared/utils/media";
+import { publicSiteUrl } from "@/shared/config/public-site";
+import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 
 export const revalidate = 300;
 
@@ -58,14 +60,21 @@ export async function generateMetadata({
   const { slug } = await params;
   const teacher = await getTeacher(slug);
   if (!teacher) {
-    return { title: "Преподаватель не найден | Робокс" };
+    return buildPublicMetadata({
+      title: "Преподаватель не найден",
+      description: "Запрошенная страница преподавателя не найдена.",
+      path: `/teachers/${slug}`,
+      noIndex: true,
+    });
   }
-  return {
+  return buildPublicMetadata({
     title: `${teacher.full_name} — преподаватель | Робокс Липецк`,
     description:
       teacher.public_bio?.slice(0, 155) ||
       `${teacher.full_name} — преподаватель школы робототехники и программирования Робокс в Липецке.`,
-  };
+    path: `/teachers/${teacher.slug}`,
+    image: teacher.avatar_url,
+  });
 }
 
 export async function generateStaticParams() {
@@ -132,9 +141,9 @@ export default async function TeacherDetailPage({
     worksFor: {
       "@type": "EducationalOrganization",
       name: "Робокс",
-      url: "https://robotics-lipetsk.ru",
+      url: publicSiteUrl("/"),
     },
-    url: `https://robotics-lipetsk.ru/teachers/${teacher.slug}`,
+    url: publicSiteUrl(`/teachers/${teacher.slug}`),
     knowsAbout: platforms,
   };
 
@@ -142,7 +151,7 @@ export default async function TeacherDetailPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLd) }}
       />
 
       <section

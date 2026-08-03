@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Робокс — робототехника и программирование для детей">
+  <defs>
+    <linearGradient id="background" x1="90" y1="40" x2="1110" y2="590" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e8f8fb"/>
+      <stop offset="0.55" stop-color="#f2efff"/>
+      <stop offset="1" stop-color="#fdeaf4"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="760" y1="140" x2="1070" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8ed0dd"/>
+      <stop offset="0.5" stop-color="#6656a8"/>
+      <stop offset="1" stop-color="#da3c8c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <circle cx="1090" cy="70" r="180" fill="#fff" opacity=".55"/>
+  <circle cx="720" cy="620" r="250" fill="#fff" opacity=".45"/>
+  <g fill="#302b55">
+    <text x="100" y="238" font-family="Arial, sans-serif" font-size="92" font-weight="800">Робокс</text>
+    <text x="104" y="330" font-family="Arial, sans-serif" font-size="42" font-weight="700">Робототехника и программирование</text>
+    <text x="104" y="392" font-family="Arial, sans-serif" font-size="42">для детей в Липецке</text>
+  </g>
+  <g transform="translate(800 120)">
+    <rect width="280" height="340" rx="72" fill="url(#brand)"/>
+    <rect x="48" y="90" width="184" height="154" rx="28" fill="#fff"/>
+    <circle cx="105" cy="156" r="23" fill="#6656a8"/>
+    <circle cx="175" cy="156" r="23" fill="#da3c8c"/>
+    <path d="M102 207c22 18 54 18 76 0" fill="none" stroke="#302b55" stroke-width="15" stroke-linecap="round"/>
+    <path d="M140 62V38" stroke="#fff" stroke-width="15" stroke-linecap="round"/>
+    <circle cx="140" cy="28" r="16" fill="#fff"/>
+    <path d="M48 276h184" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".9"/>
+  </g>
+</svg>

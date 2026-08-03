@@ -13,6 +13,7 @@ import {
   type PublicNavLink,
 } from "@/shared/utils/public-navigation";
 import Header from "./Header";
+import { getPublicSiteConfig } from "@/shared/config/public-site";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -66,7 +67,7 @@ export default async function PublicLayout({
     const { data: org } = await supabase
       .from("organizations")
       .select("id, phone, email, short_legal_name, full_legal_name, inn, legal_address, bank_name, account_number, bik, correspondent_account")
-      .eq("slug", "robotics-lipetsk")
+      .eq("slug", getPublicSiteConfig().organizationSlug)
       .single();
 
     if (org) {
