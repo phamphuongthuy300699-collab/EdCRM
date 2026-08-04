@@ -21,6 +21,7 @@ export function SingleImageEditor({
   onSave,
   dirty,
   onDirtyChange,
+  showSaveButton = true,
 }: {
   blockLabel: string;
   description: string;
@@ -33,6 +34,7 @@ export function SingleImageEditor({
   onSave: () => Promise<void>;
   dirty: boolean;
   onDirtyChange: (dirty: boolean) => void;
+  showSaveButton?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFiles, setPickerFiles] = useState<MediaLibraryFile[]>([]);
@@ -83,7 +85,12 @@ export function SingleImageEditor({
             <Button type="button" variant="secondary-crm" onClick={() => void openLibrary()}>{image ? "Заменить" : "Выбрать изображение"}</Button>
             {image && <Button type="button" variant="secondary-crm" onClick={() => { setClearedImage(image); commit(null); }} style={{ color: "#B91C1C" }}><Trash2 size={13} /> Очистить</Button>}
           </div>
-          <Button type="button" variant="primary-crm" disabled={saving} onClick={async () => {
+          {image && <div className="site-single-image-fields">
+            <label><span>Название</span><input className="form-input" value={image.title} onChange={(event) => commit({ ...image, title: event.target.value })} /></label>
+            <label><span>Alt-текст</span><input className="form-input" value={image.alt} onChange={(event) => commit({ ...image, alt: event.target.value })} /></label>
+            <label><span>Кадрирование</span><select className="form-input" value={image.objectPosition} onChange={(event) => commit({ ...image, objectPosition: event.target.value })}><option value="50% 50%">По центру</option><option value="50% 25%">Верх</option><option value="50% 75%">Низ</option><option value="25% 50%">Левая часть</option><option value="75% 50%">Правая часть</option></select></label>
+          </div>}
+          {showSaveButton && <Button type="button" variant="primary-crm" disabled={saving} onClick={async () => {
             setSaving(true);
             try {
               await onSave();
@@ -92,7 +99,7 @@ export function SingleImageEditor({
             } finally {
               setSaving(false);
             }
-          }}>{saving ? "Сохранение…" : "Сохранить"}</Button>
+          }}>{saving ? "Сохранение…" : "Сохранить"}</Button>}
         </div>
       </div>
 
@@ -111,7 +118,12 @@ export function SingleImageEditor({
         .site-single-image-actions strong { font-size: 12px; }
         .site-single-image-actions span { margin-top: 5px; color: var(--color-text-muted); font-size: 11px; overflow-wrap: anywhere; }
         .site-media-button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .site-single-image-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+        .site-single-image-fields label { display: grid; gap: 4px; min-width: 0; }
+        .site-single-image-fields label > span { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+        .site-single-image-fields input, .site-single-image-fields select { min-width: 0; width: 100%; }
         @media (max-width: 700px) { .site-single-image-content { grid-template-columns: minmax(0, 1fr); } .site-single-image-preview { width: 100%; min-height: 180px; } }
+        @media (max-width: 900px) { .site-single-image-fields { grid-template-columns: 1fr; } }
       `}</style>
 
       <MediaLibraryPicker
