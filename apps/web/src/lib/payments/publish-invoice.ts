@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createOrReuseInvoicePaymentLink } from "./invoice-payment-links";
+import { isMaxEventEnabled } from "@/lib/bots/max/events";
 
 export type PublishInvoiceResult = {
   invoiceId: string;
@@ -44,7 +45,7 @@ export async function publishInvoiceForParent(input: {
   });
 
   const { data: maxSettings } = await (admin.from("bot_settings") as any)
-    .select("is_enabled")
+    .select("is_enabled, settings")
     .eq("organization_id", invoice.organization_id)
     .eq("provider", "max")
     .maybeSingle();
@@ -57,7 +58,7 @@ export async function publishInvoiceForParent(input: {
       .eq("is_verified", true)
       .maybeSingle()
     : { data: null };
-  const channel: "max" | "manual" = maxSettings?.is_enabled && maxAccount ? "max" : "manual";
+  const channel: "max" | "manual" = maxSettings?.is_enabled && maxAccount && isMaxEventEnabled(maxSettings.settings, "invoice_payment_link") ? "max" : "manual";
 
   await (admin.from("notification_outbox") as any).insert({
     organization_id: invoice.organization_id,

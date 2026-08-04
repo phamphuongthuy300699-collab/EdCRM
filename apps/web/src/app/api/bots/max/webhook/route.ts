@@ -10,6 +10,7 @@ import {
   verifyMaxContactHash,
 } from "@/lib/bots/max/utils";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { isMaxEventEnabled } from "@/lib/bots/max/events";
 
 const PUBLIC_APP_URL = "https://xn--48-9kc0bsblm.xn--p1ai";
 
@@ -279,6 +280,10 @@ async function sendBills(admin: ReturnType<typeof createSupabaseAdminClient>, se
 async function sendSchedule(admin: ReturnType<typeof createSupabaseAdminClient>, settings: any, update: any, requestId: string, updateType: string) {
   const userId = pickUserId(update);
   const chatId = pickChatId(update);
+  if (!isMaxEventEnabled(settings.settings, "self_service_schedule")) {
+    await sendMaxMessage(settings.bot_token_secret, { userId, chatId, text: "Функция расписания временно недоступна.", inlineKeyboardButtons: mainMenuButtons() });
+    return;
+  }
   const account = await loadVerifiedAccount(admin, settings.organization_id, userId);
   if (!account) {
     await sendRequestContact(settings, update, requestId, updateType, "schedule");

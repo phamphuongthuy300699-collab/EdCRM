@@ -34,6 +34,7 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { getMediaUrl } from "@/shared/utils/media";
+import { maxEventDefinitions, normalizeMaxEvents } from "@/lib/bots/max/events";
 
 type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "bots" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
@@ -297,6 +298,8 @@ export default function CrmSettingsPage() {
     settings: {},
   });
   const [maxBotToken, setMaxBotToken] = useState("");
+  const [maxQueue, setMaxQueue] = useState<any[]>([]);
+  const [maxQueueStatus, setMaxQueueStatus] = useState("all");
 
   const [discountTypes, setDiscountTypes] = useState<any[]>([]);
   const [discountAssignments, setDiscountAssignments] = useState<any[]>([]);
@@ -422,6 +425,7 @@ export default function CrmSettingsPage() {
         staffListRes,
         paymentRes,
         maxSettingsRes,
+        maxQueueRes,
       ] = await Promise.all([
         (supabase.from("branches") as any).select("*").eq("organization_id", orgData.id).order("sort_order"),
         (supabase.from("rooms") as any).select("*").eq("organization_id", orgData.id).order("name"),
@@ -441,6 +445,7 @@ export default function CrmSettingsPage() {
         fetch("/api/crm/staff/list").then((res) => res.json()).catch(() => ({ ok: false, staff: [] })),
         fetch("/api/crm/payment-settings/alfabank").then((res) => res.json()).catch(() => null),
         fetch("/api/crm/bot-settings/max").then((res) => res.json()).catch(() => null),
+        fetch("/api/crm/bot-settings/max/queue").then((res) => res.json()).catch(() => null),
       ]);
 
       if (branchesRes.error) throw branchesRes.error;
@@ -471,6 +476,7 @@ export default function CrmSettingsPage() {
         });
         setMaxBotToken("");
       }
+      if (maxQueueRes?.ok) setMaxQueue(maxQueueRes.items || []);
 
       // Load discount data
       const [dtRes, daRes, guardiansRes, studentsRes] = await Promise.all([
@@ -1316,6 +1322,7 @@ export default function CrmSettingsPage() {
           webhookSecret: maxSettings.webhookSecret,
           webhookUrl: maxSettings.webhookUrl,
           botUsername: maxSettings.botUsername,
+          events: normalizeMaxEvents(maxSettings.settings?.events),
         }),
       });
       const payload = await response.json();
@@ -1332,6 +1339,28 @@ export default function CrmSettingsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function loadMaxQueue(status = maxQueueStatus) {
+    const response = await fetch(`/api/crm/bot-settings/max/queue${status === "all" ? "" : `?status=${status}`}`);
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось загрузить очередь MAX");
+    setMaxQueue(payload.items || []);
+  }
+
+  async function retryMaxQueueItem(id: string) {
+    const response = await fetch("/api/crm/bot-settings/max/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось повторить отправку");
+    await loadMaxQueue();
+  }
+
+  async function processMaxQueue() {
+    const response = await fetch("/api/jobs/notifications/process", { method: "POST" });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось обработать очередь");
+    setNotice(`MAX: обработано ${payload.processed}, отправлено ${payload.sent}, ошибок ${payload.failed}`);
+    await loadMaxQueue();
   }
 
   async function checkMaxBotToken() {
@@ -1808,6 +1837,7 @@ export default function CrmSettingsPage() {
                     </Button>
                   </div>
                 </div>
+
               </form>
             </>
           )}
@@ -2070,6 +2100,28 @@ export default function CrmSettingsPage() {
                     <Button type="submit" variant="primary-crm" disabled={saving}>
                       <Save size={16} /> Сохранить MAX
                     </Button>
+                  </div>
+                </div>
+
+                <div className="settings-card">
+                  <div className="settings-card-head"><div><h3>События</h3><p>Получатель и пример видны до включения события.</p></div></div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {maxEventDefinitions.map((event) => {
+                      const events = normalizeMaxEvents(maxSettings.settings?.events);
+                      return <label key={event.key} style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, border: "1px solid var(--color-border)", borderRadius: 10, padding: 12 }}>
+                        <input type="checkbox" checked={events[event.key]} onChange={(changeEvent) => setMaxSettings({ ...maxSettings, settings: { ...(maxSettings.settings || {}), events: { ...events, [event.key]: changeEvent.target.checked } } })} />
+                        <span><strong>{event.label}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{event.receiver} · {event.example}</small></span>
+                      </label>;
+                    })}
+                  </div>
+                </div>
+
+                <div className="settings-card">
+                  <div className="settings-card-head"><div><h3>Очередь уведомлений</h3><p>Последние 50 сообщений без телефонов, email и MAX ID.</p></div><div className="settings-actions"><select className="form-input" value={maxQueueStatus} onChange={(event) => { setMaxQueueStatus(event.target.value); void loadMaxQueue(event.target.value); }}><option value="all">Все</option><option value="pending">В очереди</option><option value="sent">Отправлены</option><option value="failed">Ошибки</option></select><Button type="button" variant="secondary-crm" onClick={() => void processMaxQueue()}>Обработать сейчас</Button></div></div>
+                  {maxQueue.some((item) => item.is_stale) && <div className="settings-muted" style={{ color: "var(--color-warning)" }}>Есть уведомления в очереди дольше 10 минут. Проверьте cron и токен MAX.</div>}
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {maxQueue.length === 0 && <div className="settings-empty">Очередь пуста</div>}
+                    {maxQueue.map((item) => { const guardian = Array.isArray(item.guardians) ? item.guardians[0] : item.guardians; const student = Array.isArray(item.students) ? item.students[0] : item.students; return <div key={item.id} style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", padding: "8px 0" }}><div><strong>{item.template_key}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{student?.full_name || "Ученик"} · {guardian?.full_name || "Родитель"} · попыток: {item.attempt_count || 0}</small>{item.error && <small style={{ display: "block", color: "var(--color-danger)" }}>{item.error}</small>}</div><span className={`badge ${item.status === "failed" ? "badge-red" : item.status === "sent" ? "badge-green" : "badge-amber"}`}>{item.status}</span>{item.status === "failed" && <Button type="button" variant="secondary-crm" onClick={() => void retryMaxQueueItem(item.id)}>Повторить</Button>}</div>; })}
                   </div>
                 </div>
               </form>

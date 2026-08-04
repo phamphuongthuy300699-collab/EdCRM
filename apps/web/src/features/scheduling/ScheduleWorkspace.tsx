@@ -58,6 +58,9 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
   const [createKind, setCreateKind] = useState<"regular" | "extra" | "trial">("extra");
   const [createReason, setCreateReason] = useState("");
   const [savingCreate, setSavingCreate] = useState(false);
+  const [notifyCreate, setNotifyCreate] = useState(true);
+  const [notifyChange, setNotifyChange] = useState(true);
+  const [notificationEvents, setNotificationEvents] = useState<Record<string, boolean>>({});
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => new Date(week.getTime() + index * 86400000)), [week]);
 
   const load = useCallback(async () => {
@@ -72,6 +75,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       setSessions(data.sessions || []);
       setGroups(data.groups || []);
       setMakeups(data.makeups || []);
+      setNotificationEvents(data.notificationEvents || {});
       setMaterializeGroupId((current) => current || data.groups?.[0]?.id || "");
       setCreateGroupId((current) => current || data.groups?.[0]?.id || "");
     } catch (reason: any) {
@@ -94,9 +98,12 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     const date = new Date(session.starts_at);
     const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(date).replace(" ", "T");
     setChange({ type, session });
+    setNotifyChange(type === "reschedule" ? dataEvent("lesson_rescheduled") : dataEvent("lesson_cancelled"));
     setNewStartsAt(parts);
     setChangeReason(session.change_reason || "");
   };
+
+  const dataEvent = (key: string) => notificationEvents[key] !== false;
 
   const submitChange = async () => {
     if (!change || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)) return;
@@ -104,8 +111,8 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     setError("");
     try {
       await mutate(change.type === "reschedule"
-        ? { action: "reschedule", sessionId: change.session.id, startsAt: new Date(`${newStartsAt}:00+03:00`).toISOString(), reason: changeReason.trim() }
-        : { action: "cancel", sessionId: change.session.id, reason: changeReason.trim() });
+        ? { action: "reschedule", sessionId: change.session.id, startsAt: new Date(`${newStartsAt}:00+03:00`).toISOString(), reason: changeReason.trim(), notifyGuardians: notifyChange }
+        : { action: "cancel", sessionId: change.session.id, reason: changeReason.trim(), notifyGuardians: notifyChange });
       setChange(null);
     } catch (reason: any) {
       setError(reason.message || "Не удалось изменить занятие");
@@ -134,6 +141,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     setCreateEndsAt(moscowDateTimeInput(ends));
     setCreateKind("extra");
     setCreateReason("");
+    setNotifyCreate(dataEvent("lesson_scheduled"));
     setCreating(true);
   };
 
@@ -149,7 +157,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
         endsAt: new Date(`${createEndsAt}:00+03:00`).toISOString(),
         kind: createKind,
         reason: createReason.trim() || undefined,
-        notifyGroup: true,
+        notifyGuardians: notifyCreate,
       });
       setCreating(false);
     } catch (reason: any) {
@@ -255,8 +263,9 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
             <div style={{ display: "grid", gap: 13 }}>
               {change.type === "reschedule" && <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Новые дата и время<input autoFocus type="datetime-local" className="form-input" value={newStartsAt} onChange={(event) => setNewStartsAt(event.target.value)} /></label>}
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Причина<textarea autoFocus={change.type === "cancel"} className="form-input" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} rows={3} placeholder="Например: праздничный день" style={{ height: "auto", padding: 10 }} /></label>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={notifyChange} onChange={(event) => setNotifyChange(event.target.checked)} /> Уведомить родителей в MAX</label>
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Будет отправлено: группа, старая и новая дата (при переносе), причина и имя ребёнка.</div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingChange || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)} onClick={() => void submitChange()}>{savingChange ? "Сохранение…" : change.type === "reschedule" ? "Перенести и уведомить" : "Отменить и уведомить"}</Button></div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingChange || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)} onClick={() => void submitChange()}>{savingChange ? "Сохранение…" : change.type === "reschedule" ? "Перенести" : "Отменить"}</Button></div>
             </div>
           </div>
         </div>
@@ -274,8 +283,9 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
               </div>
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Тип<select className="form-input" value={createKind} onChange={(event) => setCreateKind(event.target.value as "regular" | "extra" | "trial")}><option value="extra">Дополнительное</option><option value="trial">Пробное</option><option value="regular">Обычное</option></select></label>
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Комментарий для родителей<input className="form-input" value={createReason} onChange={(event) => setCreateReason(event.target.value)} placeholder="Например: дополнительная подготовка к соревнованиям" /></label>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={notifyCreate} onChange={(event) => setNotifyCreate(event.target.checked)} /> Уведомить родителей в MAX</label>
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Перед созданием система проверит пересечение преподавателя и кабинета. Уведомление получат все связанные родители активных учеников группы.</div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить и уведомить"}</Button></div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить занятие"}</Button></div>
             </div>
           </div>
         </div>
