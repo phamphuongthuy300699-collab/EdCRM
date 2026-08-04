@@ -70,6 +70,10 @@ export async function requireBotStaff() {
 }
 
 export async function canProcessNotificationsWithRequest(request: Request) {
+  const vercelCronSecret = process.env.CRON_SECRET;
+  const authorization = request.headers.get("authorization") || "";
+  if (vercelCronSecret && authorization === `Bearer ${vercelCronSecret}`) return { ok: true as const, organizationId: null as string | null };
+
   const cronSecret = process.env.NOTIFICATIONS_CRON_SECRET;
   const provided = request.headers.get("x-cron-secret") || "";
   if (cronSecret && provided && provided === cronSecret) return { ok: true as const, organizationId: null as string | null };
