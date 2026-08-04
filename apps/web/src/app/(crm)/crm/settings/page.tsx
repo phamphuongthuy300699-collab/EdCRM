@@ -309,6 +309,7 @@ export default function CrmSettingsPage() {
   const [courseDraft, setCourseDraft] = useState<any | null>(null);
   const [groupDraft, setGroupDraft] = useState<any | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<any[]>([]);
+  const [rebuildFutureSessions, setRebuildFutureSessions] = useState(true);
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
   const [staffError, setStaffError] = useState("");
   const [uploadingStaffAvatar, setUploadingStaffAvatar] = useState(false);
@@ -920,6 +921,7 @@ export default function CrmSettingsPage() {
   }
 
   function openGroupModal(group?: any) {
+    setRebuildFutureSessions(true);
     setGroupDraft(group ? {
       id: group.id,
       title: group.title,
@@ -986,29 +988,31 @@ export default function CrmSettingsPage() {
         if (groupDraft.id) {
           const { error: updateError } = await (supabase.from("groups") as any).update(payload).eq("id", groupDraft.id);
           if (updateError) throw updateError;
-          await (supabase.from("group_schedule_rules") as any).delete().eq("group_id", groupDraft.id);
         } else {
           const { data: created, error: insertError } = await (supabase.from("groups") as any).insert(payload).select("id").single();
           if (insertError) throw insertError;
           groupId = created.id;
         }
 
-        if (scheduleDraft.length > 0) {
-          const rulesPayload = scheduleDraft.map((rule) => ({
-            organization_id: org.id,
-            group_id: groupId,
-            weekday: Number(rule.weekday),
-            starts_at: `${rule.starts_at}:00`,
-            ends_at: `${rule.ends_at}:00`,
-          }));
-          const { error: rulesError } = await (supabase.from("group_schedule_rules") as any).insert(rulesPayload);
-          if (rulesError) throw rulesError;
-        }
+        const scheduleResponse = await fetch("/api/crm/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "replace_group_rules",
+            groupId,
+            rules: scheduleDraft.map((rule) => ({ weekday: Number(rule.weekday), starts_at: rule.starts_at, ends_at: rule.ends_at })),
+            rebuildFuture: rebuildFutureSessions,
+          }),
+        });
+        const scheduleResult = await scheduleResponse.json();
+        if (!scheduleResponse.ok || !scheduleResult.ok) throw new Error(scheduleResult.error || "Не удалось обновить расписание");
+        const result = scheduleResult.result || {};
+        setNotice(`Группа сохранена. Правил: ${result.rules || 0}, удалено занятий: ${result.deleted || 0}, создано: ${result.created || 0}`);
         await loadData();
       }
       setGroupDraft(null);
       setScheduleDraft([]);
-      setNotice("Группа и расписание сохранены");
+      if (demo) setNotice("Группа и расписание сохранены");
     } catch (err: any) {
       setError(err.message || "Не удалось сохранить группу");
     } finally {
@@ -2279,6 +2283,10 @@ export default function CrmSettingsPage() {
                   </Button>
                 </div>
               ))}
+              <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginTop: "14px", cursor: "pointer" }}>
+                <input type="checkbox" checked={rebuildFutureSessions} onChange={(event) => setRebuildFutureSessions(event.target.checked)} />
+                <span><strong>Пересчитать будущие занятия</strong><br /><small>Пересоздать на 12 недель только будущие плановые занятия из правил. Переносы, отмены, отработки и проведённые уроки сохранятся.</small></span>
+              </label>
             </div>
             <div className="settings-form-actions"><Button type="submit" variant="primary-crm" disabled={saving}>Сохранить группу</Button></div>
           </form>

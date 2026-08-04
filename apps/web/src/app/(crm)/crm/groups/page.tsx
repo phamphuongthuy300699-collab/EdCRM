@@ -93,6 +93,7 @@ export default function CrmGroupsPage() {
   const [editAgeFrom, setEditAgeFrom] = useState("6");
   const [editAgeTo, setEditAgeTo] = useState("9");
   const [savingGroup, setSavingGroup] = useState(false);
+  const [rebuildFutureSessions, setRebuildFutureSessions] = useState(true);
 
   // Enrollment fields
   const [allStudents, setAllStudents] = useState<any[]>([]);
@@ -323,18 +324,12 @@ export default function CrmGroupsPage() {
 
       if (error) throw error;
 
-      // Parse and save schedule rules
+      // Save rules and concrete lessons through the transactional schedule contour.
       const rules = parseSchedule(newSchedule);
       if (!isDemoMode()) {
-        for (const rule of rules) {
-          await (supabase.from("group_schedule_rules") as any).insert({
-            organization_id: orgRes.data.id,
-            group_id: data.id,
-            weekday: rule.weekday,
-            starts_at: rule.starts_at,
-            ends_at: rule.ends_at
-          });
-        }
+        const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "replace_group_rules", groupId: data.id, rules, rebuildFuture: rebuildFutureSessions }) });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сформировать занятия");
       }
 
       const newGroupObj = {
@@ -425,23 +420,9 @@ export default function CrmGroupsPage() {
 
       if (groupErr) throw groupErr;
 
-      // Update schedule rules: delete old, insert new
-      const { error: deleteErr } = await (supabase
-        .from("group_schedule_rules") as any)
-        .delete()
-        .eq("group_id", editingGroupId);
-
-      if (deleteErr) throw deleteErr;
-
-      for (const rule of rules) {
-        await (supabase.from("group_schedule_rules") as any).insert({
-          organization_id: orgRes.data.id,
-          group_id: editingGroupId,
-          weekday: rule.weekday,
-          starts_at: rule.starts_at,
-          ends_at: rule.ends_at
-        });
-      }
+      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "replace_group_rules", groupId: editingGroupId, rules, rebuildFuture: rebuildFutureSessions }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сформировать занятия");
 
       await loadData();
       setShowEditModal(false);
@@ -807,6 +788,10 @@ export default function CrmGroupsPage() {
                 />
                 <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Это шаблон повторения. Конкретные занятия формируются в разделе «Расписание».</span>
               </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12 }}>
+                <input type="checkbox" checked={rebuildFutureSessions} onChange={(event) => setRebuildFutureSessions(event.target.checked)} />
+                <span><strong>Пересчитать будущие занятия</strong><br />Сформировать безопасный план на 12 недель.</span>
+              </label>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Преподаватель</label>
@@ -1061,8 +1046,12 @@ export default function CrmGroupsPage() {
                   value={editSchedule}
                   onChange={(e) => setEditSchedule(e.target.value)}
                 />
-                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Изменение шаблона не переносит уже созданные занятия. Переносите конкретную дату в разделе «Расписание».</span>
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Переносы конкретных дат сохраняются и не перезаписываются.</span>
               </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12 }}>
+                <input type="checkbox" checked={rebuildFutureSessions} onChange={(event) => setRebuildFutureSessions(event.target.checked)} />
+                <span><strong>Пересчитать будущие занятия</strong><br />Пересоздать на 12 недель только плановые занятия из правил.</span>
+              </label>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Преподаватель</label>

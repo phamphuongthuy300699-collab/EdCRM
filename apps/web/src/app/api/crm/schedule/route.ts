@@ -8,6 +8,12 @@ const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("replace_group_rules"),
+    groupId: z.string().uuid(),
+    rules: z.array(z.object({ weekday: z.number().int().min(1).max(7), starts_at: z.string(), ends_at: z.string() })),
+    rebuildFuture: z.boolean().default(true),
+  }),
   z.object({ action: z.literal("materialize"), groupId: z.string().uuid(), dateFrom: z.string(), dateTo: z.string() }),
   z.object({
     action: z.literal("create_session"),
@@ -91,6 +97,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (input.action === "replace_group_rules") {
+      if (!adminRoles.has(access.role)) return NextResponse.json({ ok: false, error: "Операция доступна администратору" }, { status: 403 });
+      const { data, error } = await admin.rpc("replace_group_schedule", {
+        p_organization_id: access.organizationId,
+        p_group_id: input.groupId,
+        p_rules: input.rules,
+        p_rebuild_future: input.rebuildFuture,
+      });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, result: data });
+    }
+
     if (input.action === "create_session") {
       if (new Date(input.endsAt) <= new Date(input.startsAt)) {
         return NextResponse.json({ ok: false, error: "Время окончания должно быть позже начала" }, { status: 400 });
