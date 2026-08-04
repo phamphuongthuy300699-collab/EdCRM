@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
-import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import Link from "next/link";
 import { 
   Inbox, 
@@ -19,6 +18,7 @@ import {
 import { isDemoMode } from "@/shared/utils/demo";
 
 export default function CrmDashboard() {
+  const demoMode = isDemoMode();
   const [loading, setLoading] = useState(true);
   const [statsData, setStatsData] = useState({
     newLeadsCount: 0,
@@ -41,15 +41,15 @@ export default function CrmDashboard() {
       try {
         setLoading(true);
 
-        if (isDemoMode()) {
+        if (demoMode) {
           setLeads([
             { id: "l1", name: "Анна Петрова", phone: "+7 (905) 555-12-34", child: "Игорь, 8 лет", course: "LEGO Start", date: "Сегодня, 11:32", status: "new" },
             { id: "l2", name: "Сергей Волков", phone: "+7 (920) 222-33-44", child: "Алиса, 10 лет", course: "Scratch", date: "Сегодня, 09:15", status: "new" },
             { id: "l3", name: "Ольга Семенова", phone: "+7 (915) 333-55-66", child: "Кирилл, 7 лет", course: "LEGO Start", date: "Вчера, 18:20", status: "contacted" }
           ]);
           setSchedule([
-            { time: "17:00", name: "LEGO Start (6-8 лет)", room: "Каб. 101", teacher: "Алексей Д.", filled: "7/8 мест" },
-            { time: "18:30", name: "Scratch (8-11 лет)", room: "Каб. 102", teacher: "Мария С.", filled: "6/8 мест" }
+            { time: "17:00", name: "LEGO Start (6-8 лет)", room: "Лаборатория", teacher: "Алексей Д.", filled: "7/8 мест" },
+            { time: "18:30", name: "Scratch (8-11 лет)", room: "Компьютерный класс", teacher: "Мария С.", filled: "6/8 мест" }
           ]);
           setInvoices([
             { id: "i1", student: "Миша Сидоров", parent: "Дмитрий С.", amount: "4 000 ₽", due: "18.06.2026" },
@@ -68,120 +68,13 @@ export default function CrmDashboard() {
           return;
         }
 
-        const supabase = createSupabaseBrowserClient();
-
-        // 1. Leads
-        const { data: leadsData } = await supabase
-          .from("leads")
-          .select("id, first_name, phone, child_name, course_id, status, created_at, courses(title)")
-          .order("created_at", { ascending: false });
-
-        // 2. Invoices
-        const { data: invoicesData } = await supabase
-          .from("invoices")
-          .select(`
-            id,
-            title,
-            amount,
-            status,
-            due_date,
-            students (
-              id,
-              full_name,
-              student_guardians (
-                guardians (
-                  full_name
-                )
-              )
-            )
-          `);
-
-        // 3. Students
-        const { data: studentsData } = await supabase
-          .from("students")
-          .select("id, status");
-
-        // 4. Groups & Enrollments
-        const { data: groupsData } = await supabase
-          .from("groups")
-          .select("id, title, capacity, profiles(full_name), courses(title), group_schedule_rules(weekday, starts_at)")
-          .eq("status", "active");
-
-        const { data: enrollmentsData } = await supabase
-          .from("enrollments")
-          .select("id")
-          .eq("status", "active");
-
-        // Calculations
-        const newLeads = leadsData?.filter((l: any) => l.status === "new") || [];
-        const newLeadsToday = leadsData?.filter((l: any) => l.status === "new" && new Date(l.created_at).toDateString() === new Date().toDateString()).length || 0;
-        
-        const overdueInvs = invoicesData?.filter((i: any) => i.status === "overdue") || [];
-        const overdueSum = overdueInvs.reduce((acc: number, curr: any) => acc + parseFloat(curr.amount || 0), 0);
-        
-        const activeStuds = studentsData?.filter((s: any) => s.status === "active") || [];
-        
-        const totalCapacity = groupsData?.reduce((acc: number, curr: any) => acc + (curr.capacity || 8), 0) || 0;
-        const enrolled = enrollmentsData?.length || 0;
-
-        setStatsData({
-          newLeadsCount: newLeads.length,
-          newLeadsToday,
-          overdueAmount: overdueSum,
-          overdueCount: overdueInvs.length,
-          activeGroupsCount: groupsData?.length || 0,
-          activeStudentsCount: activeStuds.length,
-          totalCapacity,
-          enrolledCount: enrolled
-        });
-
-        // Set recent leads
-        if (leadsData && leadsData.length > 0) {
-          setLeads(leadsData.slice(0, 3).map((l: any) => ({
-            id: l.id,
-            name: l.first_name || "Без имени",
-            phone: l.phone || "",
-            child: l.child_name ? `${l.child_name}` : "Не указан",
-            course: l.courses?.title || "Не указан",
-            date: new Date(l.created_at).toLocaleDateString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
-            status: l.status
-          })));
-        } else {
-          setLeads([]);
-        }
-
-        // Set overdue invoices list
-        if (overdueInvs.length > 0) {
-          setInvoices(overdueInvs.slice(0, 3).map((i: any) => {
-            const firstGuardian = i.students?.student_guardians?.[0]?.guardians;
-            return {
-              id: i.id,
-              student: i.students?.full_name || "Неизвестно",
-              parent: firstGuardian?.full_name || "Не указан",
-              amount: `${parseFloat(i.amount).toLocaleString()} ₽`,
-              due: i.due_date ? new Date(i.due_date).toLocaleDateString("ru-RU") : "Не установлен"
-            };
-          }));
-        } else {
-          setInvoices([]);
-        }
-
-        // Set schedule
-        if (groupsData && groupsData.length > 0) {
-          setSchedule(groupsData.slice(0, 3).map((g: any, idx: number) => {
-            const rule = g.group_schedule_rules?.[0];
-            const time = rule ? rule.starts_at.slice(0, 5) : "18:00";
-            return {
-              time,
-              name: g.title,
-              room: `Каб. ${101 + idx}`,
-              teacher: g.profiles?.full_name || "Не назначен",
-              filled: `${enrolled} мест`
-            };
-          }));
-        } else {
-          setSchedule([]);
-        }
+        const response = await fetch("/api/crm/dashboard");
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось загрузить дашборд");
+        setStatsData(payload.stats);
+        setLeads(payload.leads || []);
+        setSchedule(payload.sessions || []);
+        setInvoices(payload.invoices || []);
       } catch (err) {
         console.error("Error loading dashboard data:", err);
         setLeads([]);
@@ -193,7 +86,7 @@ export default function CrmDashboard() {
     }
 
     loadDashboardData();
-  }, []);
+  }, [demoMode]);
 
   const stats = [
     { name: "Новые заявки", value: String(statsData.newLeadsCount), icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: `+${statsData.newLeadsToday} новые за сегодня` },
@@ -207,8 +100,8 @@ export default function CrmDashboard() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px" }}>
-            Рабочий стол
+          <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", color: "var(--color-text)", marginBottom: "4px", display: "flex", gap: "12px", alignItems: "center" }}>
+            Рабочий стол {demoMode && <span className="badge badge-amber">Демо-режим</span>}
           </h1>
           <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
             Сегодня: {new Date().toLocaleDateString("ru-RU", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -396,6 +289,11 @@ export default function CrmDashboard() {
           <div className="card-crm" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <h3 style={{ fontSize: "1.125rem", fontFamily: "var(--font-geologica)" }}>Занятия на сегодня</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {!loading && schedule.length === 0 && (
+                <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-small)" }}>
+                  На сегодня конкретные занятия не сформированы
+                </div>
+              )}
               {schedule.map((session, idx) => (
                 <div key={idx} style={{
                   display: "flex",
@@ -411,6 +309,9 @@ export default function CrmDashboard() {
                     </div>
                     <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>
                       {session.room} · {session.teacher}
+                    </span>
+                    <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)", display: "block" }}>
+                      {session.kind} · {session.status}
                     </span>
                   </div>
                   <span className="badge badge-blue">{session.filled}</span>

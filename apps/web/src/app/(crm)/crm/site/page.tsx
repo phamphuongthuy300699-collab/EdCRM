@@ -162,6 +162,7 @@ export default function CrmSitePage() {
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
+  const [heroSecondaryCtaText, setHeroSecondaryCtaText] = useState("");
   const [heroBullets, setHeroBullets] = useState<string[]>([]);
   const [newBullet, setNewBullet] = useState("");
 
@@ -386,6 +387,7 @@ export default function CrmSitePage() {
         setHeroSubtitle(hero?.subtitle || "");
         setHeroBadge(hero?.content?.badge || "");
         setHeroCtaText(hero?.content?.ctaText || "");
+        setHeroSecondaryCtaText(hero?.content?.secondaryCtaText || "");
         setHeroBullets(hero?.content?.bullets || []);
 
         // Portal Preview
@@ -684,6 +686,7 @@ export default function CrmSitePage() {
       await saveBlock("home.hero", heroTitle, heroSubtitle, {
         badge: heroBadge,
         ctaText: heroCtaText,
+        secondaryCtaText: heroSecondaryCtaText,
         bullets: heroBullets
       });
       await saveBlock("home.parent_student_portal_preview", portalTitle, portalSubtitle, {
@@ -1679,6 +1682,10 @@ export default function CrmSitePage() {
                   <label className="form-label">Текст кнопки призыва к действию (CTA)</label>
                   <input type="text" className="form-input" value={heroCtaText} onChange={e => setHeroCtaText(e.target.value)} required />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Текст второй кнопки</label>
+                  <input type="text" className="form-input" value={heroSecondaryCtaText} onChange={e => setHeroSecondaryCtaText(e.target.value)} required />
+                </div>
 
                 <div className="form-group">
                   <label className="form-label">Преимущества (список)</label>
@@ -2344,6 +2351,7 @@ export default function CrmSitePage() {
           {/* TAB 4: PRICES & TARIFFS */}
           {activeTab === "prices" && (
             <div style={{ display: "grid", gap: "24px" }}>
+              <div style={{ padding: "12px 14px", border: "1px solid var(--color-primary-soft)", borderRadius: "10px", background: "#F8FAFF", color: "var(--color-text-muted)", fontSize: "12px" }}>Цены редактируются в разделе “Направления и цены”. Публичный сайт использует только опубликованные записи `course_tariffs`.</div>
               <div className="card-crm">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>
                   <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Публичные тарифы Робокс</h3>

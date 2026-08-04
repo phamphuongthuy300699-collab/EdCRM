@@ -235,10 +235,6 @@ export default function LandingPageClient({
     teacherNote: "Наставник отмечает уверенный прогресс и аккуратную работу над проектом."
   };
 
-  const pricesBlock = getBlock('home.prices');
-  const trialPrice = pricesBlock?.content?.trialPrice || "0 ₽";
-  const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
-  const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
   const primaryBranch = initialBranches?.[0] || null;
   const contactBranches = publicMapBranches(initialBranches || []);
   const contactMapMarkers = resolveBranchMapMarkers(contactBranches);
@@ -365,6 +361,8 @@ export default function LandingPageClient({
       age: item.age,
       course: item.course,
       time: item.time,
+      scheduleLines: item.scheduleLines,
+      nearestLesson: item.nearestLesson,
       branch: item.branch || "",
       teacher: item.teacher || "",
       spotsText,
@@ -431,12 +429,7 @@ export default function LandingPageClient({
         }}>
           {/* Hero Left Content */}
           <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>🤖 Дошкольники и школьники</span>
-              <span className="badge badge-purple" style={{ background: "rgba(70, 62, 142, 0.08)", color: "var(--roboks-purple)", fontWeight: 800 }}>📍 2 адреса в Липецке</span>
-              <span className="badge badge-green" style={{ background: "#DCFCE7", color: "#15803D", fontWeight: 800 }}>👥 Мини-группы</span>
-              <span className="badge badge-red" style={{ background: "rgba(218, 60, 140, 0.08)", color: "var(--roboks-pink)", fontWeight: 800 }}>⚡️ 100% Практика</span>
-            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}><span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>{heroBadge}</span></div>
 
             <h1 style={{
               fontSize: "clamp(2.2rem, 5.5vw, 3.4rem)",
@@ -447,7 +440,7 @@ export default function LandingPageClient({
               fontWeight: 900,
               letterSpacing: "-0.03em"
             }}>
-              Робототехника и программирование для детей в Липецке
+              {heroTitle}
             </h1>
 
             <p style={{
@@ -457,7 +450,7 @@ export default function LandingPageClient({
               lineHeight: 1.65,
               fontWeight: 500
             }}>
-              Занятия для дошкольников и школьников: LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch и первые цифровые проекты.
+              {heroSubtitle}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
@@ -475,18 +468,18 @@ export default function LandingPageClient({
                     alignItems: "center",
                     gap: "8px"
                   }}>
-                    Записаться на пробное занятие
+                    {heroCtaText}
                     <ArrowRight size={18} />
                   </Button>
                 </a>
-                <a href="#schedule">
+                <a href="#projects">
                   <Button variant="secondary-site" style={{ 
                     height: "54px", 
                     padding: "0 32px",
                     fontWeight: 750,
                     borderRadius: "14px"
                   }}>
-                    Посмотреть расписание
+                    {heroSecondaryCtaText}
                   </Button>
                 </a>
               </div>
@@ -1178,7 +1171,10 @@ export default function LandingPageClient({
                   
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Расписание</span>
-                    <span style={{ fontWeight: 650, fontSize: "14px" }}>{sched.time}</span>
+                    {(sched.scheduleLines?.length ? sched.scheduleLines : [sched.time]).map((line: string) => (
+                      <span key={line} style={{ fontWeight: 650, fontSize: "14px" }}>{line}</span>
+                    ))}
+                    {sched.nearestLesson && <span style={{ fontSize: "12px", color: "var(--color-primary)", marginTop: "3px" }}>{sched.nearestLesson}</span>}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
