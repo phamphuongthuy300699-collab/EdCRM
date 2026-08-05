@@ -42,4 +42,6 @@ export type SiteMediaSlotDraft = {
   image?: SingleImageValue | null;
   images?: ImageCollectionItem[];
   layout?: ImageCollectionLayout;
+  title?: string;
+  subtitle?: string;
 };

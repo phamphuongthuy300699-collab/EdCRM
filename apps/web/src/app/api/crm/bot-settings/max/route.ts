@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { newWebhookSecret, requireBotStaff } from "@/lib/bots/max/utils";
+import { normalizeMaxEvents } from "@/lib/bots/max/events";
 
 const DEFAULT_MAX_WEBHOOK_URL = "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook";
 
@@ -11,6 +12,7 @@ const payloadSchema = z.object({
   webhookSecret: z.string().optional(),
   webhookUrl: z.string().optional(),
   botUsername: z.string().optional(),
+  events: z.record(z.string(), z.boolean()).optional(),
 });
 
 function sanitize(row: any) {
@@ -20,7 +22,7 @@ function sanitize(row: any) {
     webhookSecret: row?.webhook_secret || "",
     webhookUrl: row?.webhook_url || DEFAULT_MAX_WEBHOOK_URL,
     botUsername: row?.bot_username || "",
-    settings: row?.settings || {},
+    settings: { ...(row?.settings || {}), events: normalizeMaxEvents(row?.settings?.events) },
   };
 }
 
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
       webhook_secret: webhookSecret,
       bot_username: parsed.data.botUsername?.trim() || null,
       webhook_url: parsed.data.webhookUrl?.trim() || DEFAULT_MAX_WEBHOOK_URL,
-      settings: current?.settings || {},
+      settings: { ...(current?.settings || {}), events: normalizeMaxEvents(parsed.data.events ?? current?.settings?.events) },
       updated_at: new Date().toISOString(),
     },
     { onConflict: "organization_id,provider" },

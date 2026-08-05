@@ -3,11 +3,18 @@ import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
 import { materializeRuleOccurrences, type AttendanceStatus } from "@/features/scheduling/domain";
 import { enqueueScheduleNotifications } from "@/features/scheduling/server";
+import { normalizeMaxEvents } from "@/lib/bots/max/events";
 
 const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("replace_group_rules"),
+    groupId: z.string().uuid(),
+    rules: z.array(z.object({ weekday: z.number().int().min(1).max(7), starts_at: z.string(), ends_at: z.string() })),
+    rebuildFuture: z.boolean().default(true),
+  }),
   z.object({ action: z.literal("materialize"), groupId: z.string().uuid(), dateFrom: z.string(), dateTo: z.string() }),
   z.object({
     action: z.literal("create_session"),
@@ -17,10 +24,10 @@ const actionSchema = z.discriminatedUnion("action", [
     kind: z.enum(["regular", "extra", "trial"]).default("extra"),
     topic: z.string().max(500).optional(),
     reason: z.string().max(500).optional(),
-    notifyGroup: z.boolean().default(true),
+    notifyGuardians: z.boolean().default(true),
   }),
-  z.object({ action: z.literal("reschedule"), sessionId: z.string().uuid(), startsAt: z.string().datetime(), endsAt: z.string().datetime().nullable().optional(), reason: z.string().min(1).max(500) }),
-  z.object({ action: z.literal("cancel"), sessionId: z.string().uuid(), reason: z.string().min(1).max(500) }),
+  z.object({ action: z.literal("reschedule"), sessionId: z.string().uuid(), startsAt: z.string().datetime(), endsAt: z.string().datetime().nullable().optional(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
+  z.object({ action: z.literal("cancel"), sessionId: z.string().uuid(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
   z.object({ action: z.literal("schedule_makeup"), makeupAssignmentId: z.string().uuid(), targetSessionId: z.string().uuid(), notes: z.string().max(500).optional() }),
   z.object({
     action: z.literal("save_attendance"),
@@ -76,7 +83,8 @@ export async function GET(request: Request) {
   let groupsQuery = admin.from("groups").select("id, title").eq("organization_id", access.organizationId).eq("status", "active").order("title");
   if (visibleGroupIds) groupsQuery = groupsQuery.in("id", visibleGroupIds);
   const { data: groups } = await groupsQuery;
-  return NextResponse.json({ ok: true, sessions: sessions || [], makeups: makeups || [], groups: groups || [] });
+  const { data: botSettings } = await admin.from("bot_settings").select("settings").eq("organization_id", access.organizationId).eq("provider", "max").maybeSingle();
+  return NextResponse.json({ ok: true, sessions: sessions || [], makeups: makeups || [], groups: groups || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
 }
 
 export async function POST(request: Request) {
@@ -91,6 +99,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (input.action === "replace_group_rules") {
+      if (!adminRoles.has(access.role)) return NextResponse.json({ ok: false, error: "Операция доступна администратору" }, { status: 403 });
+      const { data, error } = await admin.rpc("replace_group_schedule", {
+        p_organization_id: access.organizationId,
+        p_group_id: input.groupId,
+        p_rules: input.rules,
+        p_rebuild_future: input.rebuildFuture,
+      });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, result: data });
+    }
+
     if (input.action === "create_session") {
       if (new Date(input.endsAt) <= new Date(input.startsAt)) {
         return NextResponse.json({ ok: false, error: "Время окончания должно быть позже начала" }, { status: 400 });
@@ -128,10 +148,10 @@ export async function POST(request: Request) {
         session_kind: input.kind,
         topic: input.topic || null,
         change_reason: input.reason || null,
-        notification_status: input.notifyGroup ? "pending" : "not_required",
+        notification_status: input.notifyGuardians ? "pending" : "not_required",
       }).select("id").single();
       if (createError || !created) throw createError || new Error("Не удалось создать занятие");
-      if (input.notifyGroup) {
+      if (input.notifyGuardians) {
         const queued = await enqueueScheduleNotifications(admin, {
           organizationId: access.organizationId,
           templateKey: "lesson_scheduled",
@@ -199,18 +219,22 @@ export async function POST(request: Request) {
         p_reason: input.reason,
       });
       if (rescheduleError || !createdId) throw rescheduleError || new Error("Не удалось создать занятие на новую дату");
-      const queued = await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "lesson_rescheduled", lessonSessionId: createdId, groupId: source.group_id, payload: { groupTitle: source.groups?.title, oldStartsAt: source.starts_at, startsAt: input.startsAt, reason: input.reason } });
-      if (!queued) await admin.from("lesson_sessions").update({ notification_status: "not_required" }).eq("id", createdId);
+      if (input.notifyGuardians) {
+        const queued = await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "lesson_rescheduled", lessonSessionId: createdId, groupId: source.group_id, payload: { groupTitle: source.groups?.title, oldStartsAt: source.starts_at, startsAt: input.startsAt, reason: input.reason } });
+        if (!queued) await admin.from("lesson_sessions").update({ notification_status: "not_required" }).eq("id", createdId);
+      } else await admin.from("lesson_sessions").update({ notification_status: "not_required" }).eq("id", createdId);
       return NextResponse.json({ ok: true, sessionId: createdId, oldStartsAt: source.starts_at });
     }
 
     if (input.action === "cancel") {
       const session = await loadSession(admin, access.organizationId, input.sessionId);
       if (session.status !== "planned") return NextResponse.json({ ok: false, error: "Отменить можно только предстоящее занятие" }, { status: 409 });
-      const { error } = await admin.from("lesson_sessions").update({ status: "cancelled", change_reason: input.reason, cancelled_at: new Date().toISOString(), notification_status: "pending" }).eq("organization_id", access.organizationId).eq("id", session.id);
+      const { error } = await admin.from("lesson_sessions").update({ status: "cancelled", change_reason: input.reason, cancelled_at: new Date().toISOString(), notification_status: input.notifyGuardians ? "pending" : "not_required" }).eq("organization_id", access.organizationId).eq("id", session.id);
       if (error) throw error;
-      const queued = await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "lesson_cancelled", lessonSessionId: session.id, groupId: session.group_id, payload: { groupTitle: session.groups?.title, startsAt: session.starts_at, reason: input.reason } });
-      if (!queued) await admin.from("lesson_sessions").update({ notification_status: "not_required" }).eq("id", session.id);
+      if (input.notifyGuardians) {
+        const queued = await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "lesson_cancelled", lessonSessionId: session.id, groupId: session.group_id, payload: { groupTitle: session.groups?.title, startsAt: session.starts_at, reason: input.reason } });
+        if (!queued) await admin.from("lesson_sessions").update({ notification_status: "not_required" }).eq("id", session.id);
+      }
       return NextResponse.json({ ok: true });
     }
 

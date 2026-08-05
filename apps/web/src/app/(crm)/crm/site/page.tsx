@@ -42,6 +42,7 @@ import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { normalizeImageCollection, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
 import { SiteMediaBlocksEditor } from "@/features/site-editor/media/SiteMediaBlocksEditor";
 import { createSiteMediaDrafts, type SiteMediaSlot } from "@/features/site-editor/media/site-media-slots";
+import { serializeContentImage } from "@/shared/utils/site-media-content";
 import type { ImageCollectionItem, ImageCollectionLayout, MediaLibraryFile, SiteMediaSlotDraft } from "@/features/site-editor/media/types";
 import { hasUnsavedMedia, setMediaSlotDirty, type DirtyMediaSlots } from "@/features/site-editor/media/unsaved-media";
 import { getPublicSiteConfig } from "@/shared/config/public-site";
@@ -161,6 +162,7 @@ export default function CrmSitePage() {
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
+  const [heroSecondaryCtaText, setHeroSecondaryCtaText] = useState("");
   const [heroBullets, setHeroBullets] = useState<string[]>([]);
   const [newBullet, setNewBullet] = useState("");
 
@@ -385,6 +387,7 @@ export default function CrmSitePage() {
         setHeroSubtitle(hero?.subtitle || "");
         setHeroBadge(hero?.content?.badge || "");
         setHeroCtaText(hero?.content?.ctaText || "");
+        setHeroSecondaryCtaText(hero?.content?.secondaryCtaText || "");
         setHeroBullets(hero?.content?.bullets || []);
 
         // Portal Preview
@@ -632,7 +635,7 @@ export default function CrmSitePage() {
     const existing = siteBlocks.find((block: any) => block.block_key === slot.blockKey);
     const content = { ...(existing?.content || {}) };
     if (slot.mode === "single") {
-      content[slot.field] = draft.image?.path || "";
+      content[slot.field] = slot.blockKey === "contacts.media" ? serializeContentImage(draft.image) : draft.image?.path || "";
     } else {
       const images = draft.images || [];
       content[slot.field] = slot.field === "items" || slot.field === "steps" ? blockItemsFromCollection(images) : images;
@@ -656,6 +659,23 @@ export default function CrmSitePage() {
     setSuccessMsg(`Изображения блока «${slot.label}» сохранены`);
   };
 
+  const handleSaveFacilitiesMedia = async (input: { title: string; subtitle: string; mainImage: SiteMediaSlotDraft["image"]; equipmentImage: SiteMediaSlotDraft["image"]; workspaceImage: SiteMediaSlotDraft["image"] }) => {
+    const existing = siteBlocks.find((block: any) => block.block_key === "home.facilities");
+    const content = {
+      ...(existing?.content || {}),
+      mainImage: serializeContentImage(input.mainImage),
+      equipmentImage: serializeContentImage(input.equipmentImage),
+      workspaceImage: serializeContentImage(input.workspaceImage),
+    };
+    await saveBlock("home.facilities", input.title || "Фото классов и оборудования", input.subtitle, content);
+    setSiteBlocks((current) => {
+      const next = { ...(existing || {}), block_key: "home.facilities", title: input.title, subtitle: input.subtitle, content };
+      return current.some((block: any) => block.block_key === "home.facilities") ? current.map((block: any) => block.block_key === "home.facilities" ? next : block) : [...current, next];
+    });
+    setDirtyMediaSlots((current) => ["facilities-main", "facilities-equipment", "facilities-workspace"].reduce((state, slotId) => setMediaSlotDirty(state, slotId, false), current));
+    setSuccessMsg("Блок «Фото классов и оборудования» сохранён");
+  };
+
   // Tab 1: Save Home/Hero
   const handleSaveHome = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -666,6 +686,7 @@ export default function CrmSitePage() {
       await saveBlock("home.hero", heroTitle, heroSubtitle, {
         badge: heroBadge,
         ctaText: heroCtaText,
+        secondaryCtaText: heroSecondaryCtaText,
         bullets: heroBullets
       });
       await saveBlock("home.parent_student_portal_preview", portalTitle, portalSubtitle, {
@@ -1067,10 +1088,9 @@ export default function CrmSitePage() {
 
       if (!title) {
         if (blockKey === "home.media") { title = "Медиа главной"; subtitle = "Изображения первого экрана"; }
-        else if (blockKey === "home.facilities") { title = "Фото помещений"; subtitle = "Наши учебные классы"; }
+        else if (blockKey === "home.facilities") { title = "Фото классов и оборудования"; subtitle = "Наши учебные классы"; }
         else if (blockKey === "home.student_projects") { title = "Проекты учеников"; subtitle = "Инженерные разработки"; }
         else if (blockKey === "home.lesson_process") { title = "Как проходят занятия"; subtitle = "Этапы уроков"; }
-        else if (blockKey === "home.equipment") { title = "Классы и оборудование"; subtitle = "Материалы и стенды"; }
         else if (blockKey === "contacts.media") { title = "Медиа контактов"; subtitle = "Фотографии контактов"; }
         else if (blockKey === "site.footer") { title = "Футер сайта"; subtitle = "Параметры отображения нижней части страниц"; }
         else { title = blockKey; subtitle = ""; }
@@ -1088,7 +1108,10 @@ export default function CrmSitePage() {
         };
         mergedContent[fieldName] = mergeSiteImageItems(currentImages, filesToAssign, metaByPath);
       } else {
-        mergedContent[fieldName] = mediaPath(filesToAssign[0]);
+        const path = mediaPath(filesToAssign[0]);
+        mergedContent[fieldName] = blockKey === "contacts.media" || blockKey === "home.facilities"
+          ? { path, title: selectedFileTitle || readableMediaTitle(path), alt: selectedFileAlt || selectedFileTitle || readableMediaTitle(path), objectPosition: "50% 50%" }
+          : path;
       }
 
       await saveBlock(blockKey, title, subtitle, mergedContent);
@@ -1443,11 +1466,17 @@ export default function CrmSitePage() {
       );
     }
 
+    if (activeMediaFolder === "facilities" || activeMediaFolder === "equipment") {
+      return <div style={{ display: "grid", gap: 8 }}>
+        <Button type="button" variant="primary-crm" onClick={() => handleAssignFileToBlock("home.facilities", "mainImage", false)} style={actionButtonStyle}>Использовать как основное большое фото</Button>
+        <Button type="button" variant="secondary-crm" onClick={() => handleAssignFileToBlock("home.facilities", "equipmentImage", false)} style={actionButtonStyle}>Использовать как оборудование</Button>
+        <Button type="button" variant="secondary-crm" onClick={() => handleAssignFileToBlock("home.facilities", "workspaceImage", false)} style={actionButtonStyle}>Использовать как рабочую зону</Button>
+      </div>;
+    }
+
     const folderActions: Record<string, { blockKey: string; label: string }> = {
-      facilities: { blockKey: "home.facilities", label: "Добавить в “Фото помещений”" },
       "student-projects": { blockKey: "home.student_projects", label: "Добавить в “Проекты учеников”" },
       "lesson-process": { blockKey: "home.lesson_process", label: "Добавить в “Как проходят занятия”" },
-      equipment: { blockKey: "home.equipment", label: "Добавить в “Классы и оборудование”" },
     };
 
     const arrayAction = folderActions[activeMediaFolder];
@@ -1652,6 +1681,10 @@ export default function CrmSitePage() {
                 <div className="form-group">
                   <label className="form-label">Текст кнопки призыва к действию (CTA)</label>
                   <input type="text" className="form-input" value={heroCtaText} onChange={e => setHeroCtaText(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Текст второй кнопки</label>
+                  <input type="text" className="form-input" value={heroSecondaryCtaText} onChange={e => setHeroSecondaryCtaText(e.target.value)} required />
                 </div>
 
                 <div className="form-group">
@@ -2318,6 +2351,7 @@ export default function CrmSitePage() {
           {/* TAB 4: PRICES & TARIFFS */}
           {activeTab === "prices" && (
             <div style={{ display: "grid", gap: "24px" }}>
+              <div style={{ padding: "12px 14px", border: "1px solid var(--color-primary-soft)", borderRadius: "10px", background: "#F8FAFF", color: "var(--color-text-muted)", fontSize: "12px" }}>Цены редактируются в разделе “Направления и цены”. Публичный сайт использует только опубликованные записи `course_tariffs`.</div>
               <div className="card-crm">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: "8px" }}>
                   <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Публичные тарифы Робокс</h3>
@@ -2707,6 +2741,7 @@ export default function CrmSitePage() {
                   onLoadFolder={loadMediaFolder}
                   onUpload={uploadFilesToMedia}
                   onSave={handleSaveSiteMediaSlot}
+                  onSaveFacilities={handleSaveFacilitiesMedia}
                 />
               )}
 

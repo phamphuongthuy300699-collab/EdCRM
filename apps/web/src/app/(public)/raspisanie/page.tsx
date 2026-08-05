@@ -5,6 +5,7 @@ import { Calendar, ArrowLeft } from "lucide-react";
 import { publicSiteUrl, getPublicSiteConfig } from "@/shared/config/public-site";
 import { buildPublicMetadata, safeJsonLdStringify } from "@/shared/seo/public-metadata";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { formatNearestLesson, formatPublicScheduleRules, nearestLessonsByGroup } from "@/shared/utils/public-schedule";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -59,7 +60,7 @@ export default async function RaspisaniePage() {
           branch:branches(name, address, is_active, show_on_site),
           room:rooms(name),
           teacher:profiles(full_name),
-          schedule_rules:group_schedule_rules(weekday, starts_at),
+          schedule_rules:group_schedule_rules(weekday, starts_at, ends_at),
           enrollments(id, status)
         `)
         .eq("organization_id", org.id)
@@ -68,12 +69,16 @@ export default async function RaspisaniePage() {
         .order("sort_order", { ascending: true });
 
       if (groups && groups.length > 0) {
-        const daysMap: Record<number, string> = {
-          1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
-        };
-        const fullDaysMap: Record<number, string> = {
-          1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
-        };
+        const groupIds = groups.map((group: any) => group.id);
+        const { data: sessions } = await supabase
+          .from("lesson_sessions")
+          .select("group_id, starts_at")
+          .eq("organization_id", org.id)
+          .in("group_id", groupIds)
+          .in("status", ["planned", "live"])
+          .gte("starts_at", new Date().toISOString())
+          .order("starts_at", { ascending: true });
+        const nearestByGroup = nearestLessonsByGroup(sessions || []);
 
         scheduleToRender = groups
         .filter((g: any) => {
@@ -84,14 +89,7 @@ export default async function RaspisaniePage() {
           const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
           const spots = g.capacity - activeEnrollments;
 
-          const rules = g.schedule_rules || [];
-          let timeStr = "Время уточняется";
-          if (rules.length > 0) {
-            const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
-            const days = sortedRules.map((r: any) => sortedRules.length > 2 ? daysMap[r.weekday] : fullDaysMap[r.weekday]).filter(Boolean).join(" / ");
-            const startsAt = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
-            timeStr = `${days} ${startsAt}`;
-          }
+          const scheduleLines = formatPublicScheduleRules(g.schedule_rules || []);
 
           let spotsText = "Осталось несколько мест";
           let badgeClass = "badge-green";
@@ -109,7 +107,9 @@ export default async function RaspisaniePage() {
           return {
             age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
             course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
-            time: timeStr,
+            time: scheduleLines[0] || "Время уточняется",
+            scheduleLines,
+            nearestLesson: formatNearestLesson(nearestByGroup.get(g.id)),
             branch: (Array.isArray(g.branch) ? g.branch[0]?.name : (g.branch as any)?.name) || "",
             address: (Array.isArray(g.branch) ? g.branch[0]?.address : (g.branch as any)?.address) || "",
             room: (Array.isArray(g.room) ? g.room[0]?.name : (g.room as any)?.name) || "",
@@ -193,7 +193,10 @@ export default async function RaspisaniePage() {
                   <div key={idx} style={{ display: "grid", gridTemplateColumns: "0.8fr 1.3fr 1fr 1.2fr 1fr 1.1fr", padding: "24px 32px", borderBottom: idx < scheduleToRender.length - 1 ? "1px solid var(--color-border)" : "none", alignItems: "center", fontSize: "14px", gap: "12px" }}>
                     <span style={{ fontWeight: 700 }}>{sched.age}</span>
                     <span>{sched.course}</span>
-                    <span>{sched.time}</span>
+                    <span style={{ display: "grid", gap: "3px" }}>
+                      {(sched.scheduleLines?.length ? sched.scheduleLines : [sched.time]).map((line: string) => <span key={line}>{line}</span>)}
+                      {sched.nearestLesson && <small style={{ color: "var(--color-primary)" }}>{sched.nearestLesson}</small>}
+                    </span>
                     <span>{sched.branch || sched.address || "Адрес уточняется"}{sched.room ? ` · ${sched.room}` : ""}</span>
                     <span>{sched.teacher || "Наставник назначается"}</span>
                     <span className={`badge ${sched.badgeClass}`}>{sched.spotsText}</span>

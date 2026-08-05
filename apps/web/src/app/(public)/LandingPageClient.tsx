@@ -10,6 +10,8 @@ import { buildYandexStaticMapUrl, publicMapBranches, resolveBranchMapMarkers } f
 import { ImageCollectionGrid } from "@/features/site-editor/media/ImageCollectionGrid";
 import { activeCollectionImages, normalizeImageLayout } from "@/features/site-editor/media/image-collection";
 import { PublicLessonStepCard, PublicStudentProjectCard } from "@/features/site-editor/media/PublicSiteMediaCards";
+import { FacilitiesGallery } from "@/features/site-editor/media/FacilitiesGallery";
+import { resolveContactsMedia, resolveFacilitiesMedia } from "@/shared/utils/site-media-content";
 import { 
   Users, 
   Layers, 
@@ -233,10 +235,6 @@ export default function LandingPageClient({
     teacherNote: "Наставник отмечает уверенный прогресс и аккуратную работу над проектом."
   };
 
-  const pricesBlock = getBlock('home.prices');
-  const trialPrice = pricesBlock?.content?.trialPrice || "0 ₽";
-  const monthlyPrice = pricesBlock?.content?.monthlyPrice || "от 4 000 ₽";
-  const individualPrice = pricesBlock?.content?.individualPrice || "от 1 500 ₽";
   const primaryBranch = initialBranches?.[0] || null;
   const contactBranches = publicMapBranches(initialBranches || []);
   const contactMapMarkers = resolveBranchMapMarkers(contactBranches);
@@ -250,7 +248,6 @@ export default function LandingPageClient({
   const customHeroImage = mediaPath(homeMediaBlock?.content?.heroImage);
 
   const facilitiesBlock = getBlock('home.facilities');
-  const facilitiesImages = mediaItems(facilitiesBlock?.content?.images);
 
   const studentProjectsBlock = getBlock('home.student_projects');
   const studentProjectsContent = studentProjectsBlock?.content || {};
@@ -297,30 +294,12 @@ export default function LandingPageClient({
   const showTestimonials = testimonialsToRender.length > 0;
 
   const equipmentBlock = getBlock('home.equipment');
-  const equipmentImages = mediaItems(equipmentBlock?.content?.images);
+  const facilitiesMedia = resolveFacilitiesMedia(facilitiesBlock?.content, equipmentBlock?.content);
 
   const contactsMediaBlock = getBlock('contacts.media');
-  const contactsImages = mediaItems(contactsMediaBlock?.content?.images);
-  const contactFacadeImage = mediaPath(contactsMediaBlock?.content?.facadeImage) || mediaPath(contactsImages[1]);
-  const contactClassroomImage = mediaPath(contactsMediaBlock?.content?.classroomImage)
-    || mediaPath(contactsMediaBlock?.content?.image)
-    || mediaPath(contactsImages[2]);
+  const contactsMedia = resolveContactsMedia(contactsMediaBlock?.content);
 
-  const resolvedClassroomMainImage = facilitiesImages[0] 
-    ? mediaSrc(facilitiesImages[0])
-    : "/images/classroom_lipetsk.png";
-
-  const resolvedEquipmentTopImage = equipmentImages[0]
-    ? mediaSrc(equipmentImages[0])
-    : "/images/robot_sumo.png";
-
-  const resolvedEquipmentBottomImage = equipmentImages[1]
-    ? mediaSrc(equipmentImages[1])
-    : "/images/arduino_greenhouse.png";
-
-  const resolvedHeroImage = customHeroImage ? getMediaUrl(customHeroImage) : resolvedClassroomMainImage;
-  const resolvedContactFacadeImage = contactFacadeImage ? mediaSrc(contactFacadeImage) : resolvedEquipmentTopImage;
-  const resolvedContactClassroomImage = contactClassroomImage ? mediaSrc(contactClassroomImage) : resolvedClassroomMainImage;
+  const resolvedHeroImage = customHeroImage ? getMediaUrl(customHeroImage) : facilitiesMedia.mainImage ? getMediaUrl(facilitiesMedia.mainImage.path) : "/images/classroom_lipetsk.png";
 
   // Dynamic Courses Mapping
   const coursesToRender = (initialCourses && initialCourses.length > 0)
@@ -382,6 +361,8 @@ export default function LandingPageClient({
       age: item.age,
       course: item.course,
       time: item.time,
+      scheduleLines: item.scheduleLines,
+      nearestLesson: item.nearestLesson,
       branch: item.branch || "",
       teacher: item.teacher || "",
       spotsText,
@@ -448,12 +429,7 @@ export default function LandingPageClient({
         }}>
           {/* Hero Left Content */}
           <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>🤖 Дошкольники и школьники</span>
-              <span className="badge badge-purple" style={{ background: "rgba(70, 62, 142, 0.08)", color: "var(--roboks-purple)", fontWeight: 800 }}>📍 2 адреса в Липецке</span>
-              <span className="badge badge-green" style={{ background: "#DCFCE7", color: "#15803D", fontWeight: 800 }}>👥 Мини-группы</span>
-              <span className="badge badge-red" style={{ background: "rgba(218, 60, 140, 0.08)", color: "var(--roboks-pink)", fontWeight: 800 }}>⚡️ 100% Практика</span>
-            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}><span className="badge badge-blue" style={{ background: "rgba(142, 208, 221, 0.15)", color: "var(--roboks-purple)", fontWeight: 800 }}>{heroBadge}</span></div>
 
             <h1 style={{
               fontSize: "clamp(2.2rem, 5.5vw, 3.4rem)",
@@ -464,7 +440,7 @@ export default function LandingPageClient({
               fontWeight: 900,
               letterSpacing: "-0.03em"
             }}>
-              Робототехника и программирование для детей в Липецке
+              {heroTitle}
             </h1>
 
             <p style={{
@@ -474,7 +450,7 @@ export default function LandingPageClient({
               lineHeight: 1.65,
               fontWeight: 500
             }}>
-              Занятия для дошкольников и школьников: LEGO Education, WeDo 2.0, EV3, SPIKE Prime, Scratch и первые цифровые проекты.
+              {heroSubtitle}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
@@ -492,18 +468,18 @@ export default function LandingPageClient({
                     alignItems: "center",
                     gap: "8px"
                   }}>
-                    Записаться на пробное занятие
+                    {heroCtaText}
                     <ArrowRight size={18} />
                   </Button>
                 </a>
-                <a href="#schedule">
+                <a href="#projects">
                   <Button variant="secondary-site" style={{ 
                     height: "54px", 
                     padding: "0 32px",
                     fontWeight: 750,
                     borderRadius: "14px"
                   }}>
-                    Посмотреть расписание
+                    {heroSecondaryCtaText}
                   </Button>
                 </a>
               </div>
@@ -886,42 +862,14 @@ export default function LandingPageClient({
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "64px" }}>
             <h2 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)", marginBottom: "16px" }}>
-              Фото классов и оборудования
+              {facilitiesBlock?.title || "Фото классов и оборудования"}
             </h2>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-body-lg)" }}>
-              Современные компьютеры, оригинальные конструкторы LEGO Education и электронные стенды Arduino
+              {facilitiesBlock?.subtitle || "Современные компьютеры, оригинальные конструкторы LEGO Education и электронные стенды Arduino"}
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "24px" }}>
-            <div style={{ height: "400px", position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid var(--color-border)" }}>
-              <img 
-                src={resolvedClassroomMainImage} 
-                alt="Кабинет робототехники Липецк" 
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </div>
-            <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: "24px" }}>
-              <div style={{
-                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentTopImage}') center/cover no-repeat`,
-                borderRadius: "20px",
-                border: "1px solid var(--color-border)",
-                position: "relative",
-                height: "188px"
-              }}>
-                <span style={{ position: "absolute", bottom: "16px", left: "20px", fontSize: "12px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>Оригинальное оборудование LEGO</span>
-              </div>
-              <div style={{
-                background: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedEquipmentBottomImage}') center/cover no-repeat`,
-                borderRadius: "20px",
-                border: "1px solid var(--color-border)",
-                position: "relative",
-                height: "188px"
-              }}>
-                <span style={{ position: "absolute", bottom: "16px", left: "20px", fontSize: "12px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>Удобные рабочие зоны для детей</span>
-              </div>
-            </div>
-          </div>
+          <FacilitiesGallery mainImage={facilitiesMedia.mainImage} equipmentImage={facilitiesMedia.equipmentImage} workspaceImage={facilitiesMedia.workspaceImage} />
         </div>
       </section>
 
@@ -1223,7 +1171,10 @@ export default function LandingPageClient({
                   
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Расписание</span>
-                    <span style={{ fontWeight: 650, fontSize: "14px" }}>{sched.time}</span>
+                    {(sched.scheduleLines?.length ? sched.scheduleLines : [sched.time]).map((line: string) => (
+                      <span key={line} style={{ fontWeight: 650, fontSize: "14px" }}>{line}</span>
+                    ))}
+                    {sched.nearestLesson && <span style={{ fontSize: "12px", color: "var(--color-primary)", marginTop: "3px" }}>{sched.nearestLesson}</span>}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: "1 1 180px" }}>
@@ -1657,9 +1608,9 @@ export default function LandingPageClient({
               )}
             </div>
 
-            <div className="site-contact-photo-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-              <div style={{
-                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactFacadeImage}')`,
+            {(contactsMedia.facadeImage || contactsMedia.classroomImage) && <div className="site-contact-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "20px" }}>
+              {contactsMedia.facadeImage && <div style={{
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${getMediaUrl(contactsMedia.facadeImage.path)}')`,
                 backgroundPosition: "center",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
@@ -1668,10 +1619,10 @@ export default function LandingPageClient({
                 position: "relative",
                 height: "130px"
               }}>
-                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Фасад школы</span>
-              </div>
-              <div style={{
-                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${resolvedContactClassroomImage}')`,
+                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>{contactsMedia.facadeImage.title}</span>
+              </div>}
+              {contactsMedia.classroomImage && <div style={{
+                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45)), url('${getMediaUrl(contactsMedia.classroomImage.path)}')`,
                 backgroundPosition: "center",
                 backgroundSize: "cover",
                 backgroundRepeat: "no-repeat",
@@ -1680,9 +1631,9 @@ export default function LandingPageClient({
                 position: "relative",
                 height: "130px"
               }}>
-                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>Наш класс</span>
-              </div>
-            </div>
+                <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "10px", color: "white", background: "rgba(15, 23, 42, 0.75)", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>{contactsMedia.classroomImage.title}</span>
+              </div>}
+            </div>}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>

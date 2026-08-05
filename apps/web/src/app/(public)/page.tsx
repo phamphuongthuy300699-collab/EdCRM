@@ -11,6 +11,7 @@ import {
   resolveHomeSeo,
   safeJsonLdStringify,
 } from "@/shared/seo/public-metadata";
+import { formatNearestLesson, formatPublicScheduleRules, nearestLessonsByGroup } from "@/shared/utils/public-schedule";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -142,7 +143,7 @@ export default async function Page() {
           branch:branches(name, address),
           room:rooms(name),
           teacher:profiles(full_name),
-          schedule_rules:group_schedule_rules(weekday, starts_at),
+          schedule_rules:group_schedule_rules(weekday, starts_at, ends_at),
           enrollments(id, status)
         `)
         .eq("organization_id", org.id)
@@ -151,31 +152,23 @@ export default async function Page() {
         .order("sort_order", { ascending: true });
 
       if (groups) {
-        const daysMap: Record<number, string> = {
-          1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"
-        };
-        const fullDaysMap: Record<number, string> = {
-          1: "Понедельник", 2: "Вторник", 3: "Среда", 4: "Четверг", 5: "Пятница", 6: "Суббота", 7: "Воскресенье"
-        };
-
+        const groupIds = groups.map((group: any) => group.id);
+        const { data: sessions } = groupIds.length > 0
+          ? await supabase.from("lesson_sessions").select("group_id, starts_at").eq("organization_id", org.id).in("group_id", groupIds).in("status", ["planned", "live"]).gte("starts_at", new Date().toISOString()).order("starts_at", { ascending: true })
+          : { data: [] };
+        const nearestByGroup = nearestLessonsByGroup(sessions || []);
         initialSchedule = groups.map(g => {
           const activeEnrollments = g.enrollments?.filter((e: any) => e.status === "active")?.length || 0;
           const spots = g.capacity - activeEnrollments;
 
-          const rules = g.schedule_rules || [];
-          let timeStr = "Время уточняется";
-          if (rules.length > 0) {
-            // Sort by weekday
-            const sortedRules = [...rules].sort((a: any, b: any) => a.weekday - b.weekday);
-            const days = sortedRules.map((r: any) => sortedRules.length > 2 ? daysMap[r.weekday] : fullDaysMap[r.weekday]).filter(Boolean).join(" / ");
-            const startsAt = sortedRules[0]?.starts_at ? sortedRules[0].starts_at.substring(0, 5) : "";
-            timeStr = `${days} ${startsAt}`;
-          }
+          const scheduleLines = formatPublicScheduleRules(g.schedule_rules || []);
 
           return {
             age: g.age_from && g.age_to ? `${g.age_from}–${g.age_to} лет` : "6–14 лет",
             course: (Array.isArray(g.course) ? g.course[0]?.title : (g.course as any)?.title) || g.title,
-            time: timeStr,
+            time: scheduleLines[0] || "Время уточняется",
+            scheduleLines,
+            nearestLesson: formatNearestLesson(nearestByGroup.get(g.id)),
             branch: (Array.isArray(g.branch) ? g.branch[0]?.name : (g.branch as any)?.name) || "",
             address: (Array.isArray(g.branch) ? g.branch[0]?.address : (g.branch as any)?.address) || "",
             room: (Array.isArray(g.room) ? g.room[0]?.name : (g.room as any)?.name) || "",

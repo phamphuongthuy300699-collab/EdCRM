@@ -6,6 +6,8 @@ import { ImageCollectionEditor } from "./ImageCollectionEditor";
 import { normalizeImageLayout } from "./image-collection";
 import { SingleImageEditor } from "./SingleImageEditor";
 import { SITE_MEDIA_SLOTS, type SiteMediaSlot } from "./site-media-slots";
+import { FacilitiesBlockEditor } from "./FacilitiesBlockEditor";
+import { ContactsMediaPreview } from "./ContactsMediaPreview";
 import type { MediaLibraryFile, SiteMediaSlotDraft } from "./types";
 
 const groups = [
@@ -24,6 +26,7 @@ export function SiteMediaBlocksEditor({
   onSave,
   dirtySlots,
   onDirtyChange,
+  onSaveFacilities,
 }: {
   drafts: Record<string, SiteMediaSlotDraft>;
   mediaFolders: Array<{ id: string; label: string }>;
@@ -33,6 +36,7 @@ export function SiteMediaBlocksEditor({
   onSave: (slot: SiteMediaSlot, draft: SiteMediaSlotDraft) => Promise<void>;
   dirtySlots: Record<string, true>;
   onDirtyChange: (slotId: string, dirty: boolean) => void;
+  onSaveFacilities: (input: { title: string; subtitle: string; mainImage: SiteMediaSlotDraft["image"]; equipmentImage: SiteMediaSlotDraft["image"]; workspaceImage: SiteMediaSlotDraft["image"] }) => Promise<void>;
 }) {
   const [group, setGroup] = useState<(typeof groups)[number]["id"]>("home");
   return (
@@ -58,7 +62,14 @@ export function SiteMediaBlocksEditor({
       </div>
 
       <div className="site-media-slot-list">
+        <div style={{ display: group === "home" ? "block" : "none" }}>
+          <FacilitiesBlockEditor drafts={drafts} dirty={Boolean(dirtySlots["facilities-main"] || dirtySlots["facilities-equipment"] || dirtySlots["facilities-workspace"])} mediaFolders={mediaFolders} onDraftChange={onDraftChange} onDirtyChange={onDirtyChange} onLoadFolder={onLoadFolder} onUpload={onUpload} onSave={onSaveFacilities} />
+        </div>
+        <div style={{ display: group === "contacts" ? "block" : "none" }}>
+          <ContactsMediaPreview mapImage={drafts["contacts-map"]?.image || null} facadeImage={drafts["contacts-facade"]?.image || null} classroomImage={drafts["contacts-classroom"]?.image || null} images={drafts["contacts-gallery"]?.images || []} />
+        </div>
         {SITE_MEDIA_SLOTS.map((slot) => {
+          if (slot.id.startsWith("facilities-")) return null;
           const draft = drafts[slot.id] || {};
           return <div key={slot.id} style={{ display: slot.group === group ? "block" : "none", minWidth: 0, width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>{slot.mode === "single" ? (
             <SingleImageEditor

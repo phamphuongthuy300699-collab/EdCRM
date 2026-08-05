@@ -1,5 +1,6 @@
 import "server-only";
 import type { ScheduleNotificationKey } from "./domain";
+import { isMaxEventEnabled, type MaxEventKey } from "@/lib/bots/max/events";
 
 export async function enqueueScheduleNotifications(
   admin: any,
@@ -12,6 +13,13 @@ export async function enqueueScheduleNotifications(
     payload: Record<string, unknown>;
   },
 ) {
+  const { data: botSettings, error: settingsError } = await admin.from("bot_settings")
+    .select("is_enabled, settings")
+    .eq("organization_id", input.organizationId)
+    .eq("provider", "max")
+    .maybeSingle();
+  if (settingsError) throw settingsError;
+  if (!botSettings?.is_enabled || !isMaxEventEnabled(botSettings.settings, input.templateKey as MaxEventKey)) return 0;
   let studentIds = input.studentId ? [input.studentId] : [];
   if (!studentIds.length && input.groupId) {
     const { data: enrollments, error } = await admin.from("enrollments")

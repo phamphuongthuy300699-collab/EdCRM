@@ -166,10 +166,11 @@ describe("site editor media slot registry", () => {
   it("covers every image field stored in site content blocks", () => {
     expect(SITE_MEDIA_SLOTS.map(({ blockKey, field }) => `${blockKey}.${field}`)).toEqual([
       "home.media.heroImage",
-      "home.facilities.images",
+      "home.facilities.mainImage",
+      "home.facilities.equipmentImage",
+      "home.facilities.workspaceImage",
       "home.student_projects.items",
       "home.lesson_process.steps",
-      "home.equipment.images",
       "contacts.media.mapImage",
       "contacts.media.facadeImage",
       "contacts.media.classroomImage",
