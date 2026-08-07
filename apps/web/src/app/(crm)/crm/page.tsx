@@ -27,6 +27,7 @@ export default function CrmDashboard() {
     overdueCount: 0,
     activeGroupsCount: 0,
     activeStudentsCount: 0,
+    withoutGroup: 0,
     totalCapacity: 0,
     enrolledCount: 0
   });
@@ -62,6 +63,7 @@ export default function CrmDashboard() {
             overdueCount: 2,
             activeGroupsCount: 2,
             activeStudentsCount: 5,
+            withoutGroup: 0,
             totalCapacity: 16,
             enrolledCount: 13
           });
@@ -92,7 +94,7 @@ export default function CrmDashboard() {
     { name: "Новые заявки", value: String(statsData.newLeadsCount), icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: `+${statsData.newLeadsToday} новые за сегодня` },
     { name: "Просроченные счета", value: `${statsData.overdueAmount.toLocaleString()} ₽`, icon: CreditCard, color: "var(--color-danger)", bg: "var(--color-danger-soft)", desc: `${statsData.overdueCount} неоплаченных счета` },
     { name: "Активные группы", value: String(statsData.activeGroupsCount), icon: Calendar, color: "var(--color-warning)", bg: "var(--color-warning-soft)", desc: "Действующие классы" },
-    { name: "Активные ученики", value: String(statsData.activeStudentsCount), icon: Users, color: "var(--color-success)", bg: "var(--color-success-soft)", desc: `Заполненность: ${statsData.totalCapacity > 0 ? Math.round((statsData.enrolledCount / statsData.totalCapacity) * 100) : 0}%` }
+    { name: "Активные ученики", value: String(statsData.activeStudentsCount), icon: Users, color: "var(--color-success)", bg: "var(--color-success-soft)", desc: `Без группы: ${statsData.withoutGroup}` }
   ];
 
   return (
@@ -187,8 +189,8 @@ export default function CrmDashboard() {
             <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>активных групп</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
-            <span style={{ color: "var(--color-success)", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.activeStudentsCount}</span>
-            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>активных учеников</span>
+            <span style={{ color: "var(--color-success)", fontSize: "1.1rem", fontWeight: 800 }}>{statsData.withoutGroup}</span>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-xs)" }}>активных учеников без группы</span>
           </div>
         </div>
       </div>

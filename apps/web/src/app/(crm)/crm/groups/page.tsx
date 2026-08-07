@@ -6,6 +6,8 @@ import { GraduationCap, Plus, Search, Users, Calendar, Clock, Sparkles } from "l
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { StudentPicker } from "@/shared/ui/StudentPicker";
+import { CrmDialog } from "@/shared/ui/CrmDialog";
 
 const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -461,21 +463,9 @@ export default function CrmGroupsPage() {
         return;
       }
 
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Org not found");
-
-      // Insert enrollment
-      const { error: enrollErr } = await (supabase
-        .from("enrollments") as any)
-        .insert({
-          organization_id: orgRes.data.id,
-          student_id: studentToAddId,
-          group_id: selectedGroup.id,
-          status: "active",
-          started_on: new Date().toISOString().split("T")[0]
-        });
-
-      if (enrollErr) throw enrollErr;
+      const response = await fetch("/api/crm/students/enrollment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ studentId: studentToAddId, groupId: selectedGroup.id }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось зачислить ученика");
 
       // Reload drawer students and groups list
       await handleOpenGroupDrawer(selectedGroup);
@@ -509,18 +499,9 @@ export default function CrmGroupsPage() {
         return;
       }
 
-      // Update enrollment to cancelled
-      const { error: cancelErr } = await (supabase
-        .from("enrollments") as any)
-        .update({
-          status: "cancelled",
-          ended_on: new Date().toISOString().split("T")[0]
-        })
-        .eq("group_id", selectedGroup.id)
-        .eq("student_id", studentId)
-        .eq("status", "active");
-
-      if (cancelErr) throw cancelErr;
+      const response = await fetch("/api/crm/students/enrollment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ studentId, groupId: null }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось исключить ученика");
 
       // Reload drawer students and groups list
       await handleOpenGroupDrawer(selectedGroup);
@@ -720,34 +701,7 @@ export default function CrmGroupsPage() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.4)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 50,
-          padding: "20px"
-        }}>
-          <div style={{
-            background: "white",
-            borderRadius: "var(--radius-card-site)",
-            border: "1px solid var(--color-border)",
-            width: "100%",
-            maxWidth: "480px",
-            padding: "32px",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px"
-          }}>
-            <div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Создать новую группу</h3>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Заполните параметры учебного класса</p>
-            </div>
-
+        <CrmDialog title="Создать новую группу" description="Заполните параметры учебного класса" onClose={() => setShowAddModal(false)} width={520}>
             <form onSubmit={handleCreateGroup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Название группы *</label>
@@ -856,48 +810,11 @@ export default function CrmGroupsPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </CrmDialog>
       )}
       {/* Details Drawer */}
       {selectedGroup && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "480px",
-          background: "white",
-          borderLeft: "1px solid var(--color-border)",
-          boxShadow: "-10px 0 30px rgba(15, 23, 42, 0.08)",
-          zIndex: 45,
-          padding: "32px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-          overflowY: "auto"
-        }}>
-          {/* Drawer Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--color-border)", paddingBottom: "20px" }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>{selectedGroup.title}</h3>
-                <span className={`badge ${selectedGroup.archivedAt ? "badge-gray" : selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>
-                  {selectedGroup.archivedAt ? "Архив" : selectedGroup.status === "active" ? "Активна" : selectedGroup.status === "closed" ? "Закрыта" : "Черновик"}
-                </span>
-              </div>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
-                Курс: {selectedGroup.courseName} · Преподаватель: {selectedGroup.teacherName}
-              </p>
-            </div>
-            <button 
-              onClick={() => setSelectedGroup(null)}
-              style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", fontSize: "14px" }}
-            >
-              Закрыть [x]
-            </button>
-          </div>
-
+        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedGroup.title}<span className={`badge ${selectedGroup.archivedAt ? "badge-gray" : selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>{selectedGroup.archivedAt ? "Архив" : selectedGroup.status === "active" ? "Активна" : selectedGroup.status === "closed" ? "Закрыта" : "Черновик"}</span></span>} description={`Курс: ${selectedGroup.courseName} · Преподаватель: ${selectedGroup.teacherName}`} onClose={() => setSelectedGroup(null)} width={520} variant="drawer">
           {/* Group Details / Students List */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ background: "var(--color-bg)", padding: "16px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -950,66 +867,31 @@ export default function CrmGroupsPage() {
             {/* Add Student to Group Form */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "12px" }}>
               <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Добавить ученика в группу</h4>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select 
-                  className="form-input" 
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "8px" }}>
+                <StudentPicker
                   value={studentToAddId}
-                  onChange={(e) => setStudentToAddId(e.target.value)}
-                  style={{ height: "36px", fontSize: "13px" }}
-                >
-                  <option value="">Выберите ученика...</option>
-                  {allStudents
-                    .filter(s => !groupStudents.some(gs => gs.id === s.id))
-                    .map(s => (
-                      <option key={s.id} value={s.id}>{s.full_name}</option>
-                    ))
-                  }
-                </select>
+                  onChange={(value) => setStudentToAddId(String(value))}
+                  excludeStudentIds={groupStudents.map((student) => student.id)}
+                  demoOptions={isDemoMode() ? allStudents.map((student) => ({ id: student.id, fullName: student.full_name, status: "active" as const, withoutGroup: true })) : undefined}
+                />
                 <Button 
                   onClick={handleAddStudent} 
                   disabled={!studentToAddId || addingStudentToGroup}
                   variant="primary-crm" 
-                  style={{ height: "36px", fontSize: "13px", whiteSpace: "nowrap" }}
+                  style={{ minHeight: "44px", fontSize: "13px", whiteSpace: "nowrap" }}
                 >
                   {addingStudentToGroup ? "..." : "Добавить"}
                 </Button>
               </div>
             </div>
           </div>
-        </div>
+        </CrmDialog>
       )}
       {actionModal}
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.4)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 50,
-          padding: "20px"
-        }}>
-          <div style={{
-            background: "white",
-            borderRadius: "var(--radius-card-site)",
-            border: "1px solid var(--color-border)",
-            width: "100%",
-            maxWidth: "480px",
-            padding: "32px",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px"
-          }}>
-            <div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Редактировать группу</h3>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Обновление параметров учебного класса</p>
-            </div>
-
+        <CrmDialog title="Редактировать группу" description="Обновление параметров учебного класса" onClose={() => setShowEditModal(false)} width={520}>
             <form onSubmit={handleUpdateGroup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Название группы *</label>
@@ -1118,8 +1000,7 @@ export default function CrmGroupsPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </CrmDialog>
       )}
     </div>
   );

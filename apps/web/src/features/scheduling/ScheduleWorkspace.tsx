@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
 import { Bell, CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Plus, RefreshCw, UserRound } from "lucide-react";
+import { CrmDialog } from "@/shared/ui/CrmDialog";
 
 type Session = {
   id: string;
@@ -256,10 +257,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       )}
       <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Уведомления MAX: по группе разворачиваются в отдельное сообщение каждому связанному родителю; отработка — только родителям выбранного ребёнка.</p>
       {change && (
-        <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setChange(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,.38)", display: "grid", placeItems: "center", padding: 20 }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="schedule-change-title" className="card-crm" style={{ background: "white", width: "min(460px, 100%)", padding: 22 }}>
-            <h2 id="schedule-change-title" style={{ fontSize: 19, marginBottom: 6 }}>{change.type === "reschedule" ? "Перенести занятие" : "Отменить занятие"}</h2>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 16 }}>{change.session.groups?.title} · {new Date(change.session.starts_at).toLocaleString("ru-RU")}. После сохранения родителям будут созданы уведомления MAX.</p>
+        <CrmDialog title={change.type === "reschedule" ? "Перенести занятие" : "Отменить занятие"} description={`${change.session.groups?.title} · ${new Date(change.session.starts_at).toLocaleString("ru-RU")}. После сохранения родителям будут созданы уведомления MAX.`} onClose={() => setChange(null)} width={460}>
             <div style={{ display: "grid", gap: 13 }}>
               {change.type === "reschedule" && <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Новые дата и время<input autoFocus type="datetime-local" className="form-input" value={newStartsAt} onChange={(event) => setNewStartsAt(event.target.value)} /></label>}
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Причина<textarea autoFocus={change.type === "cancel"} className="form-input" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} rows={3} placeholder="Например: праздничный день" style={{ height: "auto", padding: 10 }} /></label>
@@ -267,14 +265,10 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Будет отправлено: группа, старая и новая дата (при переносе), причина и имя ребёнка.</div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingChange || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)} onClick={() => void submitChange()}>{savingChange ? "Сохранение…" : change.type === "reschedule" ? "Перенести" : "Отменить"}</Button></div>
             </div>
-          </div>
-        </div>
+        </CrmDialog>
       )}
       {creating && (
-        <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setCreating(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,.38)", display: "grid", placeItems: "center", padding: 20 }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="create-session-title" className="card-crm" style={{ background: "white", width: "min(520px, 100%)", padding: 22 }}>
-            <h2 id="create-session-title" style={{ fontSize: 19, marginBottom: 6 }}>Добавить занятие</h2>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 16 }}>Подходит для дополнительного урока, пробного занятия или разовой замены. После сохранения родители группы получат MAX-уведомление.</p>
+        <CrmDialog title="Добавить занятие" description="Подходит для дополнительного урока, пробного занятия или разовой замены. После сохранения родители группы получат MAX-уведомление." onClose={() => setCreating(false)} width={520}>
             <div style={{ display: "grid", gap: 12 }}>
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Группа<select className="form-input" value={createGroupId} onChange={(event) => setCreateGroupId(event.target.value)}>{groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
@@ -287,8 +281,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Перед созданием система проверит пересечение преподавателя и кабинета. Уведомление получат все связанные родители активных учеников группы.</div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить занятие"}</Button></div>
             </div>
-          </div>
-        </div>
+        </CrmDialog>
       )}
     </section>
   );

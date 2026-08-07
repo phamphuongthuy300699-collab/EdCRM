@@ -19,6 +19,8 @@ import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { calculateDiscountedInvoiceAmount, shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { StudentPicker } from "@/shared/ui/StudentPicker";
+import { CrmDialog } from "@/shared/ui/CrmDialog";
 
 export default function CrmInvoicesPage() {
   const { askAction, modal: actionModal } = useActionConfirmation();
@@ -32,7 +34,6 @@ export default function CrmInvoicesPage() {
 
   // Form State
   const [newStudentId, setNewStudentId] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
   const [selectedGuardianId, setSelectedGuardianId] = useState("");
   const [publishAfterCreate, setPublishAfterCreate] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
@@ -607,7 +608,6 @@ export default function CrmInvoicesPage() {
       setShowAddModal(false);
       setNewStudentId("");
       setSelectedGuardianId("");
-      setStudentSearch("");
       setPublishAfterCreate(false);
       setNewTitle("Абонемент на 8 занятий");
       setNewAmount("4500");
@@ -642,15 +642,6 @@ export default function CrmInvoicesPage() {
     return matchesTab && matchesSearch && matchesStartDate && matchesEndDate;
   });
 
-  const invoiceStudentOptions = students.filter((student) => {
-    const q = studentSearch.trim().toLowerCase();
-    if (!q) return true;
-    const guardianText = (student.student_guardians || [])
-      .map((link: any) => `${link.guardians?.full_name || ""} ${link.guardians?.phone || ""} ${link.guardians?.email || ""}`)
-      .join(" ");
-    const groupText = (student.enrollments || []).map((enrollment: any) => enrollment.groups?.title || "").join(" ");
-    return `${student.full_name} ${guardianText} ${groupText}`.toLowerCase().includes(q);
-  });
   const selectedInvoiceStudent = students.find((student) => student.id === newStudentId);
   const selectedInvoiceGuardianLinks = selectedInvoiceStudent?.student_guardians || [];
 
@@ -1015,76 +1006,21 @@ export default function CrmInvoicesPage() {
 
       {/* Add Invoice Modal */}
       {showAddModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.4)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 50,
-          padding: "20px"
-        }}>
-          <div style={{
-            background: "white",
-            borderRadius: "var(--radius-card-site)",
-            border: "1px solid var(--color-border)",
-            width: "100%",
-            maxWidth: "440px",
-            padding: "32px",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px"
-          }}>
-            <div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Выписать счет</h3>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Создание нового платежного требования</p>
-            </div>
-
+        <CrmDialog title="Выписать счёт" description="Создание нового платежного требования" onClose={() => setShowAddModal(false)} width={440}>
             <form onSubmit={handleCreateInvoice} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Ученик *</label>
-                <input
-                  className="form-input"
-                  required
-                  value={studentSearch}
-                  onChange={(e) => {
-                    setStudentSearch(e.target.value);
-                    setNewStudentId("");
-                  }}
-                  placeholder="Поиск: ученик, родитель, телефон, email, группа"
+                <StudentPicker
+                  value={newStudentId}
+                  onChange={(value) => setNewStudentId(String(value))}
+                  demoOptions={isDemoMode() ? students.map((student) => ({
+                    id: student.id,
+                    fullName: student.full_name,
+                    status: (student.status || "active") as "active" | "paused" | "archived",
+                    groupName: student.enrollments?.find((item: any) => item.status === "active")?.groups?.title || null,
+                    guardians: (student.student_guardians || []).map((link: any) => ({ fullName: link.guardians?.full_name || "", phone: link.guardians?.phone || "" })),
+                  })) : undefined}
                 />
-                <div style={{ maxHeight: 150, overflow: "auto", border: "1px solid var(--color-border)", borderRadius: 8, marginTop: 8 }}>
-                  {invoiceStudentOptions.map((s) => {
-                    const activeEnroll = s.enrollments?.find((item: any) => item.status === "active");
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => {
-                          setNewStudentId(s.id);
-                          setStudentSearch(s.full_name);
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          textAlign: "left",
-                          border: 0,
-                          borderBottom: "1px solid var(--color-border)",
-                          background: newStudentId === s.id ? "var(--color-primary-soft)" : "#fff",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <strong>{s.full_name}</strong>
-                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                          {activeEnroll?.groups?.title || "Без группы"} · {(s.student_guardians || []).map((link: any) => link.guardians?.full_name).filter(Boolean).join(", ") || "нет родителей"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
 
               {newStudentId && (
@@ -1205,8 +1141,7 @@ export default function CrmInvoicesPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </CrmDialog>
       )}
       {actionModal}
     </div>

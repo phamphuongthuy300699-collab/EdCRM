@@ -21,12 +21,15 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { studentOperationalState, summarizeStudents } from "@/features/students/domain";
+import { CrmDialog } from "@/shared/ui/CrmDialog";
 
 interface Student {
   id: string | number;
   name: string;
   age: number;
   group: string;
+  groupId?: string | null;
   parent: string;
   phone: string;
   parentEmail?: string | null;
@@ -43,7 +46,7 @@ interface Student {
 export default function CrmStudentsPage() {
   const { askAction, modal: actionModal } = useActionConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "without_group" | "paused" | "archived">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState("");
@@ -84,6 +87,9 @@ export default function CrmStudentsPage() {
   const [parentAccessMessage, setParentAccessMessage] = useState("");
   const [temporaryParentPassword, setTemporaryParentPassword] = useState("");
   const [parentPasswordCopyMessage, setParentPasswordCopyMessage] = useState("");
+  const [enrollmentGroupId, setEnrollmentGroupId] = useState("");
+  const [savingStudentOperation, setSavingStudentOperation] = useState(false);
+  const [studentOperationMessage, setStudentOperationMessage] = useState("");
 
   const supabase = createSupabaseBrowserClient();
 
@@ -113,12 +119,12 @@ export default function CrmStudentsPage() {
   };
 
   const initialStudents: Student[] = [
-    { id: 1, name: "Игорь Петров", age: 8, group: "LEGO Start 1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Конструктор 2", project: "Робот-сумо", homeworkProgress: 90 },
-    { id: 2, name: "Данил Соловьев", age: 9, group: "LEGO Start 1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", paymentStatus: "paid", attendance: "90%", attendanceValue: 90, status: "active", level: "Конструктор 2", project: "Кран-манипулятор", homeworkProgress: 80 },
-    { id: 3, name: "Алиса Волкова", age: 10, group: "Scratch Basic", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", paymentStatus: "pending", attendance: "95%", attendanceValue: 95, status: "active", level: "Аниматор Scratch", project: "Лабиринт", homeworkProgress: 85 },
-    { id: 4, name: "Кирилл Семенов", age: 7, group: "LEGO Start 2", parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", paymentStatus: "overdue", attendance: "80%", attendanceValue: 80, status: "active", level: "Новичок", project: "Ветряк", homeworkProgress: 60 },
-    { id: 5, name: "Даша Смирнова", age: 9, group: "Scratch Basic", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Кодер Scratch", project: "Кликер звезд", homeworkProgress: 95 },
-    { id: 6, name: "Максим Козлов", age: 12, group: "Python Junior", parent: "Алексей К.", phone: "+7 (980) 444-55-66", paymentStatus: "paid", attendance: "85%", attendanceValue: 85, status: "paused", level: "Разработчик", project: "Чат-бот", homeworkProgress: 75 }
+    { id: 1, name: "Игорь Петров", age: 8, group: "LEGO Start 1", groupId: "g1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Конструктор 2", project: "Робот-сумо", homeworkProgress: 90 },
+    { id: 2, name: "Данил Соловьев", age: 9, group: "LEGO Start 1", groupId: "g1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", paymentStatus: "paid", attendance: "90%", attendanceValue: 90, status: "active", level: "Конструктор 2", project: "Кран-манипулятор", homeworkProgress: 80 },
+    { id: 3, name: "Алиса Волкова", age: 10, group: "Scratch Basic", groupId: "g3", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", paymentStatus: "pending", attendance: "95%", attendanceValue: 95, status: "active", level: "Аниматор Scratch", project: "Лабиринт", homeworkProgress: 85 },
+    { id: 4, name: "Кирилл Семенов", age: 7, group: "Без группы", groupId: null, parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", paymentStatus: "overdue", attendance: "80%", attendanceValue: 80, status: "active", level: "Новичок", project: "Ветряк", homeworkProgress: 60 },
+    { id: 5, name: "Даша Смирнова", age: 9, group: "Scratch Basic", groupId: "g3", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Кодер Scratch", project: "Кликер звезд", homeworkProgress: 95 },
+    { id: 6, name: "Максим Козлов", age: 12, group: "Python Junior", groupId: "g4", parent: "Алексей К.", phone: "+7 (980) 444-55-66", paymentStatus: "paid", attendance: "85%", attendanceValue: 85, status: "paused", level: "Разработчик", project: "Чат-бот", homeworkProgress: 75 }
   ];
 
   useEffect(() => {
@@ -162,6 +168,7 @@ export default function CrmStudentsPage() {
             notes,
             enrollments (
               group_id,
+              status,
               groups (
                 title,
                 courses (title)
@@ -195,7 +202,7 @@ export default function CrmStudentsPage() {
           if (studentsData && studentsData.length > 0) {
             const formatted = studentsData.map((s: any) => {
               // Find active enrollments
-              const activeEnroll = s.enrollments?.find((e: any) => e.groups) || null;
+              const activeEnroll = s.enrollments?.find((e: any) => e.status === "active" && e.groups) || null;
               const groupTitle = activeEnroll ? activeEnroll.groups.title : "Без группы";
               const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
 
@@ -224,6 +231,7 @@ export default function CrmStudentsPage() {
                 name: s.full_name,
                 age: ageNum,
                 group: groupTitle,
+                groupId: activeEnroll?.group_id || null,
                 parent: parentName,
                 phone: parentPhone,
                 parentEmail: parentLink?.email || null,
@@ -231,7 +239,7 @@ export default function CrmStudentsPage() {
                 paymentStatus: "paid" as const,
                 attendance: `${attVal}%`,
                 attendanceValue: attVal,
-                status: s.status,
+                status: studentOperationalState({ status: s.status, enrollments: s.enrollments }).status,
                 level: courseTitle === "LEGO Start" ? "Конструктор" : "Программист",
                 project: s.notes || "Первый проект",
                 homeworkProgress: attVal > 80 ? 90 : 70
@@ -350,6 +358,8 @@ export default function CrmStudentsPage() {
 
   const handleOpenDrawer = async (student: any) => {
     setSelectedStudent(student);
+    setEnrollmentGroupId(student.groupId || "");
+    setStudentOperationMessage("");
     setStudentInvoices([]);
     setStudentAttendance([]);
     setParentAccess(null);
@@ -394,6 +404,49 @@ export default function CrmStudentsPage() {
       console.error("Error loading drawer details:", err);
     } finally {
       setLoadingDrawer(false);
+    }
+  };
+
+  const saveEnrollment = async () => {
+    if (!selectedStudent || typeof selectedStudent.id === "number" || savingStudentOperation) return;
+    try {
+      setSavingStudentOperation(true);
+      setStudentOperationMessage("");
+      const response = await fetch("/api/crm/students/enrollment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ studentId: selectedStudent.id, groupId: enrollmentGroupId || null }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось изменить зачисление");
+      const group = groups.find((item) => item.id === enrollmentGroupId);
+      const patch = { groupId: enrollmentGroupId || null, group: group?.title || "Без группы" };
+      setStudents((current) => current.map((item) => item.id === selectedStudent.id ? { ...item, ...patch } : item));
+      setSelectedStudent((current: any) => current ? { ...current, ...patch } : current);
+      setStudentOperationMessage(enrollmentGroupId ? "Группа сохранена" : "Активное зачисление закрыто");
+    } catch (cause) {
+      setStudentOperationMessage((cause as Error).message);
+    } finally {
+      setSavingStudentOperation(false);
+    }
+  };
+
+  const saveStudentStatus = async (status: Student["status"]) => {
+    if (!selectedStudent || savingStudentOperation) return;
+    if (typeof selectedStudent.id === "number") {
+      setStudents((current) => current.map((item) => item.id === selectedStudent.id ? { ...item, status } : item));
+      setSelectedStudent((current: any) => current ? { ...current, status } : current);
+      return;
+    }
+    try {
+      setSavingStudentOperation(true);
+      setStudentOperationMessage("");
+      const response = await fetch("/api/crm/students/status", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ studentId: selectedStudent.id, status }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось изменить статус");
+      setStudents((current) => current.map((item) => item.id === selectedStudent.id ? { ...item, status } : item));
+      setSelectedStudent((current: any) => current ? { ...current, status } : current);
+      setStudentOperationMessage("Статус сохранён");
+    } catch (cause) {
+      setStudentOperationMessage((cause as Error).message);
+    } finally {
+      setSavingStudentOperation(false);
     }
   };
 
@@ -479,6 +532,7 @@ export default function CrmStudentsPage() {
         name: student.full_name,
         age: newBirthDate ? Math.floor((Date.now() - new Date(newBirthDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : 8,
         group: groupTitle,
+        groupId: selectedGroupId || null,
         parent: guardian.full_name,
         phone: guardian.phone,
         parentEmail: guardian.email || null,
@@ -587,8 +641,9 @@ export default function CrmStudentsPage() {
     }
   };
 
+  const diagnostics = summarizeStudents(students.map((student) => ({ status: student.status, enrollments: student.groupId ? [{ status: "active", groupId: student.groupId }] : [] })));
   const filteredStudents = students.filter(student => {
-    const matchesStatus = statusFilter === "all" ? student.status !== "archived" : student.status === statusFilter;
+    const matchesStatus = statusFilter === "all" ? true : statusFilter === "without_group" ? student.status === "active" && !student.groupId : student.status === statusFilter;
     const matchesSearch = 
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       student.parent.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -605,7 +660,7 @@ export default function CrmStudentsPage() {
             База учеников
           </h1>
           <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-            Активных учеников в филиале: {students.filter(s => s.status === "active").length}
+            Всего: {diagnostics.total} · Активных: {diagnostics.active} · Без группы: {diagnostics.withoutGroup} · Активных зачислений: {diagnostics.activeEnrollments}
           </p>
         </div>
         <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -626,10 +681,11 @@ export default function CrmStudentsPage() {
         {/* Status filters */}
         <div style={{ display: "flex", gap: "8px" }}>
           {[
-            { id: "all", label: "Все ученики" },
-            { id: "active", label: "Активные" },
-            { id: "paused", label: "На паузе" },
-            { id: "archived", label: "В архиве" }
+            { id: "all", label: `Все ${diagnostics.total}` },
+            { id: "active", label: `Активные ${diagnostics.active}` },
+            { id: "without_group", label: `Без группы ${diagnostics.withoutGroup}` },
+            { id: "paused", label: `Приостановлены ${diagnostics.paused}` },
+            { id: "archived", label: `Архив ${diagnostics.archived}` }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -891,34 +947,7 @@ export default function CrmStudentsPage() {
       {actionModal}
       {/* Add Student Modal */}
       {showAddModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.4)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 50,
-          padding: "20px"
-        }}>
-          <div style={{
-            background: "white",
-            borderRadius: "var(--radius-card-site)",
-            border: "1px solid var(--color-border)",
-            width: "100%",
-            maxWidth: "460px",
-            padding: "32px",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px"
-          }}>
-            <div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "4px" }}>Добавить ученика вручную</h3>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Создание карточки ученика и родителя</p>
-            </div>
-
+        <CrmDialog title="Добавить ученика вручную" description="Создание карточки ученика и родителя" onClose={() => setShowAddModal(false)} width={620}>
             <form onSubmit={handleCreateStudent} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1108,49 +1137,30 @@ export default function CrmStudentsPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </CrmDialog>
       )}
 
       {/* Details Drawer */}
       {selectedStudent && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "480px",
-          background: "white",
-          borderLeft: "1px solid var(--color-border)",
-          boxShadow: "-10px 0 30px rgba(15, 23, 42, 0.08)",
-          zIndex: 45,
-          padding: "32px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-          overflowY: "auto"
-        }}>
-          {/* Drawer Header */}
-          <div style={{ display: "flex", justifySelf: "flex-start", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--color-border)", paddingBottom: "20px" }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-                <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>{selectedStudent.name}</h3>
-                {getStatusBadge(selectedStudent.status)}
-              </div>
-              <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
-                Группа: <strong>{selectedStudent.group}</strong> · Курс: {selectedStudent.level}
-              </p>
-            </div>
-            <button 
-              onClick={closeDrawer}
-              style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer" }}
-            >
-              Закрыть [x]
-            </button>
-          </div>
-
+        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
           {/* Student Info Body */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "var(--color-primary-soft)", padding: 16, borderRadius: 10, display: "grid", gap: 12 }}>
+              <strong style={{ fontSize: 13 }}>Статус и зачисление</strong>
+              <label style={{ display: "grid", gap: 6, fontSize: 12 }}>Группа
+                <select className="form-input" value={enrollmentGroupId} onChange={(event) => setEnrollmentGroupId(event.target.value)} disabled={savingStudentOperation}>
+                  <option value="">Без группы</option>
+                  {groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}
+                </select>
+              </label>
+              <Button type="button" variant="primary-crm" disabled={savingStudentOperation || enrollmentGroupId === (selectedStudent.groupId || "")} onClick={saveEnrollment}>{selectedStudent.groupId ? "Перевести / убрать из группы" : "Назначить группу"}</Button>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "active"} onClick={() => saveStudentStatus("active")}>Активировать</Button>
+                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "paused"} onClick={() => saveStudentStatus("paused")}>Приостановить</Button>
+                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "archived"} onClick={() => saveStudentStatus("archived")}>Архивировать</Button>
+              </div>
+              {studentOperationMessage && <span role="status" style={{ fontSize: 12, fontWeight: 700, color: studentOperationMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-success)" }}>{studentOperationMessage}</span>}
+            </div>
             {/* Guardian Card Info */}
             <div style={{ background: "var(--color-bg)", padding: "16px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
               <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Родитель (законный представитель)</span>
@@ -1291,7 +1301,7 @@ export default function CrmStudentsPage() {
               )}
             </div>
           </div>
-        </div>
+        </CrmDialog>
       )}
     </div>
   );

@@ -33,6 +33,8 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { StudentPicker } from "@/shared/ui/StudentPicker";
+import { CrmDialog } from "@/shared/ui/CrmDialog";
 import { getMediaUrl } from "@/shared/utils/media";
 import { maxEventDefinitions, normalizeMaxEvents } from "@/lib/bots/max/events";
 
@@ -250,17 +252,9 @@ function Modal({
   width?: number;
 }) {
   return (
-    <div className="settings-modal-backdrop">
-      <div className="settings-modal" style={{ maxWidth: width }}>
-        <div className="settings-modal-header">
-          <h3>{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Закрыть">
-            <X size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <CrmDialog title={title} onClose={onClose} width={width}>
+      {children}
+    </CrmDialog>
   );
 }
 
@@ -2012,12 +2006,11 @@ export default function CrmSettingsPage() {
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Ученик</label>
-                      <select value={discountAssignmentDraft.student_id} onChange={(e) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, student_id: e.target.value })} className="settings-input">
-                        <option value="">Не указан</option>
-                        {discountStudents.map((s: any) => (
-                          <option key={s.id} value={s.id}>{s.full_name}</option>
-                        ))}
-                      </select>
+                      <StudentPicker
+                        value={discountAssignmentDraft.student_id}
+                        onChange={(value) => setDiscountAssignmentDraft({ ...discountAssignmentDraft, student_id: String(value) })}
+                        demoOptions={isDemoMode() ? discountStudents.map((student: any) => ({ id: student.id, fullName: student.full_name, status: "active" as const, withoutGroup: true })) : undefined}
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Комментарий</label>
