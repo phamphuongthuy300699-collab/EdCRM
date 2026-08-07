@@ -1123,7 +1123,7 @@ export default function CrmInvoicesPage() {
                 После создания сразу выставить родителю
               </label>
 
-              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+              <div className="crm-dialog-actions" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 
                   type="button" 
                   variant="secondary-site" 

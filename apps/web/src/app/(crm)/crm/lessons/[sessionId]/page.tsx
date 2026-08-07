@@ -542,7 +542,7 @@ export default function LessonConductPage() {
             </div>
 
             <AttendanceRoster
-              disabled={session.status === "completed"}
+              disabled={session.status !== "live"}
               onSave={handleSaveAttendance}
               onComplete={handleCloseSession}
               saving={savingAttendance}

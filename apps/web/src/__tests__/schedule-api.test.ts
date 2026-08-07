@@ -7,6 +7,7 @@ const read = (relative: string) => fs.readFileSync(path.resolve(process.cwd(), r
 describe("CRM scheduling API contract", () => {
   it("keeps all schedule mutations behind organization-scoped staff auth", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
+    const lifecycle = read("../../supabase/migrations/20260807000003_lesson_session_lifecycle.sql");
     expect(route).toContain("requireCrmStaff");
     expect(route).toContain('action: z.literal("materialize")');
     expect(route).toContain('action: z.literal("create_session")');
@@ -14,7 +15,9 @@ describe("CRM scheduling API contract", () => {
     expect(route).toContain('action: z.literal("cancel")');
     expect(route).toContain('action: z.literal("schedule_makeup")');
     expect(route).toContain('action: z.literal("save_attendance")');
-    expect(route).toContain('{ status: "completed", completed_at:');
+    expect(route).toContain('admin.rpc("save_lesson_attendance"');
+    expect(lifecycle).toContain("status = 'completed'");
+    expect(lifecycle).toContain("completed_at = coalesce(completed_at, now())");
     expect(route).toContain("access.organizationId");
     expect(route).toContain('templateKey: "lesson_scheduled"');
   });

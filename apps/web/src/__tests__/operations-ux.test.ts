@@ -52,6 +52,9 @@ describe("shared CRM operation contracts", () => {
     expect(api).toContain("access.organizationId");
     expect(api).toContain("student_guardians");
     expect(api).toContain("enrollments");
+    expect(api).toContain("matchingGuardianIds");
+    expect(api).toContain("candidateStudentIds");
+    expect(api).not.toContain(".limit(100)");
   });
 
   it("keeps assignment and transfer on one transactional enrollment RPC", () => {

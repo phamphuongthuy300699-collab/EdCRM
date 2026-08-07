@@ -22,15 +22,19 @@ describe("transactional group schedule replacement", () => {
     expect(migration).toContain("conflicts with another lesson");
   });
 
-  it("exposes one authorized RPC action and both editors offer explicit rebuild control", () => {
+  it("keeps the low-level rule action and saves editor changes through one atomic group RPC", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
+    const atomicMigration = read("../../supabase/migrations/20260807000004_atomic_group_schedule_save.sql");
     expect(route).toContain('action: z.literal("replace_group_rules")');
     expect(route).toContain('admin.rpc("replace_group_schedule"');
+    expect(route).toContain('action: z.literal("save_group")');
+    expect(route).toContain('admin.rpc("save_group_with_schedule"');
+    expect(atomicMigration).toContain("replace_group_schedule");
     expect(route).toContain("adminRoles.has(access.role)");
     for (const file of ["src/app/(crm)/crm/settings/page.tsx", "src/app/(crm)/crm/groups/page.tsx"]) {
       const source = read(file);
       expect(source).toContain("Пересчитать будущие занятия");
-      expect(source).toContain('action: "replace_group_rules"');
+      expect(source).toContain('action: "save_group"');
     }
   });
 });

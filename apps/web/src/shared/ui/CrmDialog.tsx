@@ -50,12 +50,14 @@ export function CrmDialog({ title, description, onClose, children, footer, width
         .crm-dialog-backdrop-drawer { place-items: stretch end; padding: 0; }
         .crm-dialog-panel-drawer { height: 100dvh; max-height: 100dvh !important; }
         .crm-dialog-panel button, .crm-dialog-panel input, .crm-dialog-panel select { min-height: 44px; }
+        .crm-dialog-actions, .crm-dialog-body .settings-form-actions { position: sticky; bottom: -20px; z-index: 3; margin: 4px -24px -20px; padding: 14px 24px; border-top: 1px solid var(--color-border); background: rgba(255,255,255,.98); box-shadow: 0 -8px 20px rgba(15,23,42,.04); }
         @media (max-width: 640px) {
           .crm-dialog-backdrop { align-items: end; padding: 0; }
           .crm-dialog-panel { width: 100% !important; max-height: 95dvh !important; border-radius: 18px 18px 0 0 !important; }
           .crm-dialog-panel-drawer { height: 95dvh; }
           .crm-dialog-header { padding: 16px !important; }
           .crm-dialog-body { padding: 16px !important; }
+          .crm-dialog-actions, .crm-dialog-body .settings-form-actions { bottom: -16px; margin: 4px -16px -16px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
           .crm-dialog-footer { padding: 12px 16px max(12px, env(safe-area-inset-bottom)) !important; position: sticky; bottom: 0; }
           .crm-dialog-footer > * { flex: 1; min-height: 44px; }
         }

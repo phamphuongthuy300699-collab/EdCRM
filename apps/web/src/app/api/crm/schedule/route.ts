@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
-import { materializeRuleOccurrences, type AttendanceStatus } from "@/features/scheduling/domain";
+import { materializeRuleOccurrences } from "@/features/scheduling/domain";
 import { enqueueScheduleNotifications } from "@/features/scheduling/server";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
 
@@ -9,6 +9,28 @@ const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("save_group"),
+    groupId: z.string().uuid().nullable().optional(),
+    group: z.object({
+      title: z.string().min(1).max(200),
+      courseId: z.string().uuid(),
+      branchId: z.string().uuid().nullable().optional(),
+      roomId: z.string().uuid().nullable().optional(),
+      teacherId: z.string().uuid().nullable().optional(),
+      status: z.enum(["draft", "active", "paused", "closed"]).optional(),
+      ageFrom: z.number().int().min(0).max(100).nullable().optional(),
+      ageTo: z.number().int().min(0).max(100).nullable().optional(),
+      capacity: z.number().int().positive().max(1000).optional(),
+      startsOn: z.string().nullable().optional(),
+      endsOn: z.string().nullable().optional(),
+      priceMonthly: z.number().nonnegative().nullable().optional(),
+      showOnSite: z.boolean().optional(),
+      sortOrder: z.number().int().optional(),
+    }),
+    rules: z.array(z.object({ weekday: z.number().int().min(1).max(7), starts_at: z.string(), ends_at: z.string() })),
+    rebuildFuture: z.boolean().default(true),
+  }),
   z.object({
     action: z.literal("replace_group_rules"),
     groupId: z.string().uuid(),
@@ -127,6 +149,33 @@ export async function POST(request: Request) {
         p_is_admin: adminRoles.has(access.role),
       });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: error.message.includes("attendance_incomplete") ? 409 : 403 });
+      return NextResponse.json({ ok: true, result: data });
+    }
+
+    if (input.action === "save_group") {
+      const { data, error } = await admin.rpc("save_group_with_schedule", {
+        p_organization_id: access.organizationId,
+        p_group_id: input.groupId || null,
+        p_group: {
+          title: input.group.title,
+          course_id: input.group.courseId,
+          ...(input.group.branchId !== undefined ? { branch_id: input.group.branchId } : {}),
+          ...(input.group.roomId !== undefined ? { room_id: input.group.roomId } : {}),
+          ...(input.group.teacherId !== undefined ? { teacher_id: input.group.teacherId } : {}),
+          ...(input.group.status !== undefined ? { status: input.group.status } : {}),
+          ...(input.group.ageFrom !== undefined ? { age_from: input.group.ageFrom } : {}),
+          ...(input.group.ageTo !== undefined ? { age_to: input.group.ageTo } : {}),
+          ...(input.group.capacity !== undefined ? { capacity: input.group.capacity } : {}),
+          ...(input.group.startsOn !== undefined ? { starts_on: input.group.startsOn } : {}),
+          ...(input.group.endsOn !== undefined ? { ends_on: input.group.endsOn } : {}),
+          ...(input.group.priceMonthly !== undefined ? { price_monthly: input.group.priceMonthly } : {}),
+          ...(input.group.showOnSite !== undefined ? { show_on_site: input.group.showOnSite } : {}),
+          ...(input.group.sortOrder !== undefined ? { sort_order: input.group.sortOrder } : {}),
+        },
+        p_rules: input.rules,
+        p_rebuild_future: input.rebuildFuture,
+      });
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
       return NextResponse.json({ ok: true, result: data });
     }
 
@@ -284,50 +333,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    const { data: saveResult, error: saveError } = await admin.rpc("save_lesson_attendance", {
+      p_organization_id: access.organizationId,
+      p_session_id: input.sessionId,
+      p_actor_id: access.userId,
+      p_is_admin: adminRoles.has(access.role),
+      p_records: input.records.map((record) => ({ student_id: record.studentId, status: record.status, comment: record.comment || null, absence_reason: record.absenceReason || null })),
+    });
+    if (saveError) {
+      const forbidden = saveError.message.includes("foreign_teacher_session");
+      return NextResponse.json({ ok: false, error: saveError.message }, { status: forbidden ? 403 : 409 });
+    }
     const session = await loadSession(admin, access.organizationId, input.sessionId);
-    if (access.role === "teacher" && session.teacher_id !== access.userId) {
-      return NextResponse.json({ ok: false, error: "Можно отмечать только свои занятия" }, { status: 403 });
+    const newAbsenceStudentIds = Array.isArray(saveResult?.new_absence_student_ids) ? saveResult.new_absence_student_ids : [];
+    for (const studentId of newAbsenceStudentIds) {
+      const record = input.records.find((item) => item.studentId === studentId);
+      await enqueueScheduleNotifications(admin, {
+        organizationId: access.organizationId,
+        templateKey: "attendance_absent",
+        lessonSessionId: session.id,
+        studentId,
+        payload: { groupTitle: session.groups?.title, startsAt: session.starts_at, reason: record?.absenceReason || undefined },
+      });
     }
-    const rows = input.records.map((record) => ({
-      organization_id: access.organizationId,
-      group_id: session.group_id,
-      lesson_session_id: session.id,
-      lesson_date: session.lesson_date || session.starts_at.slice(0, 10),
-      student_id: record.studentId,
-      attendance_status: record.status as AttendanceStatus,
-      is_present: record.status === "present" || record.status === "late",
-      comment: record.comment || null,
-      absence_reason: record.absenceReason || null,
-      marked_by: access.userId,
-      marked_at: new Date().toISOString(),
-    }));
-    const { data: previous } = await admin.from("attendance").select("student_id, attendance_status").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id).in("student_id", input.records.map((record) => record.studentId));
-    const previousByStudent = new Map((previous || []).map((record: any) => [record.student_id, record.attendance_status]));
-    const { error } = await admin.from("attendance").upsert(rows, { onConflict: "lesson_session_id,student_id" });
-    if (error) throw error;
-    const completedMakeupStudentIds = input.records.filter((record) => record.status === "present" || record.status === "late").map((record) => record.studentId);
-    if (completedMakeupStudentIds.length) {
-      const { error: makeupError } = await admin.from("makeup_assignments").update({ status: "completed", completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq("organization_id", access.organizationId)
-        .eq("target_session_id", session.id)
-        .eq("status", "scheduled")
-        .in("student_id", completedMakeupStudentIds);
-      if (makeupError) throw makeupError;
-    }
-    for (const record of input.records) {
-      const absent = record.status === "absent_excused" || record.status === "absent_unexcused";
-      const wasAbsent = previousByStudent.get(record.studentId) === "absent_excused" || previousByStudent.get(record.studentId) === "absent_unexcused";
-      if (absent && !wasAbsent) {
-        await enqueueScheduleNotifications(admin, {
-          organizationId: access.organizationId,
-          templateKey: "attendance_absent",
-          lessonSessionId: session.id,
-          studentId: record.studentId,
-          payload: { groupTitle: session.groups?.title, startsAt: session.starts_at, reason: record.absenceReason || undefined },
-        });
-      }
-    }
-    return NextResponse.json({ ok: true, saved: rows.length });
+    return NextResponse.json({ ok: true, saved: saveResult?.saved ?? input.records.length });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message || "Не удалось выполнить операцию расписания" }, { status: 500 });
   }

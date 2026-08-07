@@ -984,29 +984,35 @@ export default function CrmSettingsPage() {
         };
         setGroups((prev) => groupDraft.id ? prev.map((item) => item.id === groupDraft.id ? localGroup : item) : [localGroup, ...prev]);
       } else {
-        let groupId = groupDraft.id;
-        if (groupDraft.id) {
-          const { error: updateError } = await (supabase.from("groups") as any).update(payload).eq("id", groupDraft.id);
-          if (updateError) throw updateError;
-        } else {
-          const { data: created, error: insertError } = await (supabase.from("groups") as any).insert(payload).select("id").single();
-          if (insertError) throw insertError;
-          groupId = created.id;
-        }
-
         const scheduleResponse = await fetch("/api/crm/schedule", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "replace_group_rules",
-            groupId,
+            action: "save_group",
+            groupId: groupDraft.id || null,
+            group: {
+              title: payload.title,
+              courseId: payload.course_id,
+              branchId: payload.branch_id,
+              roomId: payload.room_id,
+              teacherId: payload.teacher_id,
+              status: payload.status,
+              ageFrom: payload.age_from,
+              ageTo: payload.age_to,
+              capacity: payload.capacity,
+              startsOn: payload.starts_on,
+              endsOn: payload.ends_on,
+              priceMonthly: payload.price_monthly,
+              showOnSite: payload.show_on_site,
+              sortOrder: payload.sort_order,
+            },
             rules: scheduleDraft.map((rule) => ({ weekday: Number(rule.weekday), starts_at: rule.starts_at, ends_at: rule.ends_at })),
             rebuildFuture: rebuildFutureSessions,
           }),
         });
         const scheduleResult = await scheduleResponse.json();
-        if (!scheduleResponse.ok || !scheduleResult.ok) throw new Error(scheduleResult.error || "Не удалось обновить расписание");
-        const result = scheduleResult.result || {};
+        if (!scheduleResponse.ok || !scheduleResult.ok) throw new Error(scheduleResult.error || "Не удалось сохранить группу и расписание");
+        const result = scheduleResult.result?.schedule || {};
         setNotice(`Группа сохранена. Правил: ${result.rules || 0}, удалено занятий: ${result.deleted || 0}, создано: ${result.created || 0}`);
         await loadData();
       }

@@ -301,7 +301,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Причина<textarea autoFocus={change.type === "cancel"} className="form-input" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} rows={3} placeholder="Например: праздничный день" style={{ height: "auto", padding: 10 }} /></label>
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={notifyChange} onChange={(event) => setNotifyChange(event.target.checked)} /> Уведомить родителей в MAX</label>
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Будет отправлено: группа, старая и новая дата (при переносе), причина и имя ребёнка.</div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingChange || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)} onClick={() => void submitChange()}>{savingChange ? "Сохранение…" : change.type === "reschedule" ? "Перенести" : "Отменить"}</Button></div>
+              <div className="crm-dialog-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingChange || !changeReason.trim() || (change.type === "reschedule" && !newStartsAt)} onClick={() => void submitChange()}>{savingChange ? "Сохранение…" : change.type === "reschedule" ? "Перенести" : "Отменить"}</Button></div>
             </div>
         </CrmDialog>
       )}
@@ -317,7 +317,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Комментарий для родителей<input className="form-input" value={createReason} onChange={(event) => setCreateReason(event.target.value)} placeholder="Например: дополнительная подготовка к соревнованиям" /></label>
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={notifyCreate} onChange={(event) => setNotifyCreate(event.target.checked)} /> Уведомить родителей в MAX</label>
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Перед созданием система проверит пересечение преподавателя и кабинета. Уведомление получат все связанные родители активных учеников группы.</div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить занятие"}</Button></div>
+              <div className="crm-dialog-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить занятие"}</Button></div>
             </div>
         </CrmDialog>
       )}

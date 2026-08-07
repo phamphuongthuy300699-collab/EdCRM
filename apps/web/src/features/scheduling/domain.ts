@@ -46,7 +46,7 @@ export function markAllPresent<T extends { status: AttendanceStatus }>(rows: T[]
 }
 
 export function allAttendanceMarked(rows: Array<{ status: AttendanceStatus }>) {
-  return rows.length > 0 && rows.every((row) => row.status !== "unmarked");
+  return rows.every((row) => row.status !== "unmarked");
 }
 
 export function eligibleForMakeup(input: { attendanceStatus: AttendanceStatus; makeupStatus: MakeupStatus | null }) {

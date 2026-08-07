@@ -298,55 +298,50 @@ export default function CrmGroupsPage() {
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingGroup) return;
     try {
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Org not found");
-
-      const insertData = {
-        organization_id: orgRes.data.id,
-        title: newTitle,
-        course_id: newCourseId,
-        teacher_id: newTeacherId || null,
-        capacity: parseInt(newCapacity, 10),
-        age_from: parseInt(newAgeFrom, 10),
-        age_to: parseInt(newAgeTo, 10),
-        status: "active" as const
-      };
-
-      const { data, error } = await (supabase.from("groups") as any).insert(insertData).select(`
-        id,
-        title,
-        capacity,
-        age_from,
-        age_to,
-        status,
-        courses (title),
-        profiles (full_name)
-      `).single();
-
-      if (error) throw error;
-
-      // Save rules and concrete lessons through the transactional schedule contour.
+      setSavingGroup(true);
       const rules = parseSchedule(newSchedule);
-      if (!isDemoMode()) {
-        const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "replace_group_rules", groupId: data.id, rules, rebuildFuture: rebuildFutureSessions }) });
+      if (isDemoMode()) {
+        const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
+        if (!orgRes.data) throw new Error("Org not found");
+        const { data, error } = await (supabase.from("groups") as any).insert({
+          organization_id: orgRes.data.id,
+          title: newTitle,
+          course_id: newCourseId,
+          teacher_id: newTeacherId || null,
+          capacity: parseInt(newCapacity, 10),
+          age_from: parseInt(newAgeFrom, 10),
+          age_to: parseInt(newAgeTo, 10),
+          status: "active" as const,
+        }).select("id, title, capacity, age_from, age_to, status, courses (title), profiles (full_name)").single();
+        if (error) throw error;
+        setGroups([{
+          id: data.id,
+          title: data.title,
+          courseName: data.courses?.title || "Не указан",
+          schedule: formatScheduleRules(rules),
+          teacherName: data.profiles?.full_name || "Не назначен",
+          ageRange: `${data.age_from}–${data.age_to} лет`,
+          capacity: data.capacity,
+          enrolled: 0,
+          status: data.status,
+        }, ...groups]);
+      } else {
+        const response = await fetch("/api/crm/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save_group",
+            group: { title: newTitle, courseId: newCourseId, teacherId: newTeacherId || null, capacity: parseInt(newCapacity, 10), ageFrom: parseInt(newAgeFrom, 10), ageTo: parseInt(newAgeTo, 10), status: "active" },
+            rules,
+            rebuildFuture: rebuildFutureSessions,
+          }),
+        });
         const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сформировать занятия");
+        if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
+        await loadData();
       }
-
-      const newGroupObj = {
-        id: data.id,
-        title: data.title,
-        courseName: data.courses?.title || "Не указан",
-        schedule: formatScheduleRules(rules),
-        teacherName: data.profiles?.full_name || "Не назначен",
-        ageRange: `${data.age_from}–${data.age_to} лет`,
-        capacity: data.capacity,
-        enrolled: 0,
-        status: data.status
-      };
-
-      setGroups([newGroupObj, ...groups]);
       setShowAddModal(false);
       
       // Reset form
@@ -358,6 +353,8 @@ export default function CrmGroupsPage() {
     } catch (err: any) {
       console.error(err);
       alert("Не удалось создать группу: " + err.message);
+    } finally {
+      setSavingGroup(false);
     }
   };
 
@@ -404,27 +401,15 @@ export default function CrmGroupsPage() {
         return;
       }
 
-      const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
-      if (!orgRes.data) throw new Error("Org not found");
-
-      // Update groups table
-      const { error: groupErr } = await (supabase
-        .from("groups") as any)
-        .update({
-          title: editTitle,
-          course_id: editCourseId,
-          teacher_id: editTeacherId || null,
-          capacity: parseInt(editCapacity, 10),
-          age_from: parseInt(editAgeFrom, 10),
-          age_to: parseInt(editAgeTo, 10)
-        })
-        .eq("id", editingGroupId);
-
-      if (groupErr) throw groupErr;
-
-      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "replace_group_rules", groupId: editingGroupId, rules, rebuildFuture: rebuildFutureSessions }) });
+      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        action: "save_group",
+        groupId: editingGroupId,
+        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10) },
+        rules,
+        rebuildFuture: rebuildFutureSessions,
+      }) });
       const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сформировать занятия");
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
 
       await loadData();
       setShowEditModal(false);
@@ -792,7 +777,7 @@ export default function CrmGroupsPage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+              <div className="crm-dialog-actions" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 
                   type="button" 
                   variant="secondary-site" 
@@ -980,7 +965,7 @@ export default function CrmGroupsPage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+              <div className="crm-dialog-actions" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 
                   type="button" 
                   variant="secondary-site" 

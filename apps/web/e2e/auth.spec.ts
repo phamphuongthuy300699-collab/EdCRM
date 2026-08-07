@@ -28,6 +28,6 @@ test.describe("Auth and Middleware redirects", () => {
 
     // Should redirect to teacher portal
     await page.waitForURL("**/teacher");
-    await expect(page.locator("h1")).toContainText("Приветствуем");
+    await expect(page.locator("h1")).toContainText("Сегодня");
   });
 });

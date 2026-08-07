@@ -18,7 +18,7 @@ export async function GET(_: Request, context: { params: Promise<{ sessionId: st
 
   const [{ data: enrollments }, { data: makeups }, { data: attendance }] = await Promise.all([
     admin.from("enrollments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("group_id", session.group_id).eq("status", "active"),
-    admin.from("makeup_assignments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("target_session_id", session.id).eq("status", "scheduled"),
+    admin.from("makeup_assignments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("target_session_id", session.id).in("status", ["scheduled", "completed"]),
     admin.from("attendance").select("id, student_id, attendance_status, comment, absence_reason").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id),
   ]);
   const attendanceByStudent = new Map((attendance || []).map((row: any) => [row.student_id, row]));

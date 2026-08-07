@@ -56,6 +56,17 @@ begin
     end if;
 
     -- FUTURE FINANCE ATOMIC BOUNDARY: lesson debit, teacher accrual and ledgers belong in this transaction.
+    update public.makeup_assignments makeup
+    set status = 'completed', completed_at = coalesce(makeup.completed_at, now()), updated_at = now()
+    where makeup.organization_id = p_organization_id
+      and makeup.target_session_id = target_session.id
+      and makeup.status = 'scheduled'
+      and exists (
+        select 1 from public.attendance attendance_row
+        where attendance_row.lesson_session_id = target_session.id
+          and attendance_row.student_id = makeup.student_id
+          and attendance_row.attendance_status in ('present', 'late')
+      );
     update public.lesson_sessions
     set status = 'completed', completed_at = coalesce(completed_at, now())
     where id = target_session.id;
