@@ -3,18 +3,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@robotics-crm/ui";
-import { Bell, CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Plus, RefreshCw, UserRound } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, MapPin, Plus, RefreshCw, UserRound } from "lucide-react";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
+import { groupOperationalSessions, type ScheduleView } from "./domain";
+
+type Period = "today" | "week";
 
 type Session = {
   id: string;
+  group_id?: string;
+  teacher_id?: string | null;
+  room_id?: string | null;
   starts_at: string;
   ends_at?: string | null;
   status: string;
   session_kind?: string;
   change_reason?: string | null;
   notification_status?: string;
-  groups?: { title?: string } | null;
+  groups?: { title?: string; branch_id?: string | null } | null;
   courses?: { title?: string } | null;
   profiles?: { full_name?: string } | null;
   rooms?: { name?: string } | null;
@@ -42,8 +48,19 @@ function moscowDateTimeInput(date: Date) {
 
 export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: boolean; groupId?: string }) {
   const [week, setWeek] = useState(() => monday(new Date()));
+  const [period, setPeriod] = useState<Period>("today");
+  const [view, setView] = useState<ScheduleView>("all");
+  const [teacherId, setTeacherId] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState(groupId || "");
+  const [branchId, setBranchId] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [status, setStatus] = useState("");
+  const [sessionKind, setSessionKind] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [groups, setGroups] = useState<Array<{ id: string; title: string }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; title: string; branch_id?: string; teacher_id?: string; room_id?: string }>>([]);
+  const [teachers, setTeachers] = useState<Array<{ id: string; name: string }>>([]);
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const [rooms, setRooms] = useState<Array<{ id: string; name: string; branch_id?: string }>>([]);
   const [makeups, setMakeups] = useState<Makeup[]>([]);
   const [materializeGroupId, setMaterializeGroupId] = useState(groupId || "");
   const [loading, setLoading] = useState(true);
@@ -62,19 +79,27 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
   const [notifyCreate, setNotifyCreate] = useState(true);
   const [notifyChange, setNotifyChange] = useState(true);
   const [notificationEvents, setNotificationEvents] = useState<Record<string, boolean>>({});
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => new Date(week.getTime() + index * 86400000)), [week]);
+  const days = useMemo(() => period === "today" ? [new Date()] : Array.from({ length: 7 }, (_, index) => new Date(week.getTime() + index * 86400000)), [period, week]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ dateFrom: dateKey(days[0]), dateTo: dateKey(days[6]) });
-      if (groupId) params.set("groupId", groupId);
+      const params = new URLSearchParams({ dateFrom: dateKey(days[0]), dateTo: dateKey(days[days.length - 1]) });
+      if (selectedGroupId) params.set("groupId", selectedGroupId);
+      if (teacherId) params.set("teacherId", teacherId);
+      if (branchId) params.set("branchId", branchId);
+      if (roomId) params.set("roomId", roomId);
+      if (status) params.set("status", status);
+      if (sessionKind) params.set("sessionKind", sessionKind);
       const response = await fetch(`/api/crm/schedule?${params}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось загрузить расписание");
       setSessions(data.sessions || []);
       setGroups(data.groups || []);
+      setTeachers(data.teachers || []);
+      setBranches(data.branches || []);
+      setRooms(data.rooms || []);
       setMakeups(data.makeups || []);
       setNotificationEvents(data.notificationEvents || {});
       setMaterializeGroupId((current) => current || data.groups?.[0]?.id || "");
@@ -84,7 +109,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     } finally {
       setLoading(false);
     }
-  }, [days, groupId]);
+  }, [days, selectedGroupId, teacherId, branchId, roomId, status, sessionKind]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -177,18 +202,43 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     }
   };
 
+  const sections = groupOperationalSessions(sessions.map((session) => ({
+    ...session,
+    startsAt: session.starts_at,
+    teacherId: session.teacher_id,
+    teacherName: session.profiles?.full_name,
+    groupId: session.group_id,
+    groupName: session.groups?.title,
+  })), view);
+
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 18 }} aria-label="Оперативное расписание">
       <div className="card-crm" style={{ background: "white", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <strong>Неделя {days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} — {days[6].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</strong>
+          <strong>{period === "today" ? `Сегодня, ${days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}` : `Неделя ${days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} — ${days[days.length - 1].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`}</strong>
           <div style={{ color: "var(--color-text-muted)", fontSize: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}><Bell size={13} /> Переносы и отмены создают адресные уведомления MAX</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="secondary-crm" aria-label="Предыдущая неделя" onClick={() => setWeek(new Date(week.getTime() - 7 * 86400000))}><ChevronLeft size={16} /></Button>
-          <Button variant="secondary-crm" onClick={() => setWeek(monday(new Date()))}>Сегодня</Button>
-          <Button variant="secondary-crm" aria-label="Следующая неделя" onClick={() => setWeek(new Date(week.getTime() + 7 * 86400000))}><ChevronRight size={16} /></Button>
+          <Button variant="secondary-crm" onClick={() => setPeriod("today")}>Сегодня</Button>
+          <Button variant="secondary-crm" onClick={() => setPeriod("week")}>Неделя</Button>
+          {period === "week" && <Button variant="secondary-crm" aria-label="Предыдущая неделя" onClick={() => setWeek(new Date(week.getTime() - 7 * 86400000))}><ChevronLeft size={16} /></Button>}
+          {period === "week" && <Button variant="secondary-crm" aria-label="Следующая неделя" onClick={() => setWeek(new Date(week.getTime() + 7 * 86400000))}><ChevronRight size={16} /></Button>}
           <Button variant="secondary-crm" aria-label="Обновить" onClick={() => void load()}><RefreshCw size={16} /></Button>
+        </div>
+      </div>
+      <div className="card-crm schedule-filter-toolbar" style={{ background: "white", display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <Button variant={view === "all" ? "primary-crm" : "secondary-crm"} onClick={() => setView("all")}>Все занятия</Button>
+          <Button variant={view === "teacher" ? "primary-crm" : "secondary-crm"} onClick={() => setView("teacher")}>По преподавателям</Button>
+          <Button variant={view === "group" ? "primary-crm" : "secondary-crm"} onClick={() => setView("group")}>По группам</Button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8 }}>
+          <select aria-label="Преподаватель" className="form-input" value={teacherId} onChange={(event) => setTeacherId(event.target.value)}><option value="">Все преподаватели</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select>
+          <select aria-label="Группа" className="form-input" value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}><option value="">Все группы</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select>
+          <select aria-label="Филиал" className="form-input" value={branchId} onChange={(event) => { setBranchId(event.target.value); setRoomId(""); }}><option value="">Все филиалы</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+          <select aria-label="Кабинет" className="form-input" value={roomId} onChange={(event) => setRoomId(event.target.value)}><option value="">Все кабинеты</option>{rooms.filter((room) => !branchId || room.branch_id === branchId).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select>
+          <select aria-label="Статус" className="form-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Все статусы</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select aria-label="Тип занятия" className="form-input" value={sessionKind} onChange={(event) => setSessionKind(event.target.value)}><option value="">Все типы</option><option value="regular">Обычное</option><option value="extra">Дополнительное</option><option value="trial">Пробное</option><option value="makeup">Отработка</option></select>
         </div>
       </div>
       {canManage && (
@@ -224,35 +274,23 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       )}
       {error && <div role="alert" className="card-crm" style={{ color: "var(--color-danger)", background: "white" }}>{error}</div>}
       {loading ? <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: 32 }}>Загрузка расписания…</p> : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          {days.map((day) => {
-            const daySessions = sessions.filter((session) => dateKey(new Date(session.starts_at)) === dateKey(day));
-            return (
-              <div key={dateKey(day)} className="card-crm" style={{ background: "white", padding: 14, minHeight: 170 }}>
-                <div style={{ fontWeight: 750, display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}><CalendarDays size={15} /> {day.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" })}</div>
-                {!daySessions.length && <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Нет занятий</span>}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {daySessions.map((session) => (
-                    <article key={session.id} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10, opacity: session.status === "cancelled" || session.status === "moved" ? .65 : 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}><strong style={{ fontSize: 13 }}>{session.groups?.title || "Без группы"}</strong><span className={`badge ${session.status === "cancelled" ? "badge-red" : session.status === "completed" ? "badge-green" : "badge-blue"}`}>{statusLabel[session.status] || session.status}</span></div>
-                      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 7, display: "grid", gap: 4 }}>
-                        <span><Clock size={11} /> {new Date(session.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
-                        <span><UserRound size={11} /> {session.profiles?.full_name || "Преподаватель не назначен"}</span>
-                        <span><MapPin size={11} /> {session.rooms?.name || "Кабинет не назначен"}</span>
-                      </div>
-                      {session.change_reason && <p style={{ fontSize: 11, margin: "7px 0 0" }}>Причина: {session.change_reason}</p>}
-                      {session.notification_status && session.notification_status !== "not_required" && <p style={{ fontSize: 10, margin: "5px 0 0", color: session.notification_status === "failed" ? "var(--color-danger)" : "var(--color-text-muted)" }}>MAX: {session.notification_status === "sent" ? "отправлено" : session.notification_status === "failed" ? "ошибка отправки" : "в очереди"}</p>}
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
-                        <Link href={`/crm/lessons/${session.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>Открыть журнал</Link>
-                        {canManage && session.status === "planned" && <button onClick={() => openChange("reschedule", session)} style={{ border: 0, background: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Перенести</button>}
-                        {canManage && session.status === "planned" && <button onClick={() => openChange("cancel", session)} style={{ border: 0, background: "none", color: "var(--color-danger)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Отменить</button>}
-                      </div>
-                    </article>
-                  ))}
-                </div>
+        <div style={{ display: "grid", gap: 14 }}>
+          {!sessions.length && <div className="card-crm" style={{ background: "white", textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>В выбранном периоде занятий нет</div>}
+          {sections.map((section) => (
+            <section key={section.key} className="card-crm" style={{ background: "white", padding: 16 }}>
+              {view !== "all" && <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>{section.label}</h2>}
+              <div style={{ display: "grid", gap: 8 }}>
+                {section.sessions.map((session) => (
+                  <article key={session.id} style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr) auto", gap: 12, alignItems: "center", border: "1px solid var(--color-border)", borderRadius: 10, padding: 12, opacity: session.status === "cancelled" || session.status === "moved" ? .65 : 1 }}>
+                    <div><strong style={{ fontSize: 15 }}>{new Date(session.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</strong><div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</div></div>
+                    <div><strong style={{ fontSize: 13 }}>{session.groups?.title || "Без группы"}</strong><div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5, fontSize: 11, color: "var(--color-text-muted)" }}><span><UserRound size={11} /> {session.profiles?.full_name || "Преподаватель не назначен"}</span><span><MapPin size={11} /> {session.rooms?.name || "Кабинет не назначен"}</span><span>{session.session_kind === "regular" ? "Обычное" : session.session_kind === "trial" ? "Пробное" : session.session_kind === "makeup" ? "Отработка" : "Дополнительное"}</span></div>{session.change_reason && <p style={{ fontSize: 11, margin: "5px 0 0" }}>Причина: {session.change_reason}</p>}</div>
+                    <div style={{ display: "grid", justifyItems: "end", gap: 7 }}><span className={`badge ${session.status === "cancelled" ? "badge-red" : session.status === "completed" ? "badge-green" : "badge-blue"}`}>{statusLabel[session.status] || session.status}</span><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}><Link href={`/crm/lessons/${session.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>Открыть журнал</Link>{canManage && session.status === "planned" && <button onClick={() => openChange("reschedule", session)} style={{ border: 0, background: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Перенести</button>}{canManage && session.status === "planned" && <button onClick={() => openChange("cancel", session)} style={{ border: 0, background: "none", color: "var(--color-danger)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Отменить</button>}</div></div>
+                  </article>
+                ))}
               </div>
-            );
-          })}
+            </section>
+          ))}
+          <style jsx>{`@media (max-width: 640px) { article { grid-template-columns: 64px minmax(0, 1fr) !important; } article > div:last-child { grid-column: 1 / -1; justify-items: start !important; } .schedule-filter-toolbar select { width: 100%; } }`}</style>
         </div>
       )}
       <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Уведомления MAX: по группе разворачиваются в отдельное сообщение каждому связанному родителю; отработка — только родителям выбранного ребёнка.</p>

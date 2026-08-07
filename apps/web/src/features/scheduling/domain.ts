@@ -13,6 +13,21 @@ export type ConcreteLessonSession = {
 };
 
 export type ScheduleRule = { id: string; weekday: number; startsAt: string; endsAt: string };
+export type ScheduleView = "all" | "teacher" | "group";
+
+export function groupOperationalSessions<T extends { startsAt: string; teacherId?: string | null; teacherName?: string | null; groupId?: string | null; groupName?: string | null }>(sessions: T[], view: ScheduleView) {
+  const sorted = [...sessions].sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime());
+  if (view === "all") return [{ key: "all", label: "Все занятия", sessions: sorted }];
+  const groups = new Map<string, { key: string; label: string; sessions: T[] }>();
+  for (const session of sorted) {
+    const key = view === "teacher" ? session.teacherId || "unassigned" : session.groupId || "unassigned";
+    const label = view === "teacher" ? session.teacherName || "Преподаватель не назначен" : session.groupName || "Без группы";
+    const bucket = groups.get(key) || { key, label, sessions: [] };
+    bucket.sessions.push(session);
+    groups.set(key, bucket);
+  }
+  return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label, "ru"));
+}
 
 const attendanceLabels: Record<AttendanceStatus, string> = {
   unmarked: "Не отмечено",

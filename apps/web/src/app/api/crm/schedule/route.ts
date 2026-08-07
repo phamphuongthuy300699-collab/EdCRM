@@ -53,21 +53,31 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const dateFrom = url.searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);
   const dateTo = url.searchParams.get("dateTo") || new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10);
+  const groupId = url.searchParams.get("groupId");
+  const teacherId = url.searchParams.get("teacherId");
+  const branchId = url.searchParams.get("branchId");
+  const roomId = url.searchParams.get("roomId");
+  const status = url.searchParams.get("status");
+  const sessionKind = url.searchParams.get("sessionKind");
   let visibleGroupIds: string[] | null = null;
+  if (branchId) {
+    const { data: branchGroups } = await admin.from("groups").select("id").eq("organization_id", access.organizationId).eq("branch_id", branchId);
+    visibleGroupIds = (branchGroups || []).map((group: any) => group.id);
+  }
   let query = admin.from("lesson_sessions")
-    .select("id, group_id, course_id, teacher_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title), courses(title), profiles(full_name), rooms(name)")
+    .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id), courses(title), profiles(full_name), rooms(name)")
     .eq("organization_id", access.organizationId)
     .gte("lesson_date", dateFrom)
     .lte("lesson_date", dateTo)
     .order("starts_at", { ascending: true });
-  const groupId = url.searchParams.get("groupId");
   if (groupId) query = query.eq("group_id", groupId);
+  if (teacherId) query = query.eq("teacher_id", teacherId);
+  if (roomId) query = query.eq("room_id", roomId);
+  if (status) query = query.eq("status", status);
+  if (sessionKind) query = query.eq("session_kind", sessionKind);
+  if (visibleGroupIds) query = visibleGroupIds.length ? query.in("group_id", visibleGroupIds) : query.eq("group_id", "00000000-0000-0000-0000-000000000000");
   if (access.role === "teacher") {
-    const { data: ownedGroups } = await admin.from("groups").select("id, title").eq("organization_id", access.organizationId).eq("teacher_id", access.userId);
-    const ownedIds = (ownedGroups || []).map((group: any) => group.id);
-    visibleGroupIds = ownedIds;
-    if (!ownedIds.length) return NextResponse.json({ ok: true, sessions: [], makeups: [] });
-    query = query.in("group_id", ownedIds);
+    query = query.eq("teacher_id", access.userId);
   }
   const { data: sessions, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -80,11 +90,17 @@ export async function GET(request: Request) {
   const makeups = access.role === "teacher"
     ? (allMakeups || []).filter((makeup: any) => makeup.target_session_id && sessionIds.has(makeup.target_session_id))
     : allMakeups || [];
-  let groupsQuery = admin.from("groups").select("id, title").eq("organization_id", access.organizationId).eq("status", "active").order("title");
-  if (visibleGroupIds) groupsQuery = groupsQuery.in("id", visibleGroupIds);
-  const { data: groups } = await groupsQuery;
+  let groupsQuery = admin.from("groups").select("id, title, branch_id, teacher_id, room_id").eq("organization_id", access.organizationId).eq("status", "active").order("title");
+  if (access.role === "teacher") groupsQuery = groupsQuery.eq("teacher_id", access.userId);
+  const [{ data: groups }, { data: teacherMemberships }, { data: branches }, { data: rooms }] = await Promise.all([
+    groupsQuery,
+    admin.from("org_memberships").select("user_id, profiles(full_name)").eq("organization_id", access.organizationId).eq("role", "teacher").eq("is_active", true),
+    admin.from("branches").select("id, name").eq("organization_id", access.organizationId).eq("is_active", true).is("archived_at", null).order("name"),
+    admin.from("rooms").select("id, name, branch_id").eq("organization_id", access.organizationId).is("archived_at", null).order("name"),
+  ]);
+  const teachers = (teacherMemberships || []).map((membership: any) => ({ id: membership.user_id, name: Array.isArray(membership.profiles) ? membership.profiles[0]?.full_name : membership.profiles?.full_name })).filter((teacher: any) => teacher.name);
   const { data: botSettings } = await admin.from("bot_settings").select("settings").eq("organization_id", access.organizationId).eq("provider", "max").maybeSingle();
-  return NextResponse.json({ ok: true, sessions: sessions || [], makeups: makeups || [], groups: groups || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
+  return NextResponse.json({ ok: true, sessions: sessions || [], makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
 }
 
 export async function POST(request: Request) {
