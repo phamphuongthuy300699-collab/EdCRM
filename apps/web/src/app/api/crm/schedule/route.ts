@@ -29,6 +29,8 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reschedule"), sessionId: z.string().uuid(), startsAt: z.string().datetime(), endsAt: z.string().datetime().nullable().optional(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
   z.object({ action: z.literal("cancel"), sessionId: z.string().uuid(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
   z.object({ action: z.literal("schedule_makeup"), makeupAssignmentId: z.string().uuid(), targetSessionId: z.string().uuid(), notes: z.string().max(500).optional() }),
+  z.object({ action: z.literal("start_session"), sessionId: z.string().uuid() }),
+  z.object({ action: z.literal("complete_session"), sessionId: z.string().uuid() }),
   z.object({
     action: z.literal("save_attendance"),
     sessionId: z.string().uuid(),
@@ -110,11 +112,24 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Некорректные данные операции расписания" }, { status: 400 });
   const input = parsed.data;
   const admin = crmAdmin();
-  if (input.action !== "save_attendance" && !adminRoles.has(access.role)) {
+  const teacherActions = new Set(["save_attendance", "start_session", "complete_session"]);
+  if (!teacherActions.has(input.action) && !adminRoles.has(access.role)) {
     return NextResponse.json({ ok: false, error: "Операция доступна администратору" }, { status: 403 });
   }
 
   try {
+    if (input.action === "start_session" || input.action === "complete_session") {
+      const { data, error } = await admin.rpc("transition_lesson_session", {
+        p_organization_id: access.organizationId,
+        p_session_id: input.sessionId,
+        p_actor_id: access.userId,
+        p_action: input.action === "start_session" ? "start" : "complete",
+        p_is_admin: adminRoles.has(access.role),
+      });
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: error.message.includes("attendance_incomplete") ? 409 : 403 });
+      return NextResponse.json({ ok: true, result: data });
+    }
+
     if (input.action === "replace_group_rules") {
       if (!adminRoles.has(access.role)) return NextResponse.json({ ok: false, error: "Операция доступна администратору" }, { status: 403 });
       const { data, error } = await admin.rpc("replace_group_schedule", {

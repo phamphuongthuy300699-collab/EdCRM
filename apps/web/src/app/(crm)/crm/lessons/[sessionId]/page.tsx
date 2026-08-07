@@ -6,7 +6,6 @@ import {
   ArrowLeft, 
   BookOpen, 
   ClipboardList, 
-  CheckCircle, 
   MapPin, 
   Clock, 
   Calendar, 
@@ -99,6 +98,8 @@ export default function LessonConductPage() {
   const [closingSession, setClosingSession] = useState(false);
   const [submittingHw, setSubmittingHw] = useState(false);
   const [orgId, setOrgId] = useState<string>("");
+  const [attendanceMessage, setAttendanceMessage] = useState("");
+  const [attendanceError, setAttendanceError] = useState("");
 
   const supabase = createSupabaseBrowserClient();
 
@@ -231,10 +232,12 @@ export default function LessonConductPage() {
     loadData();
   }, [sessionId]);
 
-  const handleSaveAttendance = async () => {
+  const handleSaveAttendance = async (throwOnError = false) => {
     if (!session) return;
     try {
       setSavingAttendance(true);
+      setAttendanceMessage("");
+      setAttendanceError("");
       const response = await fetch("/api/crm/schedule", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -251,10 +254,11 @@ export default function LessonConductPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Не удалось сохранить посещаемость");
-      alert("Посещаемость успешно сохранена!");
+      setAttendanceMessage("Посещаемость сохранена");
     } catch (err) {
       console.error("Error saving attendance:", err);
-      alert("Не удалось сохранить посещаемость");
+      setAttendanceError((err as Error).message || "Не удалось сохранить посещаемость");
+      if (throwOnError) throw err;
     } finally {
       setSavingAttendance(false);
     }
@@ -310,24 +314,21 @@ export default function LessonConductPage() {
 
     try {
       setClosingSession(true);
-      // First save attendance to be safe
-      await handleSaveAttendance();
-
-      const { error } = await (supabase
-        .from("lesson_sessions") as any)
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString()
-        })
-        .eq("id", session.id);
-
-      if (error) throw error;
+      if (session.status === "planned") {
+        const startResponse = await fetch("/api/crm/schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start_session", sessionId: session.id }) });
+        const startResult = await startResponse.json();
+        if (!startResponse.ok || !startResult.ok) throw new Error(startResult.error || "Не удалось начать занятие");
+      }
+      await handleSaveAttendance(true);
+      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "complete_session", sessionId: session.id }) });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось завершить занятие");
 
       setSession(prev => prev ? { ...prev, status: "completed" } : null);
-      alert("Занятие успешно закрыто!");
+      setAttendanceMessage("Занятие завершено");
     } catch (err) {
       console.error("Error closing session:", err);
-      alert("Не удалось завершить занятие");
+      setAttendanceError((err as Error).message || "Не удалось завершить занятие");
     } finally {
       setClosingSession(false);
     }
@@ -381,17 +382,6 @@ export default function LessonConductPage() {
               <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><MapPin size={14} /> {session.rooms ? session.rooms.name : "Каб. 101"}</span>
             </div>
           </div>
-          {session.status !== "completed" && (
-            <Button 
-              variant="primary-crm" 
-              style={{ display: "flex", alignItems: "center", gap: "8px" }} 
-              onClick={handleCloseSession}
-              disabled={closingSession}
-            >
-              <CheckCircle size={16} />
-              <span>{closingSession ? "Завершение..." : "Завершить занятие"}</span>
-            </Button>
-          )}
         </div>
       </div>
 
@@ -549,20 +539,16 @@ export default function LessonConductPage() {
                 <Users size={20} style={{ color: "var(--color-primary)" }} />
                 <span>Журнал посещаемости ({students.length})</span>
               </h3>
-              {session.status !== "completed" && (
-                <Button 
-                  variant="secondary-crm" 
-                  style={{ height: "32px", padding: "0 12px", fontSize: "11px", borderRadius: "8px" }}
-                  onClick={handleSaveAttendance}
-                  disabled={savingAttendance}
-                >
-                  {savingAttendance ? "Сохранение..." : "Сохранить"}
-                </Button>
-              )}
             </div>
 
             <AttendanceRoster
               disabled={session.status === "completed"}
+              onSave={handleSaveAttendance}
+              onComplete={handleCloseSession}
+              saving={savingAttendance}
+              completing={closingSession}
+              sessionStatus={session.status}
+              message={attendanceMessage}
               rows={students.map((student): AttendanceRosterRow => {
                 const record = attendance[student.id];
                 return {
@@ -583,6 +569,7 @@ export default function LessonConductPage() {
                 id: attendance[row.studentId]?.id,
               }])))}
             />
+            {attendanceError && <div role="alert" style={{ color: "var(--color-danger)", marginTop: 10, fontSize: 13, fontWeight: 700 }}>{attendanceError}</div>}
           </div>
         </div>
 
