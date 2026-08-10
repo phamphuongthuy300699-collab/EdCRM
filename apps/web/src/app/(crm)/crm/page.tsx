@@ -29,7 +29,11 @@ export default function CrmDashboard() {
     activeStudentsCount: 0,
     withoutGroup: 0,
     totalCapacity: 0,
-    enrolledCount: 0
+    enrolledCount: 0,
+    todayCompleted: 0,
+    todayRemaining: 0,
+    parentDebt: 0,
+    monthPayroll: 0
   });
 
   // Lists state (empty by default)
@@ -65,7 +69,11 @@ export default function CrmDashboard() {
             activeStudentsCount: 5,
             withoutGroup: 0,
             totalCapacity: 16,
-            enrolledCount: 13
+            enrolledCount: 13,
+            todayCompleted: 1,
+            todayRemaining: 1,
+            parentDebt: 8500,
+            monthPayroll: 3200
           });
           return;
         }
@@ -152,6 +160,19 @@ export default function CrmDashboard() {
           );
         })}
       </div>
+
+      <section className="card-crm" style={{ background: "white", display: "grid", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
+          <div><small>Занятия сегодня</small><strong style={{ display: "block", fontSize: 22 }}>{schedule.length}</strong><span style={{ fontSize: 12 }}>Проведено {statsData.todayCompleted} · осталось {statsData.todayRemaining}</span></div>
+          <div><small>Задолженность родителей</small><strong style={{ display: "block", fontSize: 22, color: "var(--color-danger)" }}>{statsData.parentDebt.toLocaleString("ru-RU")} ₽</strong></div>
+          <div><small>Начислено преподавателям за месяц</small><strong style={{ display: "block", fontSize: 22 }}>{statsData.monthPayroll.toLocaleString("ru-RU")} ₽</strong></div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link className="btn btn-secondary-site" href="/crm/lessons">Открыть расписание</Link>
+          <Link className="btn btn-secondary-site" href="/crm/reports?view=debt">Открыть должников</Link>
+          <Link className="btn btn-secondary-site" href="/crm/finance?view=payroll">Открыть payroll</Link>
+        </div>
+      </section>
 
       {/* Сегодня требует внимания */}
       <div className="card-crm" style={{ 

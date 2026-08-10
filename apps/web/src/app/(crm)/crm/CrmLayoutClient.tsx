@@ -21,7 +21,8 @@ import {
   FileText,
   Globe,
   Receipt,
-  Coins
+  Coins,
+  BarChart3
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -51,6 +52,7 @@ export default function CrmLayout({
     { name: "Счета (Invoices)", path: "/crm/invoices", icon: CreditCard },
     { name: "Платежи (Payments)", path: "/crm/payments", icon: Receipt },
     { name: "Финансы", path: "/crm/finance", icon: Coins },
+    { name: "Отчёты", path: "/crm/reports", icon: BarChart3 },
     { name: "Учебные материалы", path: "/crm/materials", icon: BookOpen },
     { name: "Занятия", path: "/crm/lessons", icon: Calendar },
     { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },
