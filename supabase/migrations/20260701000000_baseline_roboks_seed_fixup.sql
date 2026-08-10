@@ -16,6 +16,20 @@ on conflict (id) do update set
   timezone = coalesce(public.organizations.timezone, excluded.timezone),
   updated_at = now();
 
+insert into public.branches (id, organization_id, name, address, is_active)
+values (
+  '120c1a93-8ef9-4eb5-8e7c-eb8ab57342fb',
+  'a3848a60-a292-491a-85eb-7f2824cf4e77',
+  'Основной',
+  'Липецк',
+  true
+)
+on conflict (id) do update set
+  organization_id = excluded.organization_id,
+  name = coalesce(public.branches.name, excluded.name),
+  address = coalesce(public.branches.address, excluded.address),
+  is_active = coalesce(public.branches.is_active, excluded.is_active);
+
 insert into public.courses (
   id,
   organization_id,

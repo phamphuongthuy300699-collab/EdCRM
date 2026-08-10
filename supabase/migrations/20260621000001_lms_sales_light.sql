@@ -299,6 +299,20 @@ create policy "objections_all" on public.objections
 
 -- 9. Seed Demo Data directly in Migration
 -- Organization is 'a3848a60-a292-491a-85eb-7f2824cf4e77', Course is '4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a'
+-- Older production databases already had these records before this migration.
+-- A fresh database creates them later in the explicit baseline seed migration,
+-- so this legacy demo block must be skipped until both parents exist.
+do $legacy_demo_seed$
+begin
+if exists (
+  select 1 from public.organizations
+  where id = 'a3848a60-a292-491a-85eb-7f2824cf4e77'
+) and exists (
+  select 1 from public.courses
+  where id = '4f8d5918-a6fe-4fbe-9b37-236b28ee2e7a'
+    and organization_id = 'a3848a60-a292-491a-85eb-7f2824cf4e77'
+) then
+
 -- Update title of seeded course to Lego Start
 update public.courses
 set title = 'LEGO Start'
@@ -412,3 +426,7 @@ values
   ('f4444444-4444-4444-4444-444444444444', 'a3848a60-a292-491a-85eb-7f2824cf4e77', 'Ребенок уже ходит в другой кружок', 'Конкуренты', '"Отлично, что ребенок активный! А куда вы ходите? Робототехника и программирование развивают системное алгоритмическое мышление, которое поможет ему и в спорте, и в языках. К тому же наши занятия проходят по выходным и отлично сочетаются с другими секциями. Приходите просто на пробный урок — это ни к чему не обязывает, но ребенок попробует новое направление."', '{"конкуренты", "спорт", "время"}'),
   ('f5555555-5555-5555-5555-555555555555', 'a3848a60-a292-491a-85eb-7f2824cf4e77', 'Неудобное время', 'Расписание', '"Понимаю вас, график у всех плотный. У нас есть несколько вариантов групп: утренние в 10:00, дневные в 13:00 и вечерние в 16:30. Также мы сейчас формируем новую группу на будний день в 18:30. Какое время вам было бы комфортно в идеале? Давайте мы запишем вас в лист ожидания на это время."', '{"время", "расписание", "график"}')
 on conflict do nothing;
+
+end if;
+end
+$legacy_demo_seed$;
