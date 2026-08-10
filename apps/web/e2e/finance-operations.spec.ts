@@ -12,8 +12,13 @@ async function mockFinance(page: Page) {
   await page.route("**/api/crm/media?path=branding/**", async (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#4b3f9f"/><text x="16" y="22" text-anchor="middle" font-size="18" font-family="sans-serif" fill="white">Р</text></svg>' }));
   await page.route("**/api/crm/finance?**", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
-    const hasAccount = new URL(route.request().url()).searchParams.has("accountId");
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, canManage: true, accounts: [account], payroll: [payroll], problems: [{ id: "problem-1", warning_type: "missing_teacher_rate", created_at: "2026-08-07T12:00:00Z", lesson_sessions: { lesson_date: "2026-08-07", groups: { title: "Тестовая группа" } } }], ledger: hasAccount ? [{ id: "entry-1", entry_type: "lesson_debit", amount: -750, reason: "Занятие 2026-08-07", created_at: "2026-08-07T12:00:00Z" }] : [] }) });
+    const view = new URL(route.request().url()).searchParams.get("view") || "accounts";
+    const items = view === "ledger"
+      ? [{ id: "entry-1", entry_type: "lesson_debit", amount: -750, reason: "Занятие 2026-08-07", created_at: "2026-08-07T12:00:00Z" }]
+      : view === "payroll" ? [payroll]
+      : view === "warnings" ? [{ id: "problem-1", warning_type: "missing_teacher_rate", teacher_id: "10000000-0000-4000-8000-000000000004", created_at: "2026-08-07T12:00:00Z", lesson_sessions: { lesson_date: "2026-08-07", groups: { title: "Тестовая группа" } } }]
+      : [account];
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, canManage: true, view, items, total: items.length, hasMore: false, page: 1, summary: view === "payroll" ? [{ teacherId: payroll.teacher_id, teacherName: "Тестовый преподаватель", accrued: 1500, approved: 0, payable: 0, paid: 0 }] : null }) });
   });
   await page.route("**/api/crm/finance", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
 }
@@ -40,13 +45,13 @@ test.describe("finance operational contour", () => {
     await page.screenshot({ path: path.join(output, "crm-account-drawer.png"), fullPage: true }); // 11
     await page.getByLabel("Сумма").fill("500"); // 12
     await page.getByLabel("Причина корректировки").fill("Тестовая корректировка"); // 13
-    await expect(page.getByRole("button", { name: "Добавить операцию" })).toBeEnabled(); // 14
+    await expect(page.getByRole("button", { name: "Задать начальный остаток / добавить операцию" })).toBeEnabled(); // 14
     await page.getByRole("button", { name: "Закрыть" }).click(); // 15
     await page.getByRole("button", { name: "Начисления преподавателям" }).click(); // 16
-    await expect(page.getByText("Тестовый преподаватель")).toBeVisible(); // 17
+    await expect(page.getByRole("row", { name: /Тестовый преподаватель/ })).toBeVisible(); // 17
     await expect(page.getByRole("row", { name: /Тестовый преподаватель/ }).getByText("1 500,00 ₽", { exact: true })).toBeVisible(); // 18
     await page.screenshot({ path: path.join(output, "crm-payroll.png"), fullPage: true }); // 19
-    await page.getByRole("button", { name: "Проблемы · 1" }).click(); // 20
+    await page.getByRole("button", { name: "Проблемы" }).click(); // 20
     await expect(page.getByText("Не задана ставка преподавателя")).toBeVisible(); // 21
     await page.screenshot({ path: path.join(output, "crm-problems.png"), fullPage: true }); // 22
     await noOverflow(page); // 23
