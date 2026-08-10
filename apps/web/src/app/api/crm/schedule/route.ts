@@ -25,6 +25,10 @@ const actionSchema = z.discriminatedUnion("action", [
       startsOn: z.string().nullable().optional(),
       endsOn: z.string().nullable().optional(),
       priceMonthly: z.number().nonnegative().nullable().optional(),
+      billingEnabled: z.boolean().optional(),
+      lessonPrice: z.number().positive().nullable().optional(),
+      chargeAbsentExcused: z.boolean().optional(),
+      chargeAbsentUnexcused: z.boolean().optional(),
       showOnSite: z.boolean().optional(),
       sortOrder: z.number().int().optional(),
     }),
@@ -114,6 +118,20 @@ export async function GET(request: Request) {
   const makeups = access.role === "teacher"
     ? (allMakeups || []).filter((makeup: any) => makeup.target_session_id && sessionIds.has(makeup.target_session_id))
     : allMakeups || [];
+  const visibleGroupIdList = [...new Set((sessions || []).map((session: any) => session.group_id).filter(Boolean))];
+  const { data: activeEnrollments } = visibleGroupIdList.length
+    ? await admin.from("enrollments").select("group_id, student_id").eq("organization_id", access.organizationId).eq("status", "active").in("group_id", visibleGroupIdList)
+    : { data: [] as any[] };
+  const studentsByGroup = new Map<string, Set<string>>();
+  for (const enrollment of activeEnrollments || []) {
+    if (!studentsByGroup.has(enrollment.group_id)) studentsByGroup.set(enrollment.group_id, new Set());
+    studentsByGroup.get(enrollment.group_id)?.add(enrollment.student_id);
+  }
+  const sessionsWithStudentCount = (sessions || []).map((session: any) => {
+    const studentIds = new Set(studentsByGroup.get(session.group_id) || []);
+    for (const makeup of allMakeups || []) if (makeup.target_session_id === session.id && makeup.status === "scheduled") studentIds.add(makeup.student_id);
+    return { ...session, studentCount: studentIds.size };
+  });
   let groupsQuery = admin.from("groups").select("id, title, branch_id, teacher_id, room_id").eq("organization_id", access.organizationId).eq("status", "active").order("title");
   if (access.role === "teacher") groupsQuery = groupsQuery.eq("teacher_id", access.userId);
   const [{ data: groups }, { data: teacherMemberships }, { data: branches }, { data: rooms }] = await Promise.all([
@@ -124,7 +142,7 @@ export async function GET(request: Request) {
   ]);
   const teachers = (teacherMemberships || []).map((membership: any) => ({ id: membership.user_id, name: Array.isArray(membership.profiles) ? membership.profiles[0]?.full_name : membership.profiles?.full_name })).filter((teacher: any) => teacher.name);
   const { data: botSettings } = await admin.from("bot_settings").select("settings").eq("organization_id", access.organizationId).eq("provider", "max").maybeSingle();
-  return NextResponse.json({ ok: true, sessions: sessions || [], makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
+  return NextResponse.json({ ok: true, sessions: sessionsWithStudentCount, makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
 }
 
 export async function POST(request: Request) {
@@ -149,7 +167,8 @@ export async function POST(request: Request) {
         p_is_admin: adminRoles.has(access.role),
       });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: error.message.includes("attendance_incomplete") ? 409 : 403 });
-      return NextResponse.json({ ok: true, result: data });
+      const result = access.role === "teacher" ? { id: data?.id, status: data?.status, unchanged: data?.unchanged } : data;
+      return NextResponse.json({ ok: true, result });
     }
 
     if (input.action === "save_group") {
@@ -169,6 +188,10 @@ export async function POST(request: Request) {
           ...(input.group.startsOn !== undefined ? { starts_on: input.group.startsOn } : {}),
           ...(input.group.endsOn !== undefined ? { ends_on: input.group.endsOn } : {}),
           ...(input.group.priceMonthly !== undefined ? { price_monthly: input.group.priceMonthly } : {}),
+          ...(input.group.billingEnabled !== undefined ? { billing_enabled: input.group.billingEnabled } : {}),
+          ...(input.group.lessonPrice !== undefined ? { lesson_price: input.group.lessonPrice } : {}),
+          ...(input.group.chargeAbsentExcused !== undefined ? { charge_absent_excused: input.group.chargeAbsentExcused } : {}),
+          ...(input.group.chargeAbsentUnexcused !== undefined ? { charge_absent_unexcused: input.group.chargeAbsentUnexcused } : {}),
           ...(input.group.showOnSite !== undefined ? { show_on_site: input.group.showOnSite } : {}),
           ...(input.group.sortOrder !== undefined ? { sort_order: input.group.sortOrder } : {}),
         },

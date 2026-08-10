@@ -94,6 +94,10 @@ export default function CrmGroupsPage() {
   const [editCapacity, setEditCapacity] = useState("8");
   const [editAgeFrom, setEditAgeFrom] = useState("6");
   const [editAgeTo, setEditAgeTo] = useState("9");
+  const [editBillingEnabled, setEditBillingEnabled] = useState(false);
+  const [editLessonPrice, setEditLessonPrice] = useState("");
+  const [editChargeExcused, setEditChargeExcused] = useState(false);
+  const [editChargeUnexcused, setEditChargeUnexcused] = useState(true);
   const [savingGroup, setSavingGroup] = useState(false);
   const [rebuildFutureSessions, setRebuildFutureSessions] = useState(true);
 
@@ -191,6 +195,10 @@ export default function CrmGroupsPage() {
           status,
           show_on_site,
           archived_at,
+          billing_enabled,
+          lesson_price,
+          charge_absent_excused,
+          charge_absent_unexcused,
           courses (title),
           profiles (full_name),
           group_schedule_rules (weekday, starts_at, ends_at)
@@ -231,7 +239,11 @@ export default function CrmGroupsPage() {
             status: g.status
             ,
             showOnSite: g.show_on_site,
-            archivedAt: g.archived_at
+            archivedAt: g.archived_at,
+            billingEnabled: g.billing_enabled,
+            lessonPrice: g.lesson_price,
+            chargeAbsentExcused: g.charge_absent_excused,
+            chargeAbsentUnexcused: g.charge_absent_unexcused
           }));
           setGroups(formatted);
         } else {
@@ -367,6 +379,10 @@ export default function CrmGroupsPage() {
     setEditCapacity(String(group.capacity));
     setEditAgeFrom(String(group.ageFrom));
     setEditAgeTo(String(group.ageTo));
+    setEditBillingEnabled(Boolean(group.billingEnabled));
+    setEditLessonPrice(group.lessonPrice == null ? "" : String(group.lessonPrice));
+    setEditChargeExcused(Boolean(group.chargeAbsentExcused));
+    setEditChargeUnexcused(group.chargeAbsentUnexcused !== false);
     setShowEditModal(true);
   };
 
@@ -404,7 +420,7 @@ export default function CrmGroupsPage() {
       const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         action: "save_group",
         groupId: editingGroupId,
-        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10) },
+        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
         rules,
         rebuildFuture: rebuildFutureSessions,
       }) });
@@ -964,6 +980,14 @@ export default function CrmGroupsPage() {
                   />
                 </div>
               </div>
+
+              <fieldset style={{ border: "1px solid var(--color-border)", borderRadius: 12, padding: 14, display: "grid", gap: 12 }}>
+                <legend style={{ padding: "0 6px", fontWeight: 800 }}>Оплата занятий</legend>
+                <label style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13 }}><input type="checkbox" checked={editBillingEnabled} onChange={(event) => setEditBillingEnabled(event.target.checked)} /><span><strong>Списывать с лицевого счёта</strong><br /><small style={{ color: "var(--color-text-muted)" }}>По умолчанию выключено. Пробные занятия бесплатны.</small></span></label>
+                <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label">Цена одного занятия, ₽</label><input type="number" min="0.01" step="0.01" className="form-input" value={editLessonPrice} onChange={(event) => setEditLessonPrice(event.target.value)} disabled={!editBillingEnabled} placeholder="Например, 750" /></div>
+                <label style={{ display: "flex", gap: 8, fontSize: 13 }}><input type="checkbox" checked={editChargeExcused} onChange={(event) => setEditChargeExcused(event.target.checked)} disabled={!editBillingEnabled} /> Списывать за уважительный пропуск</label>
+                <label style={{ display: "flex", gap: 8, fontSize: 13 }}><input type="checkbox" checked={editChargeUnexcused} onChange={(event) => setEditChargeUnexcused(event.target.checked)} disabled={!editBillingEnabled} /> Списывать за неуважительный пропуск</label>
+              </fieldset>
 
               <div className="crm-dialog-actions" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 

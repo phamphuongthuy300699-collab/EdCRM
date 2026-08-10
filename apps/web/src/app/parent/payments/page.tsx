@@ -27,6 +27,7 @@ export default function ParentPaymentsPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
+  const [billingAccounts, setBillingAccounts] = useState<any[]>([]);
   const [accessMessage, setAccessMessage] = useState("");
   const supabase = createSupabaseBrowserClient();
 
@@ -84,6 +85,14 @@ export default function ParentPaymentsPage() {
           setAccessMessage("Доступ к личному кабинету не привязан. Обратитесь к администратору школы.");
           setLoading(false);
           return;
+        }
+
+        try {
+          const financeResponse = await fetch("/api/parent/finance");
+          const financePayload = await financeResponse.json();
+          setBillingAccounts(financeResponse.ok && financePayload.ok ? financePayload.accounts || [] : []);
+        } catch {
+          setBillingAccounts([]);
         }
 
         // Get linked kids
@@ -277,6 +286,12 @@ export default function ParentPaymentsPage() {
           </p>
         </div>
       )}
+
+      {!isDemoMode() && <section className="card-crm" style={{ background: "white", padding: 24, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap", alignItems: "center" }}><div><span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>ЛИЦЕВОЙ СЧЁТ</span><h2 style={{ margin: "4px 0 0", fontSize: 19 }}>Текущий баланс</h2></div><strong style={{ fontSize: 24, color: Number(billingAccounts[0]?.balance || 0) < 0 ? "var(--color-danger)" : "var(--color-success)" }}>{Number(billingAccounts[0]?.balance || 0).toLocaleString("ru-RU", { minimumFractionDigits: 2 })} ₽</strong></div>
+        {Number(billingAccounts[0]?.balance || 0) < 0 && <p style={{ color: "var(--color-danger)", fontWeight: 700, marginBottom: 0 }}>Задолженность: {Math.abs(Number(billingAccounts[0]?.balance)).toLocaleString("ru-RU")} ₽</p>}
+        <div style={{ display: "grid", gap: 0, marginTop: 14 }}>{(billingAccounts[0]?.ledger || []).slice(0, 8).map((entry: any) => <div key={entry.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, padding: "10px 0", borderTop: "1px solid var(--color-border)" }}><span><strong style={{ fontSize: 13 }}>{entry.reason || "Операция"}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{new Date(entry.created_at).toLocaleDateString("ru-RU")}</small></span><strong style={{ color: Number(entry.amount) < 0 ? "var(--color-danger)" : "var(--color-success)" }}>{Number(entry.amount) > 0 ? "+" : ""}{Number(entry.amount).toLocaleString("ru-RU")} ₽</strong></div>)}</div>
+      </section>}
 
       {/* Active Discounts */}
       <div className="card-crm" style={{ background: "white", padding: "24px" }}>

@@ -40,7 +40,7 @@ export default function TeacherLayout({
           padding: "0 20px"
         }}>
           {/* Logo */}
-          <Link href="/teacher" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+          <Link className="portal-logo" href="/teacher" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
             <img 
               src="/api/crm/media?path=branding/roboks-logo.svg" 
               alt="Робокс" 
@@ -66,13 +66,13 @@ export default function TeacherLayout({
               Р
             </div>
             <span style={{ fontWeight: 900, fontSize: "1.2rem", fontFamily: "var(--font-geologica)", color: "var(--color-text)" }}>
-              Робокс <span style={{ fontWeight: 500, color: "var(--color-text-muted)", fontSize: "0.95rem" }}>Наставникам</span>
+              Робокс <span className="portal-audience" style={{ fontWeight: 500, color: "var(--color-text-muted)", fontSize: "0.95rem" }}>Наставникам</span>
             </span>
           </Link>
 
           {/* Navigation / Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Link href="/" style={{
+          <div className="portal-actions" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <Link aria-label="На сайт" href="/" style={{
               fontSize: "var(--font-small)",
               color: "var(--color-text-muted)",
               fontWeight: 600,
@@ -114,6 +114,7 @@ export default function TeacherLayout({
           {children}
         </div>
       </main>
+      <style jsx global>{`@media (max-width: 520px) { .portal-logo { gap: 5px !important; } .portal-logo img, .portal-logo > div { width: 28px !important; height: 28px !important; } .portal-logo > span { font-size: 15px !important; } .portal-audience, .hidden-mobile { display: none !important; } .portal-actions { gap: 6px !important; } .portal-actions a, .portal-actions button { width: 40px; height: 40px; padding: 0 !important; justify-content: center; border-radius: 9px; } header .container { padding: 0 10px !important; } main { padding-top: 18px !important; } main > .container { padding: 0 10px !important; } }`}</style>
     </div>
   );
 }

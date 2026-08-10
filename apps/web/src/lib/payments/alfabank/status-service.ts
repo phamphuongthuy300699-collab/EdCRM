@@ -186,15 +186,40 @@ export async function refreshAlfabankPaymentStatus(
 
   if (newStatus !== payment.status) {
     const nowStr = new Date().toISOString();
+    const safeResponse = redactSensitivePaymentPayload(statusResponse);
+
+    if (newStatus === "paid") {
+      const { error: settlementError } = await (admin as any).rpc("settle_paid_payment", {
+        p_organization_id: payment.organization_id,
+        p_payment_id: payment.id,
+        p_paid_at: nowStr,
+        p_raw_response: safeResponse,
+        p_event_payload: redactSensitivePaymentPayload({ statusResponse, source }),
+      });
+      if (settlementError) {
+        throw new AlfaStatusError("Не удалось атомарно зачислить платеж", 500, "PAYMENT_SETTLEMENT_FAILED");
+      }
+      return { ok: true, message: "Статус платежа обновлен", status: newStatus, paymentId: payment.id, invoiceId: payment.invoice_id };
+    }
+
+    if (newStatus === "refunded") {
+      const { error: refundError } = await (admin as any).rpc("settle_refunded_payment", {
+        p_organization_id: payment.organization_id,
+        p_payment_id: payment.id,
+        p_raw_response: safeResponse,
+        p_event_payload: redactSensitivePaymentPayload({ statusResponse, source }),
+      });
+      if (refundError) throw new AlfaStatusError("Не удалось атомарно сохранить возврат", 500, "PAYMENT_REFUND_FAILED");
+      return { ok: true, message: "Возврат сохранен", status: newStatus, paymentId: payment.id, invoiceId: payment.invoice_id };
+    }
+
     const updateData: Record<string, any> = {
       status: newStatus,
-      raw_response: redactSensitivePaymentPayload(statusResponse),
+      raw_response: safeResponse,
       updated_at: nowStr,
     };
 
-    if (newStatus === "paid") {
-      updateData.paid_at = nowStr;
-    } else if (newStatus === "failed" || newStatus === "cancelled") {
+    if (newStatus === "failed" || newStatus === "cancelled") {
       updateData.failed_at = nowStr;
     }
 
@@ -206,19 +231,13 @@ export async function refreshAlfabankPaymentStatus(
       throw new AlfaStatusError("Не удалось обновить платеж", 500, "PAYMENT_UPDATE_FAILED");
     }
 
-    if (newStatus === "paid") {
-      await (admin.from("invoices") as any)
-        .update({ status: "paid", paid_at: nowStr })
-        .eq("id", payment.invoice_id);
-    }
-
-    if (newStatus === "paid" || newStatus === "failed" || newStatus === "cancelled") {
+    if (newStatus === "failed" || newStatus === "cancelled") {
       await (admin.from("payment_events") as any).insert({
         organization_id: payment.organization_id,
         payment_id: payment.id,
         invoice_id: payment.invoice_id,
         provider: "alfabank",
-        event_type: newStatus === "paid" ? "payment_paid" : "payment_failed",
+        event_type: "payment_failed",
         payload: redactSensitivePaymentPayload({ statusResponse, source }),
       });
     }

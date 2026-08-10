@@ -22,7 +22,7 @@ export async function GET() {
     admin.from("invoices").select("id", { count: "exact", head: true }).eq("organization_id", access.organizationId).eq("status", "overdue"),
     admin.from("invoices").select("amount").eq("organization_id", access.organizationId).eq("status", "overdue"),
     admin.from("invoices").select("id, title, amount, status, due_date, students(full_name, student_guardians(guardians(full_name)))").eq("organization_id", access.organizationId).eq("status", "overdue").order("due_date", { ascending: true }).limit(3),
-    admin.from("students").select("id, status").eq("organization_id", access.organizationId).eq("status", "active"),
+    admin.from("students").select("id, status").eq("organization_id", access.organizationId).or("status.eq.active,status.is.null"),
     admin.from("groups").select("id, capacity").eq("organization_id", access.organizationId).eq("status", "active"),
     admin.from("enrollments").select("id, group_id, student_id").eq("organization_id", access.organizationId).eq("status", "active"),
     admin.from("lesson_sessions").select("id, group_id, starts_at, ends_at, status, session_kind, groups(title, capacity), profiles(full_name), rooms(name)").eq("organization_id", access.organizationId).eq("lesson_date", today).in("status", ["planned", "live", "completed", "cancelled", "moved"]).order("starts_at", { ascending: true }),

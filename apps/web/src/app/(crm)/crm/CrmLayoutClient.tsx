@@ -20,7 +20,8 @@ import {
   ClipboardList,
   FileText,
   Globe,
-  Receipt
+  Receipt,
+  Coins
 } from "lucide-react";
 
 export default function CrmLayout({
@@ -49,6 +50,7 @@ export default function CrmLayout({
     { name: "Группы", path: "/crm/groups", icon: GraduationCap },
     { name: "Счета (Invoices)", path: "/crm/invoices", icon: CreditCard },
     { name: "Платежи (Payments)", path: "/crm/payments", icon: Receipt },
+    { name: "Финансы", path: "/crm/finance", icon: Coins },
     { name: "Учебные материалы", path: "/crm/materials", icon: BookOpen },
     { name: "Занятия", path: "/crm/lessons", icon: Calendar },
     { name: "Домашние задания", path: "/crm/homework", icon: ClipboardList },

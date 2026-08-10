@@ -139,6 +139,8 @@ const emptyStaff = {
   avatarUrl: "",
   showOnSite: false,
   sortOrder: 100,
+  payRate: "",
+  payRateEffectiveFrom: new Date().toISOString().slice(0, 10),
 };
 
 const demoOrg = {
@@ -1060,6 +1062,12 @@ export default function CrmSettingsPage() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(staffErrorMessage(payload));
+      const savedUserId = payload.userId || staffDraft.userId;
+      if (!demo && staffDraft.role === "teacher" && staffDraft.payRate !== "" && savedUserId) {
+        const rateResponse = await fetch("/api/crm/finance/teacher-rates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ teacherId: savedUserId, rate: Number(staffDraft.payRate), effectiveFrom: staffDraft.payRateEffectiveFrom }) });
+        const ratePayload = await rateResponse.json();
+        if (!rateResponse.ok || !ratePayload.ok) throw new Error(ratePayload.error || "Сотрудник сохранён, но ставку сохранить не удалось");
+      }
       if (payload.temporaryPassword) setTemporaryPassword(payload.temporaryPassword);
       if (demo) {
         const local = {
@@ -1760,6 +1768,8 @@ export default function CrmSettingsPage() {
                           avatarUrl: person.avatar_url || "",
                           showOnSite: Boolean(person.show_on_site),
                           sortOrder: person.sort_order || 100,
+                          payRate: person.pay_rate == null ? "" : String(person.pay_rate),
+                          payRateEffectiveFrom: person.pay_rate_effective_from || new Date().toISOString().slice(0, 10),
                         })}
                       >
                         Редактировать
@@ -2388,6 +2398,7 @@ export default function CrmSettingsPage() {
                 </div>
               </Field>
               <Field label="Порядок"><TextInput type="number" value={staffDraft.sortOrder} onChange={(e) => setStaffDraft({ ...staffDraft, sortOrder: e.target.value })} /></Field>
+              {staffDraft.role === "teacher" && <><Field label="Ставка за присутствующего ученика, ₽"><TextInput type="number" min="0" step="0.01" value={staffDraft.payRate} onChange={(e) => setStaffDraft({ ...staffDraft, payRate: e.target.value })} /></Field><Field label="Действует с"><TextInput type="date" value={staffDraft.payRateEffectiveFrom} onChange={(e) => setStaffDraft({ ...staffDraft, payRateEffectiveFrom: e.target.value })} /></Field></>}
             </div>
             <Field label="Публичное описание"><TextArea value={staffDraft.publicBio} onChange={(e) => setStaffDraft({ ...staffDraft, publicBio: e.target.value })} /></Field>
             <Field label="Внутренний комментарий"><TextArea value={staffDraft.internalComment} onChange={(e) => setStaffDraft({ ...staffDraft, internalComment: e.target.value })} /></Field>

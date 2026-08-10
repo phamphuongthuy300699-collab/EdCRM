@@ -36,6 +36,9 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
+    const { data: payRules } = await admin.from("teacher_pay_rules").select("teacher_id, effective_from, rate_per_attendee").eq("organization_id", organizationId).order("effective_from", { ascending: false });
+    const latestRate = new Map<string, any>();
+    for (const rule of payRules || []) if (!latestRate.has(rule.teacher_id)) latestRate.set(rule.teacher_id, rule);
     const staff = (memberships || []).map((membership: any) => {
       const profile = Array.isArray(membership.profiles) 
         ? membership.profiles[0] 
@@ -55,6 +58,8 @@ export async function GET(request: Request) {
         show_on_site: profile?.show_on_site ?? false,
         show_public_contacts: profile?.show_public_contacts ?? false,
         sort_order: profile?.sort_order ?? 100,
+        pay_rate: latestRate.get(membership.user_id)?.rate_per_attendee ?? null,
+        pay_rate_effective_from: latestRate.get(membership.user_id)?.effective_from ?? null,
       };
     });
 

@@ -326,39 +326,13 @@ export default function CrmInvoicesPage() {
         return;
       }
 
-      // Fetch invoice details
-      const { data: inv, error: fetchErr } = await supabase
-        .from("invoices")
-        .select("student_id, amount, organization_id")
-        .eq("id", id)
-        .single() as any;
-
-      if (fetchErr || !inv) {
-        throw new Error("Счет не найден в базе данных");
-      }
-
-      // Create manual payment
-      const { error: paymentErr } = await (supabase
-        .from("payments") as any)
-        .insert({
-          organization_id: inv.organization_id,
-          student_id: inv.student_id,
-          invoice_id: id,
-          amount: parseFloat(inv.amount),
-          provider: "manual",
-          status: "paid",
-          paid_at: new Date().toISOString()
-        }) as any;
-
-      if (paymentErr) throw paymentErr;
-
-      // Update invoice status
-      const { error } = await (supabase
-        .from("invoices") as any)
-        .update({ status: "paid", paid_at: new Date().toISOString() })
-        .eq("id", id);
-      
-      if (error) throw error;
+      const response = await fetch("/api/crm/invoices/settle", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoiceId: id }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось зачислить оплату");
 
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: "paid" } : inv));
       setActionMessage("Счет успешно оплачен вручную.");

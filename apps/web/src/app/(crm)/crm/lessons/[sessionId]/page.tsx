@@ -325,7 +325,7 @@ export default function LessonConductPage() {
       if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось завершить занятие");
 
       setSession(prev => prev ? { ...prev, status: "completed" } : null);
-      setAttendanceMessage("Занятие завершено");
+      setAttendanceMessage(result.result?.warnings ? `Занятие завершено. Финансовых предупреждений: ${result.result.warnings} — они доступны в разделе «Финансы».` : "Занятие завершено");
     } catch (err) {
       console.error("Error closing session:", err);
       setAttendanceError((err as Error).message || "Не удалось завершить занятие");

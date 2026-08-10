@@ -65,6 +65,7 @@ export default function StudentDetailPage() {
   const [editParentPhone, setEditParentPhone] = useState("");
   const [editParentEmail, setEditParentEmail] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [billingFinance, setBillingFinance] = useState<any | null>(null);
 
   // Enrollment form fields
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -82,6 +83,13 @@ export default function StudentDetailPage() {
     d.setDate(d.getDate() + 10);
     setNewInvoiceDueDate(d.toISOString().split("T")[0]);
   }, []);
+
+  useEffect(() => {
+    if (isDemoMode() || !/^[0-9a-f-]{36}$/i.test(studentId)) return;
+    fetch(`/api/crm/students/${studentId}/finance`).then((response) => response.json()).then((payload) => {
+      if (payload.ok) setBillingFinance(payload);
+    }).catch(() => setBillingFinance(null));
+  }, [studentId]);
 
   // Mock data fallbacks for demo mode or numeric IDs
   const mockStudents = [
@@ -302,30 +310,15 @@ export default function StudentDetailPage() {
         return;
       }
 
-      // Create Payment Transaction and update invoice
       const targetInvoice = invoices.find(inv => inv.id === invoiceId);
       if (!targetInvoice) return;
-
-      const { error: paymentErr } = await (supabase
-        .from("payments") as any)
-        .insert({
-          organization_id: student.organization_id || "7f8d5918-a6fe-4fbe-9b37-236b28ee2e7b",
-          student_id: student.id,
-          invoice_id: invoiceId,
-          amount: targetInvoice.amount,
-          provider: "manual",
-          status: "paid",
-          paid_at: new Date().toISOString()
-        });
-
-      if (paymentErr) throw paymentErr;
-
-      const { error: invUpdateErr } = await (supabase
-        .from("invoices") as any)
-        .update({ status: "paid" })
-        .eq("id", invoiceId);
-
-      if (invUpdateErr) throw invUpdateErr;
+      const response = await fetch("/api/crm/invoices/settle", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось зачислить оплату");
 
       setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: "paid" } : inv));
       alert("Счет успешно оплачен!");
@@ -565,6 +558,7 @@ export default function StudentDetailPage() {
     if (curr.status === "paid") return acc;
     return acc - curr.amount;
   }, 0);
+  const projectedBalance = billingFinance?.account ? Number(billingFinance.account.balance || 0) : balance;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", padding: "20px" }}>
@@ -622,16 +616,17 @@ export default function StudentDetailPage() {
 
           {/* Balance Status */}
           <div style={{
-            background: balance < 0 ? "var(--color-danger-soft)" : "var(--color-success-soft)",
-            border: `1px solid ${balance < 0 ? "var(--color-danger)" : "var(--color-success)"}`,
+            background: projectedBalance < 0 ? "var(--color-danger-soft)" : "var(--color-success-soft)",
+            border: `1px solid ${projectedBalance < 0 ? "var(--color-danger)" : "var(--color-success)"}`,
             padding: "16px 24px",
             borderRadius: "12px",
             textAlign: "right"
           }}>
-            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Баланс абонемента</div>
-            <div style={{ fontSize: "20px", fontWeight: 800, color: balance < 0 ? "var(--color-danger-dark)" : "var(--color-success-dark)" }}>
-              {balance === 0 ? "0 ₽" : `${balance} ₽`}
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase" }}>{billingFinance ? "Лицевой счёт плательщика" : "Баланс абонемента"}</div>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: projectedBalance < 0 ? "var(--color-danger-dark)" : "var(--color-success-dark)" }}>
+              {projectedBalance === 0 ? "0 ₽" : `${projectedBalance.toLocaleString("ru-RU")} ₽`}
             </div>
+            {billingFinance?.problem && <small style={{ color: "var(--color-danger)" }}>{billingFinance.problem}</small>}
           </div>
         </div>
       </div>
