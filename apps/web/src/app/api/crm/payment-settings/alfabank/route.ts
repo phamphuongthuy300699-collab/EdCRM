@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requirePaymentAdmin } from "./_shared";
 
 const gatewayUrl = z.string().url().optional().nullable().or(z.literal(""));
@@ -92,7 +92,7 @@ function sanitizeSettings(row: any): AlfabankSettingsResponse {
 
 export async function GET() {
   try {
-    if (isDemoMode()) {
+    if (isDemoAuthBypassAllowed()) {
       return NextResponse.json({ ok: true, settings: defaultSettings(), passwordConfigured: false });
     }
 
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Некорректные настройки Альфа-Банка", details: parsed.error.format() }, { status: 400 });
     }
 
-    if (isDemoMode()) {
+    if (isDemoAuthBypassAllowed()) {
       return NextResponse.json({ ok: true, passwordConfigured: Boolean(parsed.data.apiPassword) });
     }
 

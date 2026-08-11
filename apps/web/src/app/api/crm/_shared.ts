@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 
 export const crmMutationRoles = new Set(["owner", "admin", "manager"]);
 export const crmFinanceRoles = new Set(["owner", "admin", "manager", "accountant"]);
 
 export async function requireCrmStaff(roles: Set<string> = crmMutationRoles) {
-  if (isDemoMode()) {
+  if (isDemoAuthBypassAllowed()) {
     return { ok: true as const, userId: "demo-user", organizationId: "demo-org", role: "admin" };
   }
 

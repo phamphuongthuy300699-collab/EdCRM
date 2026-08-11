@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/shared/db/types";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,10 +10,10 @@ export async function middleware(request: NextRequest) {
   // Если ключей базы данных нет в окружении
   if (!url || !key) {
     const isProduction = process.env.NODE_ENV === "production";
-    const demoExplicit = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+    const demoAuthBypassAllowed = isDemoAuthBypassAllowed();
 
     // В production без явного DEMO_MODE — показать ошибку конфигурации
-    if (isProduction && !demoExplicit) {
+    if (isProduction && !demoAuthBypassAllowed) {
       const pathname = request.nextUrl.pathname;
       // Разрешить статику и API
       if (pathname.startsWith("/_next") || pathname.startsWith("/api/public") || pathname === "/favicon.ico") {
@@ -27,8 +28,9 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // В dev/test или с явным DEMO_MODE — пропускаем без авторизации
-    return NextResponse.next();
+    // Authorization bypass requires the explicit server-only flag and is impossible in Docker production.
+    if (demoAuthBypassAllowed) return NextResponse.next();
+    return new NextResponse("Authentication is not configured", { status: 503 });
   }
 
   let response = NextResponse.next({
@@ -204,4 +206,3 @@ export const config = {
     "/((?!api/public|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-

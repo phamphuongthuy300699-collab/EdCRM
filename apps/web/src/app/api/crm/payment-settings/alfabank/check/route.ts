@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requirePaymentAdmin } from "../_shared";
 
 function isValidUrl(value: string | null | undefined) {
@@ -30,7 +30,7 @@ async function assertGatewayDoesNotReturnHtml404(gatewayUrl: string) {
 
 export async function POST() {
   try {
-    if (isDemoMode()) {
+    if (isDemoAuthBypassAllowed()) {
       return NextResponse.json({
         ok: true,
         status: "warning",

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { temporaryPortalPassword } from "@/shared/utils/passwords";
 
 export const uuidSchema = z.string().uuid();
@@ -14,7 +14,7 @@ export const parentAccessPayloadSchema = z.object({
 });
 
 export async function requireParentAccessStaff() {
-  if (isDemoMode()) {
+  if (isDemoAuthBypassAllowed()) {
     return { ok: true as const, userId: "demo-user", organizationId: "demo-org", role: "admin" };
   }
 

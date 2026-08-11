@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requireStaffAdmin, resolveOrganizationId, staffPayloadSchema, temporaryPassword } from "../_shared";
 
 export async function POST(request: Request) {
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Некорректные данные сотрудника", details: parsed.error.format() }, { status: 400 });
     }
 
-    if (isDemoMode()) {
+    if (isDemoAuthBypassAllowed()) {
       return NextResponse.json({
         ok: true,
         userId: `demo-${Date.now()}`,

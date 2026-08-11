@@ -4,7 +4,7 @@ import path from "path";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { resolveMediaUsages } from "./media-usages";
 
 const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
@@ -29,7 +29,7 @@ function getLocalMediaDir() {
 
 // Helper to authenticate and verify user role
 async function checkAuthAndRole(req: NextRequest) {
-  if (isDemoMode()) {
+  if (isDemoAuthBypassAllowed()) {
     return { ok: true, role: "admin" };
   }
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 
 export const staffRoleSchema = z.enum(["owner", "admin", "manager", "teacher", "accountant"]);
 export const postgresUuidSchema = z.string().regex(
@@ -39,7 +39,7 @@ export const userIdPayloadSchema = z.object({
 });
 
 export async function requireStaffAdmin() {
-  if (isDemoMode()) {
+  if (isDemoAuthBypassAllowed()) {
     return { ok: true as const, organizationId: "demo-org" };
   }
 

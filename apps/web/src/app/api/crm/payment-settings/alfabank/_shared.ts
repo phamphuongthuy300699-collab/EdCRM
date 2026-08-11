@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
-import { isDemoMode } from "@/shared/utils/demo";
+import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 
 export async function requirePaymentAdmin() {
-  if (isDemoMode()) {
+  if (isDemoAuthBypassAllowed()) {
     return { ok: true as const, organizationId: "demo-org" };
   }
 
