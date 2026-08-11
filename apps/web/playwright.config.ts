@@ -31,6 +31,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_URL: "",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
         NEXT_PUBLIC_DEMO_MODE: "true",
+        DEMO_AUTH_BYPASS: "true",
       }),
     },
   },
