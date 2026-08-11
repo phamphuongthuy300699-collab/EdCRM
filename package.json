@@ -18,6 +18,6 @@
     "test:e2e:real": "npm run test:e2e:real --workspace=apps/web"
   },
   "dependencies": {
-    "pg": "^8.22.0"
+    "pg": "^8.23.0"
   }
 }
