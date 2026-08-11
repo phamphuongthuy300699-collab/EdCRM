@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, RefreshCw } from "lucide-react";
+import { periodRange } from "@/lib/reports/date-range";
 
 const rub = (value: unknown) => `${Number(value || 0).toLocaleString("ru-RU")} ₽`;
 const periods = ["Сегодня", "Неделя", "Месяц", "Прошлый месяц", "Произвольный диапазон"] as const;
@@ -10,13 +11,9 @@ type ReportTab = "overview" | "groups" | "teachers" | "attendance" | "debt";
 type GroupSort = "occupancy" | "attendance" | "debits" | "students";
 
 function rangeFor(period: string) {
-  const now = new Date();
-  const iso = (date: Date) => date.toISOString().slice(0, 10);
-  if (period === "Сегодня") return [iso(now), iso(now)];
-  if (period === "Неделя") { const start = new Date(now); start.setDate(now.getDate() - 6); return [iso(start), iso(now)]; }
-  if (period === "Прошлый месяц") { const start = new Date(now.getFullYear(), now.getMonth() - 1, 1); const end = new Date(now.getFullYear(), now.getMonth(), 0); return [iso(start), iso(end)]; }
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  return [iso(start), iso(now)];
+  const key = period === "Сегодня" ? "today" : period === "Неделя" ? "week" : period === "Прошлый месяц" ? "previous-month" : "month";
+  const range = periodRange(key);
+  return [range.dateFrom, range.dateTo];
 }
 
 export default function ReportsPage() {
@@ -89,13 +86,13 @@ export default function ReportsPage() {
     {loading && <div className="card-crm">Строим отчёт…</div>}
     {!loading && report && tab === "overview" && <>
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
-        {card("Активные ученики", report.students.active, `Без группы: ${report.students.withoutGroup} · новых: ${report.students.newInPeriod}`)}
+        {card("Активные ученики", report.students.active, `Без группы во всей организации: ${report.students.withoutGroup} · новых: ${report.students.newInPeriod}`)}
         {card("Активные группы", report.groups.active, `Текущая заполненность: ${report.groups.occupancyRate}%`)}
         {card("Занятия", report.lessons.scheduled, `Проведено ${report.lessons.completed} · отменено ${report.lessons.cancelled} · переносы ${report.lessons.moved}`)}
         {card("Посещаемость", `${report.attendance.rate}%`, `${report.attendance.present} были · ${report.attendance.late} опоздали`)}
-        {card("Получено оплат", rub(report.finance.cashReceived), `${report.finance.paidPayments} подтверждённых оплат`)}
+        {card("Получено оплат", rub(report.finance.cashReceived), `${report.finance.paidPayments} подтверждённых оплат · по всей организации`)}
         {card("Стоимость проведённых занятий", rub(report.finance.lessonDebits), "Источник: lesson_debit, не денежные поступления")}
-        {card("Задолженность родителей", rub(report.finance.totalDebt), `${report.finance.debtors} лицевых счетов ниже нуля`)}
+        {card("Задолженность родителей", rub(report.finance.totalDebt), `${report.finance.debtors} лицевых счетов ниже нуля · по всей организации`)}
         {card("Начислено преподавателям", rub(report.payroll.accrued), `Одобрено ${rub(report.payroll.approved)} · к выплате ${rub(report.payroll.payable)}`)}
       </section>
       <details className="card-crm" style={{ background: "white" }}><summary style={{ cursor: "pointer", fontWeight: 700 }}>Источники и формулы</summary><ul>{Object.entries(report.sources).map(([key,value]) => <li key={key}><code>{key}</code>: {String(value)}</li>)}</ul></details>
