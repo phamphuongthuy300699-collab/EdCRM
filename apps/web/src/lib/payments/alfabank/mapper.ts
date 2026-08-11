@@ -5,6 +5,7 @@ import type {
   CreateAlfaOrderInput,
   SafeAlfaRegisterRequest,
 } from "./types";
+import { AlfaBankError } from "./errors";
 
 const defaultAllowedGatewayHosts = new Set([
   "alfa.rbsuat.com",
@@ -44,8 +45,17 @@ export function normalizeGatewayUrl(gatewayUrl: string) {
 }
 
 export function resolveRegisterEndpoint(config: Pick<AlfaGatewayConfig, "registerEndpoint" | "paymentStage">) {
-  if (config.registerEndpoint?.trim()) return config.registerEndpoint.trim().replace(/^\/+/, "");
-  return config.paymentStage === "two_step" ? "registerPreAuth.do" : "register.do";
+  const defaultEndpoint = config.paymentStage === "two_step" ? "registerPreAuth.do" : "register.do";
+  if (!config.registerEndpoint?.trim()) return defaultEndpoint;
+
+  const endpoint = config.registerEndpoint.trim().replace(/^\/+/, "");
+  const allowedRegisterEndpoints = new Set(["register.do", "registerPreAuth.do"]);
+  if (!allowedRegisterEndpoints.has(endpoint)) {
+    throw new AlfaBankError("Недопустимый endpoint регистрации платежа", {
+      code: "ALFABANK_REGISTER_ENDPOINT_REJECTED",
+    });
+  }
+  return endpoint;
 }
 
 export function toMinorUnits(amount: number) {

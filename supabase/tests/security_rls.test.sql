@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap;
-select plan(12);
+select plan(13);
 
 select ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -16,6 +16,11 @@ select ok(not exists (
   select 1 from information_schema.role_table_grants
   where table_schema = 'public' and grantee = 'authenticated' and privilege_type in ('TRUNCATE','TRIGGER','REFERENCES')
 ), 'authenticated cannot truncate, trigger or reference business tables');
+
+select ok(not exists (
+  select 1 from information_schema.role_table_grants
+  where table_schema = 'public' and table_name = 'payment_provider_settings' and grantee = 'authenticated'
+), 'authenticated browser cannot directly read or mutate provider secrets');
 
 select ok(not has_function_privilege('anon', 'public.convert_lead_to_student(uuid,uuid)', 'EXECUTE'), 'anon cannot execute lead conversion');
 select ok(not has_function_privilege('authenticated', 'public.convert_lead_to_student(uuid,uuid)', 'EXECUTE'), 'authenticated cannot execute service-only lead conversion');

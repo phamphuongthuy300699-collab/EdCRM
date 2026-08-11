@@ -81,7 +81,7 @@ browser -> Next.js -> Supabase -> AlfaBank
 - Cookie mutations lacked a uniform origin check; middleware now rejects foreign Origin/Sec-Fetch-Site for CRM/parent/teacher/student and browser payment mutations. Provider/cron endpoints remain explicitly exempt.
 - Payment return paths could resolve to an external origin; production now requires configured application origin. Payment create bodies are strict and amount remains server-derived from invoice.
 - Expensive payment status/callback, MAX webhook, media upload, staff password reset and notification worker paths now have bounded application throttles. Reverse proxy remains the first line.
-- Provider APIs returned operational errors too directly and MAX returned its stored webhook secret. Public/provider errors are generic; MAX and Alfa return configured flags rather than plaintext credentials.
+- Provider APIs returned operational errors too directly and MAX returned its stored webhook secret. Public/provider errors are generic; MAX and Alfa return configured flags rather than plaintext credentials. Authenticated PostgREST access to `payment_provider_settings` is explicitly revoked, so browser code cannot bypass the sanitized server API.
 - Browser headers were absent. Enforced CSP, nosniff, frame denial, referrer/permissions policy and production HSTS are configured; sensitive APIs receive `private, no-store`.
 - Critical finance/staff/media/provider settings mutations now write safe `crm_audit_log` records without password/token/secret/provider-body fields.
 
@@ -105,7 +105,7 @@ browser -> Next.js -> Supabase -> AlfaBank
 - `/payments/success` performs no database mutation; it calls the server return-status endpoint.
 - Alfa callback status is not trusted. The callback locates an existing payment and calls authenticated `getOrderStatusExtended.do`; only the server response can reach atomic settlement/refund RPCs.
 - Provider amount in minor units is compared to stored CRM amount before settlement. Mismatch emits `payment_amount_mismatch`, returns a generic error and leaves ledger/balance unchanged.
-- Stored gateway URLs are constrained to HTTPS Alfa/paymentgate hosts and the exact REST base path before credentials are sent; redirects are rejected. Additional verified provider hosts require the server-only `ALFABANK_ALLOWED_GATEWAY_HOSTS` allowlist.
+- Stored gateway URLs are constrained to HTTPS Alfa/paymentgate hosts and the exact REST base path before credentials are sent; redirects are rejected. The optional registration endpoint accepts only relative `register.do` or `registerPreAuth.do`, so it cannot replace the validated origin. Additional verified provider hosts require the server-only `ALFABANK_ALLOWED_GATEWAY_HOSTS` allowlist.
 - Existing unique ledger/payment/refund constraints and atomic RPCs make repeated callback/status/reconciliation idempotent; a final status cannot regress to non-final.
 - The reviewed Alfa merchant protocol documents merchant login/password for REST status requests and dynamic callback URL; no compatible callback HMAC/token field was identified for this integration. Therefore no invented signature was added. Callback is a throttled hint followed by an authoritative authenticated bank query.
 

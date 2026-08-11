@@ -66,4 +66,10 @@ describe("payment boundary security", () => {
     expect(isAllowedAlfaGatewayUrl("https://evil.example/payment/rest/")).toBe(false);
     expect(isAllowedAlfaGatewayUrl("https://engine.paymentgate.ru.evil.example/payment/rest/")).toBe(false);
   });
+
+  it("does not allow an absolute register endpoint to replace the validated gateway origin", () => {
+    const mapper = read("lib/payments/alfabank/mapper.ts");
+    expect(mapper).toContain("allowedRegisterEndpoints");
+    expect(mapper).toContain("ALFABANK_REGISTER_ENDPOINT_REJECTED");
+  });
 });

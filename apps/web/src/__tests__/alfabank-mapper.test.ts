@@ -51,10 +51,12 @@ describe("alfabank mapper", () => {
     expect(request.currency).toBe("810");
   });
 
-  it("uses registerPreAuth for two-step payments unless endpoint is configured", () => {
+  it("allows only known relative registration endpoints", () => {
     expect(resolveRegisterEndpoint({ paymentStage: "one_step" })).toBe("register.do");
     expect(resolveRegisterEndpoint({ paymentStage: "two_step" })).toBe("registerPreAuth.do");
-    expect(resolveRegisterEndpoint({ paymentStage: "two_step", registerEndpoint: "/custom/register.do" })).toBe("custom/register.do");
+    expect(resolveRegisterEndpoint({ paymentStage: "two_step", registerEndpoint: "/register.do" })).toBe("register.do");
+    expect(() => resolveRegisterEndpoint({ paymentStage: "one_step", registerEndpoint: "https://evil.example/collect" })).toThrow();
+    expect(() => resolveRegisterEndpoint({ paymentStage: "one_step", registerEndpoint: "custom/register.do" })).toThrow();
   });
 
   it("scrubs sensitive values from payment logs nested payloads", () => {

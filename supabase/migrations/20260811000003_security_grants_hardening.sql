@@ -1,6 +1,8 @@
 -- Defense in depth for the exposed public schema. RLS remains enabled on every table.
 revoke all privileges on all tables in schema public from anon;
 revoke truncate, references, trigger on all tables in schema public from authenticated;
+-- Provider credentials are server-only. Browser users must use the sanitized Next API.
+revoke all privileges on table public.payment_provider_settings from anon, authenticated;
 
 alter default privileges for role postgres in schema public revoke all on tables from anon;
 alter default privileges for role postgres in schema public revoke truncate, references, trigger on tables from authenticated;
