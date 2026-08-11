@@ -74,7 +74,9 @@ describe("representative BOLA defenses", () => {
       const source = read(file);
       expect(source).toContain("getUserById");
       expect(source).toContain("isStaffIdentityOwnedByOrganization");
+      expect(source).toContain("hasExclusiveStaffIdentityScope");
       expect(source.indexOf("isStaffIdentityOwnedByOrganization")).toBeLessThan(source.indexOf("updateUserById"));
+      expect(source.indexOf("hasExclusiveStaffIdentityScope")).toBeLessThan(source.indexOf("updateUserById"));
     }
   });
 });

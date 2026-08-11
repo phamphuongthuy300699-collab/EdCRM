@@ -9,9 +9,19 @@ alter default privileges for role postgres in schema public revoke truncate, ref
 
 -- Existing staff identities are assigned only when exactly one organization can own them.
 -- Ambiguous multi-organization identities stay unassigned and must use account recovery.
-with single_organization_staff as (
+with identity_organizations as (
+  select user_id, organization_id from public.org_memberships
+  union
+  select user_id, organization_id from public.guardian_users
+  union
+  select user_id, organization_id from public.student_users
+), single_organization_staff as (
   select user_id, max(organization_id::text) as organization_id
-  from public.org_memberships
+  from identity_organizations
+  where exists (
+    select 1 from public.org_memberships as membership
+    where membership.user_id = identity_organizations.user_id
+  )
   group by user_id
   having count(distinct organization_id) = 1
 )

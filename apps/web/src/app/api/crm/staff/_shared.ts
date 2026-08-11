@@ -105,3 +105,32 @@ export function isStaffIdentityOwnedByOrganization(
 ) {
   return user?.app_metadata?.[staffOrganizationMetadataKey] === organizationId;
 }
+
+type IdentityOrganizationLink = { organization_id: string | null };
+
+export function identityOrganizationsAreExclusive(
+  linkSets: IdentityOrganizationLink[][],
+  organizationId: string,
+) {
+  const organizations = new Set(
+    linkSets.flatMap((links) => links.map((link) => link.organization_id).filter((id): id is string => Boolean(id))),
+  );
+  return organizations.size === 1 && organizations.has(organizationId);
+}
+
+export async function hasExclusiveStaffIdentityScope(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string,
+  organizationId: string,
+) {
+  const results = await Promise.all([
+    (admin.from("org_memberships") as any).select("organization_id").eq("user_id", userId),
+    (admin.from("guardian_users") as any).select("organization_id").eq("user_id", userId),
+    (admin.from("student_users") as any).select("organization_id").eq("user_id", userId),
+  ]);
+  if (results.some((result) => result.error)) return false;
+  return identityOrganizationsAreExclusive(
+    results.map((result) => (result.data || []) as IdentityOrganizationLink[]),
+    organizationId,
+  );
+}

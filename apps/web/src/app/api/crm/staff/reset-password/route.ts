@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
-import { isStaffIdentityOwnedByOrganization, requireStaffAdmin, temporaryPassword, userIdPayloadSchema } from "../_shared";
+import { hasExclusiveStaffIdentityScope, isStaffIdentityOwnedByOrganization, requireStaffAdmin, temporaryPassword, userIdPayloadSchema } from "../_shared";
 import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
@@ -23,13 +23,16 @@ export async function POST(request: Request) {
 
     const password = temporaryPassword();
     const admin = createSupabaseAdminClient();
-    const { data: targetMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", access.organizationId).eq("user_id", parsed.data.userId).maybeSingle();
+    const { data: targetMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", access.organizationId).eq("user_id", parsed.data.userId).eq("is_active", true).maybeSingle();
     if (!targetMembership) return NextResponse.json({ ok: false, error: "Сотрудник не найден в этой организации" }, { status: 404 });
     if (access.role !== "owner" && ["owner", "admin"].includes(targetMembership.role)) return NextResponse.json({ ok: false, error: "Только владелец может сбросить пароль этого сотрудника" }, { status: 403 });
     const { data: targetIdentity, error: identityError } = await admin.auth.admin.getUserById(parsed.data.userId);
     if (identityError || !targetIdentity.user) return NextResponse.json({ ok: false, error: "Учётная запись сотрудника не найдена" }, { status: 404 });
     if (!isStaffIdentityOwnedByOrganization(targetIdentity.user, access.organizationId)) {
       return NextResponse.json({ ok: false, error: "Для этой учётной записи доступно только безопасное восстановление пароля", code: "STAFF_IDENTITY_OWNERSHIP_REQUIRED" }, { status: 403 });
+    }
+    if (!await hasExclusiveStaffIdentityScope(admin, parsed.data.userId, access.organizationId)) {
+      return NextResponse.json({ ok: false, error: "Для общей учётной записи доступно только безопасное восстановление пароля", code: "STAFF_IDENTITY_SHARED" }, { status: 403 });
     }
     const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, {
       password,

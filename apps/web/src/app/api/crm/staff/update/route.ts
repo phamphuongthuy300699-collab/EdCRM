@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
-import { isStaffIdentityOwnedByOrganization, postgresUuidSchema, requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
+import { hasExclusiveStaffIdentityScope, isStaffIdentityOwnedByOrganization, postgresUuidSchema, requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
     const organizationId = await resolveOrganizationId(access.organizationId);
     const admin = createSupabaseAdminClient();
-    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", organizationId).eq("user_id", input.userId).maybeSingle();
+    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", organizationId).eq("user_id", input.userId).eq("is_active", true).maybeSingle();
     if (!currentMembership) return NextResponse.json({ ok: false, error: "Сотрудник не найден в этой организации" }, { status: 404 });
     if (access.role !== "owner" && ["owner", "admin"].includes(currentMembership.role)) {
       return NextResponse.json({ ok: false, error: "Только владелец может изменять этого сотрудника" }, { status: 403 });
@@ -33,6 +33,9 @@ export async function POST(request: Request) {
     if (identityError || !targetIdentity.user) return NextResponse.json({ ok: false, error: "Учётная запись сотрудника не найдена" }, { status: 404 });
     if (!isStaffIdentityOwnedByOrganization(targetIdentity.user, organizationId)) {
       return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись без подтверждённого владения", code: "STAFF_IDENTITY_OWNERSHIP_REQUIRED" }, { status: 403 });
+    }
+    if (!await hasExclusiveStaffIdentityScope(admin, input.userId, organizationId)) {
+      return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись из CRM организации", code: "STAFF_IDENTITY_SHARED" }, { status: 403 });
     }
 
     try {
