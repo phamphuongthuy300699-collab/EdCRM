@@ -1,12 +1,21 @@
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createPublicLeadSchema } from "@/features/leads/schemas";
 import type { Database } from "@/shared/db/types";
 import { isDemoMode } from "@/shared/utils/demo";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const DEFAULT_ORG_SLUG = process.env.DEFAULT_ORG_SLUG || "robotics-lipetsk";
 
 export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+  const fingerprint = requestFingerprint(request);
+  const rate = checkRateLimit({ key: `public-lead:${fingerprint}`, limit: 10, windowMs: 10 * 60_000 });
+  if (!rate.allowed) {
+    console.warn("[security]", { scope: "security", event: "rate_limit_exceeded", endpoint: "public_lead", requestId, rateLimited: true });
+    return rateLimitResponse(rate);
+  }
   try {
     const body = await request.json();
     const parsed = createPublicLeadSchema.safeParse(body);
@@ -19,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     if (isDemoMode()) {
-      console.log("Demo Mode: lead submission received:", body);
+      console.info("[public lead]", { requestId, result: "demo_accepted", coursePresent: Boolean(parsed.data.courseId), hasMessage: Boolean(parsed.data.message), rateLimited: false });
       return NextResponse.json({ ok: true });
     }
 

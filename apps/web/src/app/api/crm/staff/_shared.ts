@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
+import { temporaryPortalPassword } from "@/shared/utils/passwords";
 
 export const staffRoleSchema = z.enum(["owner", "admin", "manager", "teacher", "accountant"]);
 export const postgresUuidSchema = z.string().regex(
@@ -31,12 +32,12 @@ export const staffPayloadSchema = z.object({
   avatarUrl: z.string().optional().nullable().or(z.literal("")),
   showOnSite: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
-});
+}).strict();
 
 export const userIdPayloadSchema = z.object({
   userId: postgresUuidSchema,
   organizationId: postgresUuidSchema.optional(),
-});
+}).strict();
 
 export async function requireStaffAdmin() {
   if (isDemoAuthBypassAllowed()) {
@@ -68,7 +69,7 @@ export async function requireStaffAdmin() {
     };
   }
 
-  return { ok: true as const, organizationId: membership.organization_id as string };
+  return { ok: true as const, userId: user.id, organizationId: membership.organization_id as string, role: membership.role as string };
 }
 
 export async function resolveOrganizationId(preferred?: string) {
@@ -89,6 +90,5 @@ export async function resolveOrganizationId(preferred?: string) {
 }
 
 export function temporaryPassword() {
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return `Robotics-${suffix}-2026`;
+  return temporaryPortalPassword("Roboks");
 }

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../../_shared";
+import { writeSecurityAudit } from "@/lib/security/audit";
 
 const roles = new Set(["owner", "admin", "accountant"]);
 const warning = "Исторические оплаты и начальный остаток нельзя учитывать дважды";
 const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("payments"), paymentIds: z.array(z.string().uuid()).min(1).max(100) }),
-  z.object({ action: z.literal("lesson"), lessonSessionId: z.string().uuid() }),
-  z.object({ action: z.literal("openingBalance"), guardianId: z.string().uuid(), amount: z.number().refine((value) => value !== 0), acknowledgeNoDoubleCount: z.literal(true) }),
+  z.object({ action: z.literal("payments"), paymentIds: z.array(z.string().uuid()).min(1).max(100) }).strict(),
+  z.object({ action: z.literal("lesson"), lessonSessionId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("openingBalance"), guardianId: z.string().uuid(), amount: z.number().refine((value) => value !== 0), acknowledgeNoDoubleCount: z.literal(true) }).strict(),
 ]);
 
 export async function POST(request: Request) {
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   if (input.action === "lesson") {
     const call = await admin.rpc("reconcile_lesson_finance", { p_organization_id: access.organizationId, p_lesson_session_id: input.lessonSessionId, p_actor_id: access.userId });
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
+    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "historical_lesson_reconciliation", entityTable: "lesson_sessions", entityId: input.lessonSessionId });
     return NextResponse.json({ ok: true, result: call.data });
   }
 
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
       p_actor_id: access.userId,
     });
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
+    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "opening_balance_reconciliation", entityTable: "billing_accounts", entityId: input.guardianId, metadata: { amount: input.amount } });
     return NextResponse.json({ ok: true, warning, result: call.data });
   }
 
@@ -42,5 +45,6 @@ export async function POST(request: Request) {
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message, paymentId }, { status: 409 });
     results.push(call.data);
   }
+  await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "historical_payment_reconciliation", entityTable: "payments", metadata: { paymentCount: input.paymentIds.length } });
   return NextResponse.json({ ok: true, warning, results });
 }

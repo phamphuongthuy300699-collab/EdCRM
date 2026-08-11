@@ -2,34 +2,47 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/shared/db/types";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
+import { assertSameOriginMutation } from "@/lib/security/origin";
+
+const cookieMutationPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
+const cookiePaymentMutations = new Set(["/api/payments/alfabank/create", "/api/payments/alfabank/status", "/api/payments/alfabank/return-status"]);
+const sensitiveApiPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
+
+function applySensitiveCachePolicy(response: NextResponse, pathname: string) {
+  if (sensitiveApiPrefixes.some((prefix) => pathname.startsWith(prefix)) || cookiePaymentMutations.has(pathname)) {
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+  return response;
+}
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isCookieMutation = !["GET", "HEAD", "OPTIONS"].includes(request.method) && (
+    cookieMutationPrefixes.some((prefix) => pathname.startsWith(prefix)) || cookiePaymentMutations.has(pathname)
+  );
+  if (isCookieMutation) {
+    const origin = assertSameOriginMutation(request, process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin);
+    if (!origin.ok) {
+      console.warn("[security]", { scope: "security", event: "csrf_rejected", path: pathname });
+      return applySensitiveCachePolicy(NextResponse.json({ ok: false, error: "Запрос отклонён", code: origin.code }, { status: origin.status }), pathname);
+    }
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   // Если ключей базы данных нет в окружении
   if (!url || !key) {
-    const isProduction = process.env.NODE_ENV === "production";
     const demoAuthBypassAllowed = isDemoAuthBypassAllowed();
-
-    // В production без явного DEMO_MODE — показать ошибку конфигурации
-    if (isProduction && !demoAuthBypassAllowed) {
-      const pathname = request.nextUrl.pathname;
-      // Разрешить статику и API
-      if (pathname.startsWith("/_next") || pathname.startsWith("/api/public") || pathname === "/favicon.ico") {
-        return NextResponse.next();
-      }
-      // Для всех защищённых маршрутов — вернуть ошибку
-      if (pathname.startsWith("/crm") || pathname.startsWith("/teacher") || pathname.startsWith("/parent") || pathname.startsWith("/student")) {
-        return new NextResponse(
-          "Ошибка конфигурации: отсутствуют переменные SUPABASE_URL / SUPABASE_KEY. Обратитесь к администратору.",
-          { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } }
-        );
-      }
-    }
-
     // Authorization bypass requires the explicit server-only flag and is impossible in Docker production.
     if (demoAuthBypassAllowed) return NextResponse.next();
+
+    const protectedPagePrefixes = ["/crm", "/teacher", "/parent", "/student"];
+    const isProtectedWithoutAuth = protectedPagePrefixes.some((prefix) => pathname.startsWith(prefix)) || (
+      pathname.startsWith("/api/") && pathname !== "/api/health" && !pathname.startsWith("/api/public/")
+    );
+    const isPublicWithoutAuth = pathname === "/api/health" || pathname.startsWith("/api/public/") || !isProtectedWithoutAuth;
+    if (isPublicWithoutAuth) return NextResponse.next();
+
     return new NextResponse("Authentication is not configured", { status: 503 });
   }
 
@@ -61,8 +74,6 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
 
   // Check authentication for protected paths
   const isCrmPath = pathname.startsWith("/crm");
@@ -190,7 +201,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response;
+  return applySensitiveCachePolicy(response, pathname);
 }
 
 export const config = {

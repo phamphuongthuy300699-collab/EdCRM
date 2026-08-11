@@ -11,7 +11,7 @@ const createInvoiceSchema = z.object({
   dueDate: z.string().min(1),
   discountAssignmentId: z.string().uuid().optional().nullable(),
   publishNow: z.boolean().optional(),
-});
+}).strict();
 
 export async function POST(request: Request) {
   const access = await requireCrmStaff(crmFinanceRoles);

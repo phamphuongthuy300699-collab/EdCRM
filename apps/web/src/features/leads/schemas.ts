@@ -9,7 +9,7 @@ export const createPublicLeadSchema = z.object({
   courseId: z.string().uuid().optional().nullable(),
   convenientTime: z.string().max(100).optional().nullable(),
   message: z.string().max(1000).optional().nullable(),
-});
+}).strict();
 
 export type CreatePublicLeadInput = z.infer<typeof createPublicLeadSchema>;
 
@@ -22,4 +22,4 @@ export const updateLeadStatusSchema = z.object({
     "converted",
     "lost",
   ]),
-});
+}).strict();

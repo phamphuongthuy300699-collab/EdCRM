@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../../_shared";
 
-const schema = z.object({ studentId: z.string().uuid(), status: z.enum(["active", "paused", "archived"]) });
+const schema = z.object({ studentId: z.string().uuid(), status: z.enum(["active", "paused", "archived"]) }).strict();
 
 export async function POST(request: Request) {
   const access = await requireCrmStaff();

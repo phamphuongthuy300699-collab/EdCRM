@@ -62,4 +62,11 @@ describe("server-only demo authorization", () => {
       expect(source).not.toMatch(/if \(isDemoMode\(\)\)\s*\{\s*return \{ ok: true/);
     }
   });
+
+  it("keeps public content and health available without turning that into protected API access", () => {
+    const source = read("middleware.ts");
+    expect(source).toContain("isPublicWithoutAuth");
+    expect(source).toContain('pathname === "/api/health"');
+    expect(source).toContain("isProtectedWithoutAuth");
+  });
 });

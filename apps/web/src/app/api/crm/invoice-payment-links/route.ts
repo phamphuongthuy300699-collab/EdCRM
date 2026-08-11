@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
   regenerate: z.boolean().optional(),
-});
+}).strict();
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
 

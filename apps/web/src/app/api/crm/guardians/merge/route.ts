@@ -7,7 +7,7 @@ const mergeSchema = z.object({
   duplicateGuardianId: z.string().uuid(),
   confirmation: z.string().optional(),
   previewOnly: z.boolean().optional(),
-});
+}).strict();
 
 async function buildPreview(admin: any, organizationId: string, duplicateGuardianId: string) {
   const tables = [

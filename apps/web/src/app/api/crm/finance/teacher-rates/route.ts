@@ -3,7 +3,7 @@ import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../../_shared";
 
 const roles = new Set(["owner", "admin", "accountant"]);
-const schema = z.object({ teacherId: z.string().uuid(), rate: z.number().nonnegative(), effectiveFrom: z.string().date() });
+const schema = z.object({ teacherId: z.string().uuid(), rate: z.number().nonnegative(), effectiveFrom: z.string().date() }).strict();
 
 export async function POST(request: Request) {
   const access = await requireCrmStaff(roles);

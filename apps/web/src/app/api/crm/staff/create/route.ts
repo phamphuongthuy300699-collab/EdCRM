@@ -22,7 +22,13 @@ export async function POST(request: Request) {
     if (!access.ok) return access.response;
 
     const input = parsed.data;
-    const organizationId = await resolveOrganizationId(input.organizationId || access.organizationId);
+    if (input.organizationId && input.organizationId !== access.organizationId) {
+      return NextResponse.json({ ok: false, error: "Недостаточно прав для данной организации" }, { status: 403 });
+    }
+    if (access.role !== "owner" && ["owner", "admin"].includes(input.role)) {
+      return NextResponse.json({ ok: false, error: "Только владелец может назначать эту роль" }, { status: 403 });
+    }
+    const organizationId = await resolveOrganizationId(access.organizationId);
     const password = temporaryPassword();
     const admin = createSupabaseAdminClient();
 
@@ -71,6 +77,8 @@ export async function POST(request: Request) {
       { onConflict: "organization_id,user_id" },
     );
     if (membershipError) throw membershipError;
+
+    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.userId, action: "create_staff", entity_table: "org_memberships", entity_id: userId, metadata: { role: input.role, result: "success" } });
 
     return NextResponse.json({ ok: true, userId, temporaryPassword: password });
   } catch (error: any) {

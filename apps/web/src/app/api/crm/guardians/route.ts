@@ -10,7 +10,7 @@ const guardianSchema = z.object({
   email: z.string().optional().nullable(),
   status: z.string().optional().default("active"),
   notes: z.string().optional().nullable(),
-});
+}).strict();
 
 function duplicateWarning(row: any) {
   return {

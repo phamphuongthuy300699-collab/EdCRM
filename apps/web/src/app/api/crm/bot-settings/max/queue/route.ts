@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { requireBotStaff } from "@/lib/bots/max/utils";
 
-const retrySchema = z.object({ id: z.string().uuid() });
+const retrySchema = z.object({ id: z.string().uuid() }).strict();
 
 export async function GET(request: Request) {
   const access = await requireBotStaff();

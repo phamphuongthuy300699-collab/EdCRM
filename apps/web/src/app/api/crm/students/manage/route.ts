@@ -11,7 +11,7 @@ const guardianInputSchema = z.object({
   relation: z.string().optional().nullable(),
   isPrimary: z.boolean().optional(),
   isBillingContact: z.boolean().optional(),
-});
+}).strict();
 
 const createStudentSchema = z.object({
   fullName: z.string().min(1),
@@ -20,7 +20,7 @@ const createStudentSchema = z.object({
   groupId: z.string().uuid().optional().nullable(),
   guardians: z.array(guardianInputSchema).min(1).max(4),
   allowDuplicate: z.boolean().optional(),
-});
+}).strict();
 
 function maskPhone(phone: string | null | undefined) {
   const digits = String(phone || "").replace(/\D/g, "");

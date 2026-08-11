@@ -3,7 +3,7 @@ import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../../_shared";
 
 const roles = new Set(["owner", "admin", "accountant"]);
-const schema = z.object({ invoiceId: z.string().uuid() });
+const schema = z.object({ invoiceId: z.string().uuid() }).strict();
 
 export async function POST(request: Request) {
   const access = await requireCrmStaff(roles);

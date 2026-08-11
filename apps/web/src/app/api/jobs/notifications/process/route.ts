@@ -3,6 +3,7 @@ import { buildPayInvoiceMessage, sendMaxMessage } from "@/lib/bots/max/client";
 import { canProcessNotificationsWithRequest } from "@/lib/bots/max/utils";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { buildScheduleNotificationText, type ScheduleNotificationKey } from "@/features/scheduling/domain";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 async function syncLessonNotificationStatus(admin: ReturnType<typeof createSupabaseAdminClient>, lessonSessionId?: string | null) {
   if (!lessonSessionId) return;
@@ -15,6 +16,8 @@ async function syncLessonNotificationStatus(admin: ReturnType<typeof createSupab
 async function processNotifications(request: Request) {
   const access = await canProcessNotificationsWithRequest(request);
   if (!access.ok) return access.response;
+  const rate = checkRateLimit({ key: `notification-worker:${access.organizationId || requestFingerprint(request)}`, limit: 30, windowMs: 60_000 });
+  if (!rate.allowed) return rateLimitResponse(rate);
 
   const admin = createSupabaseAdminClient();
   const now = new Date();

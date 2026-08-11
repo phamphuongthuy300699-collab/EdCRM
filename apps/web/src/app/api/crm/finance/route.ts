@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
+import { writeSecurityAudit } from "@/lib/security/audit";
 
 const readRoles = new Set(["owner", "admin", "accountant", "manager"]);
 const writeRoles = new Set(["owner", "admin", "accountant"]);
 const pageSizeSchema = z.coerce.number().int().min(5).max(100).catch(25);
 const actionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("adjust"), guardianId: z.string().uuid(), amount: z.number().refine((value) => value !== 0), reason: z.string().trim().min(3).max(500) }),
-  z.object({ action: z.literal("payroll"), entryId: z.string().uuid(), status: z.enum(["approved", "paid"]) }),
-  z.object({ action: z.literal("payrollPeriod"), teacherId: z.string().uuid(), month: z.string().date(), status: z.enum(["approved", "paid"]) }),
+  z.object({ action: z.literal("adjust"), guardianId: z.string().uuid(), amount: z.number().refine((value) => value !== 0), reason: z.string().trim().min(3).max(500) }).strict(),
+  z.object({ action: z.literal("payroll"), entryId: z.string().uuid(), status: z.enum(["approved", "paid"]) }).strict(),
+  z.object({ action: z.literal("payrollPeriod"), teacherId: z.string().uuid(), month: z.string().date(), status: z.enum(["approved", "paid"]) }).strict(),
 ]);
 
 const paged = (items: any[] | null, count: number | null, page: number, pageSize: number) => ({
@@ -145,5 +146,15 @@ export async function POST(request: Request) {
       ? await admin.rpc("transition_teacher_payroll", { p_organization_id: access.organizationId, p_entry_id: input.entryId, p_status: input.status, p_actor_id: access.userId })
       : await admin.rpc("transition_teacher_payroll_period", { p_organization_id: access.organizationId, p_teacher_id: input.teacherId, p_month: input.month, p_status: input.status, p_actor_id: access.userId });
   if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
+  await writeSecurityAudit(admin, {
+    organizationId: access.organizationId,
+    actorId: access.userId,
+    action: input.action === "adjust" ? "billing_manual_adjustment" : "teacher_payroll_transition",
+    entityTable: input.action === "adjust" ? "billing_accounts" : "teacher_payroll_entries",
+    entityId: input.action === "adjust" ? input.guardianId : input.action === "payroll" ? input.entryId : input.teacherId,
+    metadata: input.action === "adjust"
+      ? { amount: input.amount }
+      : { status: input.status, scope: input.action === "payrollPeriod" ? "period" : "entry" },
+  });
   return NextResponse.json({ ok: true, result: call.data });
 }
