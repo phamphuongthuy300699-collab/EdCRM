@@ -4,8 +4,9 @@ import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requirePaymentAdmin } from "./_shared";
 import { writeSecurityAudit } from "@/lib/security/audit";
+import { isAllowedAlfaGatewayUrl } from "@/lib/payments/alfabank/mapper";
 
-const gatewayUrl = z.string().url().optional().nullable().or(z.literal(""));
+const gatewayUrl = z.string().url().refine(isAllowedAlfaGatewayUrl, "Недопустимый адрес платёжного шлюза").optional().nullable().or(z.literal(""));
 const pathValue = z.string().max(240).optional().nullable().or(z.literal(""));
 
 const payloadSchema = z.object({

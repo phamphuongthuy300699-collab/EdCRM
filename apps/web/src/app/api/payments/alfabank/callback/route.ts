@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
-import { isFinalPaymentStatus } from "@/shared/utils/payments";
 import {
   AlfaStatusError,
   findAlfabankPayment,
@@ -70,10 +69,6 @@ async function processCallback(request: NextRequest) {
       event_type: "callback_received",
       payload: redactSensitivePaymentPayload(rawPayload),
     });
-
-    if (isFinalPaymentStatus(payment.status)) {
-      return NextResponse.json({ ok: true, message: "Payment already processed", status: payment.status });
-    }
 
     const result = await refreshAlfabankPaymentStatus(admin, payment, "callback");
     return NextResponse.json(toPublicStatusResponse(result));

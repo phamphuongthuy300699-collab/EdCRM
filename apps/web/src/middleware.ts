@@ -6,7 +6,7 @@ import { assertSameOriginMutation } from "@/lib/security/origin";
 
 const cookieMutationPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
 const cookiePaymentMutations = new Set(["/api/payments/alfabank/create", "/api/payments/alfabank/status", "/api/payments/alfabank/return-status"]);
-const sensitiveApiPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
+const sensitiveApiPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/", "/api/debug/"];
 
 function applySensitiveCachePolicy(response: NextResponse, pathname: string) {
   if (sensitiveApiPrefixes.some((prefix) => pathname.startsWith(prefix)) || cookiePaymentMutations.has(pathname)) {

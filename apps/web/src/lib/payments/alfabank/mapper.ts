@@ -6,9 +6,40 @@ import type {
   SafeAlfaRegisterRequest,
 } from "./types";
 
+const defaultAllowedGatewayHosts = new Set([
+  "alfa.rbsuat.com",
+  "engine.paymentgate.ru",
+  "web.sandbox.paymentgate.ru",
+  "payment.alfabank.ru",
+]);
+
+function allowedGatewayHosts() {
+  const configured = (process.env.ALFABANK_ALLOWED_GATEWAY_HOSTS || "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...defaultAllowedGatewayHosts, ...configured]);
+}
+
+export function isAllowedAlfaGatewayUrl(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const path = url.pathname.endsWith("/") ? url.pathname : `${url.pathname}/`;
+    return url.protocol === "https:"
+      && !url.username
+      && !url.password
+      && (!url.port || url.port === "443")
+      && allowedGatewayHosts().has(url.hostname.toLowerCase())
+      && path === "/payment/rest/";
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeGatewayUrl(gatewayUrl: string) {
   const trimmed = gatewayUrl.trim();
-  if (!trimmed) return "";
+  if (!isAllowedAlfaGatewayUrl(trimmed)) return "";
   return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
 }
 

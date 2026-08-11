@@ -6,7 +6,7 @@ import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { verifyInvoicePaymentPublicId } from "@/lib/payments/invoice-payment-links";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
-import { buildPaymentReturnUrl } from "../../alfabank/create/route";
+import { buildPaymentReturnUrl } from "@/lib/payments/alfabank/return-url";
 import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({

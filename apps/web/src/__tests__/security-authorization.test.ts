@@ -54,4 +54,11 @@ describe("representative BOLA defenses", () => {
       expect(source).toContain('["owner", "admin"].includes(input.role)');
     }
   });
+
+  it("scopes database diagnostics to the authenticated administrator organization", () => {
+    const diagnostics = read("app/api/debug/public-data/route.ts");
+    expect(diagnostics).toContain('.select("organization_id, role")');
+    expect(diagnostics).toContain('.eq("id", membership.organization_id)');
+    expect(diagnostics).not.toContain("DEFAULT_ORG_SLUG");
+  });
 });

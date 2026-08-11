@@ -32,12 +32,13 @@ insert into public.organizations (id, name, slug) values ('aaaaaaaa-0000-4000-80
 insert into public.org_memberships (organization_id, user_id, role) values ('aaaaaaaa-0000-4000-8000-000000000000', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'admin'), ('bbbbbbbb-0000-4000-8000-000000000000', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'admin');
 insert into public.students (id, organization_id, full_name) values ('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', 'aaaaaaaa-0000-4000-8000-000000000000', 'Student A'), ('bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb', 'bbbbbbbb-0000-4000-8000-000000000000', 'Student B');
 
+grant select on public.students, public.org_memberships to authenticated;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
-select throws_ok($$select * from public.students$$, '42501', null, 'authenticated direct student table access is denied');
-select throws_ok($$select * from public.students where id = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb'$$, '42501', null, 'org A cannot read org B student by UUID');
-select throws_ok($$select * from public.org_memberships where organization_id = 'bbbbbbbb-0000-4000-8000-000000000000'$$, '42501', null, 'org A cannot read org B membership');
+select is((select count(*) from public.students where id = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'), 1::bigint, 'org A can read its own student through RLS');
+select is((select count(*) from public.students where id = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb'), 0::bigint, 'org A cannot read org B student by UUID');
+select is((select count(*) from public.org_memberships where organization_id = 'bbbbbbbb-0000-4000-8000-000000000000'), 0::bigint, 'org A cannot read org B membership');
 select throws_ok($$truncate table public.students$$, '42501', null, 'authenticated cannot bypass RLS with truncate');
 
 select * from finish();

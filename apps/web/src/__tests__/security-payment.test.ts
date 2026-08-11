@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildPaymentReturnUrl } from "@/app/api/payments/alfabank/create/route";
+import { buildPaymentReturnUrl } from "@/lib/payments/alfabank/return-url";
+import { assertAlfaAmountMatches } from "@/lib/payments/alfabank/status-service";
+import { isAllowedAlfaGatewayUrl } from "@/lib/payments/alfabank/mapper";
 
 const root = path.resolve(__dirname, "..");
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -42,5 +44,26 @@ describe("payment boundary security", () => {
     const service = read("lib/payments/alfabank/status-service.ts");
     expect(service).toContain('event: "payment_amount_mismatch"');
     expect(service.indexOf('event: "payment_amount_mismatch"')).toBeLessThan(service.indexOf('"AMOUNT_MISMATCH"'));
+  });
+
+  it("fails closed when Alfa omits or corrupts the authoritative amount", () => {
+    const payment = { id: "payment", organization_id: "org", amount: 100 };
+    expect(() => assertAlfaAmountMatches(undefined, payment, "callback")).toThrowError(/amount/i);
+    expect(() => assertAlfaAmountMatches("not-a-number", payment, "callback")).toThrowError(/amount/i);
+    expect(() => assertAlfaAmountMatches(10_000, payment, "callback")).not.toThrow();
+  });
+
+  it("does not skip provider refresh for a stored final status because refunds may follow payment", () => {
+    const callback = read("app/api/payments/alfabank/callback/route.ts");
+    expect(callback).not.toContain("if (isFinalPaymentStatus(payment.status))");
+  });
+
+  it("rejects SSRF gateway targets before credentials can be sent", () => {
+    expect(isAllowedAlfaGatewayUrl("https://alfa.rbsuat.com/payment/rest/")).toBe(true);
+    expect(isAllowedAlfaGatewayUrl("https://engine.paymentgate.ru/payment/rest/")).toBe(true);
+    expect(isAllowedAlfaGatewayUrl("http://engine.paymentgate.ru/payment/rest/")).toBe(false);
+    expect(isAllowedAlfaGatewayUrl("https://127.0.0.1/payment/rest/")).toBe(false);
+    expect(isAllowedAlfaGatewayUrl("https://evil.example/payment/rest/")).toBe(false);
+    expect(isAllowedAlfaGatewayUrl("https://engine.paymentgate.ru.evil.example/payment/rest/")).toBe(false);
   });
 });

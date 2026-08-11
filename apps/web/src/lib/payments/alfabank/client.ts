@@ -44,6 +44,7 @@ export async function createAlfaOrder(input: CreateAlfaOrderInput, config: AlfaG
       body,
       signal: controller.signal,
       cache: "no-store",
+      redirect: "error",
     });
   } catch (error) {
     throw new AlfaBankError("Альфа-Банк не ответил на запрос регистрации заказа", {
@@ -119,6 +120,7 @@ export async function getAlfaOrderStatus(
       body,
       signal: controller.signal,
       cache: "no-store",
+      redirect: "error",
     });
   } catch (error) {
     throw new AlfaBankError("Альфа-Банк не ответил на запрос статуса заказа", {

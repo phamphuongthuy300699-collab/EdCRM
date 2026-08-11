@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectMediaUpload } from "@/lib/security/media-upload";
+import { inspectMediaUpload, mediaStorageNameBelongsToOrganization, namespaceMediaStorageName } from "@/lib/security/media-upload";
 
 const bytes = (...values: number[]) => Buffer.from(values);
 
@@ -18,5 +18,13 @@ describe("media upload inspection", () => {
     const result = inspectMediaUpload({ folder: "hero", originalName: "same-name.webp", declaredType: "image/webp", size: 12, bytes: Buffer.from("RIFFxxxxWEBP"), maxBytes: 8_000_000 });
     expect(result).toMatchObject({ ok: true, contentType: "image/webp", extension: "webp" });
     if (result.ok) expect(result.storageName).not.toBe("same-name.webp");
+  });
+
+  it("namespaces stored files and rejects cross-organization media names", () => {
+    const name = namespaceMediaStorageName("org-a", "00000000-0000-4000-8000-000000000001.webp");
+    expect(name).toBe("org-a--00000000-0000-4000-8000-000000000001.webp");
+    expect(mediaStorageNameBelongsToOrganization(name, "org-a")).toBe(true);
+    expect(mediaStorageNameBelongsToOrganization(name, "org-b")).toBe(false);
+    expect(mediaStorageNameBelongsToOrganization("legacy.webp", "org-a")).toBe(false);
   });
 });

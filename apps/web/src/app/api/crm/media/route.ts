@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { resolveMediaUsages } from "./media-usages";
-import { inspectMediaUpload } from "@/lib/security/media-upload";
+import { inspectMediaUpload, mediaStorageNameBelongsToOrganization, namespaceMediaStorageName } from "@/lib/security/media-upload";
 import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
@@ -32,7 +32,7 @@ function getLocalMediaDir() {
 // Helper to authenticate and verify user role
 async function checkAuthAndRole(req: NextRequest) {
   if (isDemoAuthBypassAllowed()) {
-    return { ok: true, role: "admin" };
+    return { ok: true, user: { id: "demo-user" }, organizationId: "demo-org", role: "admin" };
   }
 
   try {
@@ -49,7 +49,7 @@ async function checkAuthAndRole(req: NextRequest) {
       .eq("is_active", true)
       .maybeSingle();
 
-    if (!membership || !["owner", "admin", "manager"].includes(membership.role)) {
+    if (!membership?.organization_id || !["owner", "admin", "manager"].includes(membership.role)) {
       return { ok: false, status: 403, error: "Forbidden - Insufficient permissions" };
     }
 
@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
   }
 
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
+  const organizationId = (auth as any).organizationId as string;
 
   try {
     if (driver === "local") {
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
         fs.mkdirSync(resolvedDir, { recursive: true });
       }
 
-      const files = fs.readdirSync(resolvedDir);
+      const files = fs.readdirSync(resolvedDir).filter((name) => mediaStorageNameBelongsToOrganization(name, organizationId));
       const list = files
         .filter(name => !name.startsWith("."))
         .map(name => {
@@ -121,6 +122,7 @@ export async function GET(req: NextRequest) {
 
       const list = (data || [])
         .filter(f => f.name !== ".emptyFolderPlaceholder")
+        .filter(f => mediaStorageNameBelongsToOrganization(f.name, organizationId))
         .map(f => ({
           name: f.name,
           url: getMediaUrl(`${folder}/${f.name}`),
@@ -149,6 +151,7 @@ export async function POST(req: NextRequest) {
   if (!rate.allowed) return rateLimitResponse(rate);
 
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
+  const organizationId = (auth as any).organizationId as string;
 
   try {
     const formData = await req.formData();
@@ -174,7 +177,7 @@ export async function POST(req: NextRequest) {
       console.warn("[security]", { scope: "security", event: "media_upload_rejected", code: inspection.code });
       return NextResponse.json({ error: "Недопустимый файл", code: inspection.code }, { status: inspection.status });
     }
-    const storageName = inspection.storageName;
+    const storageName = namespaceMediaStorageName(organizationId, inspection.storageName);
 
     if (driver === "local") {
       const resolvedDir = path.join(getLocalMediaDir(), folder);
@@ -233,6 +236,11 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createSupabaseAdminClient();
   const organizationId = (auth as any).organizationId;
+  const storageName = mediaPath.split("/").at(-1) || "";
+  if (!mediaStorageNameBelongsToOrganization(storageName, organizationId)) {
+    console.warn("[security]", { scope: "security", event: "cross_org_denied", resource: "media" });
+    return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
+  }
   const usageMap = await resolveMediaUsages(admin, organizationId, [mediaPath]);
   const usages = (usageMap[mediaPath] || []).map((usage) => usage.label);
 

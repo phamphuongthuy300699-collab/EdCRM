@@ -8,6 +8,8 @@ import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 
+const TEST_ORG_ID = "11111111-1111-4111-8111-111111111111";
+
 vi.mock("@/shared/db/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
 }));
@@ -77,7 +79,7 @@ describe("Media API Endpoint Security", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: TEST_ORG_ID, role: "admin" } }),
       }),
     };
     vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
@@ -113,11 +115,10 @@ describe("Media API Endpoint Security", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: TEST_ORG_ID, role: "admin" } }),
       }),
     };
     vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
-
     try {
       const req = new NextRequest("http://localhost:3000/api/crm/media?folder=hero", {
         method: "GET",
@@ -153,7 +154,7 @@ describe("Media API Endpoint Security", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: TEST_ORG_ID, role: "admin" } }),
       }),
     } as any);
 
@@ -175,7 +176,9 @@ describe("Media API Endpoint Security", () => {
     const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-usages-"));
     const heroDir = path.join(tempMediaDir, "hero");
     fs.mkdirSync(heroDir, { recursive: true });
-    fs.writeFileSync(path.join(heroDir, "main.jpg"), "image");
+    const mediaName = "org-id--00000000-0000-4000-8000-000000000001.jpg";
+    const mediaPath = `hero/${mediaName}`;
+    fs.writeFileSync(path.join(heroDir, mediaName), "image");
     process.env.MEDIA_DRIVER = "local";
     process.env.MEDIA_LOCAL_DIR = tempMediaDir;
 
@@ -194,15 +197,15 @@ describe("Media API Endpoint Security", () => {
         eq: vi.fn().mockReturnThis(),
         in: vi.fn().mockResolvedValue({
           data: table === "site_content_blocks"
-            ? [{ block_key: "home.media", title: "Первый экран", content: { heroImage: "hero/main.jpg" } }]
+            ? [{ block_key: "home.media", title: "Первый экран", content: { heroImage: mediaPath } }]
             : table === "profiles"
-              ? [{ id: "private-staff-id", avatar_url: "hero/main.jpg" }]
+              ? [{ id: "private-staff-id", avatar_url: mediaPath }]
               : table === "courses"
-                ? [{ title: "Робототехника", card_image_url: "hero/main.jpg" }]
+                ? [{ title: "Робототехника", card_image_url: mediaPath }]
                 : [],
         }),
         then: table === "site_content_blocks"
-          ? (resolve: (value: unknown) => unknown) => resolve({ data: [{ block_key: "home.media", title: "Первый экран", content: { heroImage: "hero/main.jpg" } }] })
+          ? (resolve: (value: unknown) => unknown) => resolve({ data: [{ block_key: "home.media", title: "Первый экран", content: { heroImage: mediaPath } }] })
           : undefined,
       })),
     } as any);
@@ -242,10 +245,13 @@ describe("Media API Endpoint Security", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { role: "admin" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: TEST_ORG_ID, role: "admin" } }),
       }),
     };
     vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue({ insert: vi.fn().mockResolvedValue({ error: null }) }),
+    } as any);
 
     try {
       expect(getMediaUrl("teachers/photo one.jpg")).toBe("/media/teachers/photo%20one.jpg");
@@ -272,7 +278,7 @@ describe("Media API Endpoint Security", () => {
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json.success).toBe(true);
-      expect(json.path).toMatch(/^teachers\/[0-9a-f-]{36}\.jpg$/);
+      expect(json.path).toMatch(new RegExp(`^teachers/${TEST_ORG_ID}--[0-9a-f-]{36}\\.jpg$`));
       expect(json.url).toBe(`/media/${json.path}`);
       expect(fs.existsSync(path.join(tempMediaDir, json.path))).toBe(true);
     } finally {
@@ -316,7 +322,7 @@ describe("Media API Endpoint Security", () => {
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockResolvedValue({
-              data: [{ block_key: "hero.main", title: "Hero", content: { image: "hero/main.jpg" } }],
+              data: [{ block_key: "hero.main", title: "Hero", content: { image: `hero/${TEST_ORG_ID}--main.jpg` } }],
             }),
           };
         }
@@ -332,7 +338,7 @@ describe("Media API Endpoint Security", () => {
     };
     vi.mocked(createSupabaseAdminClient).mockReturnValue(mockAdmin as any);
 
-    const req = new NextRequest("http://localhost:3000/api/crm/media?path=hero/main.jpg", { method: "DELETE" });
+    const req = new NextRequest(`http://localhost:3000/api/crm/media?path=hero/${TEST_ORG_ID}--main.jpg`, { method: "DELETE" });
     const response = await DELETE(req);
     expect(response.status).toBe(409);
     const json = await response.json();
@@ -345,19 +351,19 @@ describe("Media API Endpoint Security", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: "org-id", role: "admin" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { organization_id: TEST_ORG_ID, role: "admin" } }),
       }),
     } as any);
 
     vi.mocked(createSupabaseAdminClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === "site_content_blocks") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ data: [] }) };
-        if (table === "profiles") return { select: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [{ avatar_url: "teachers/avatar.jpg" }] }) };
+        if (table === "profiles") return { select: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [{ avatar_url: `teachers/${TEST_ORG_ID}--avatar.jpg` }] }) };
         return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), in: vi.fn().mockResolvedValue({ data: [] }) };
       }),
     } as any);
 
-    const response = await DELETE(new NextRequest("http://localhost:3000/api/crm/media?path=teachers/avatar.jpg", { method: "DELETE" }));
+    const response = await DELETE(new NextRequest(`http://localhost:3000/api/crm/media?path=teachers/${TEST_ORG_ID}--avatar.jpg`, { method: "DELETE" }));
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ usages: ["Фото сотрудника"] });
   });
@@ -369,7 +375,8 @@ describe("Media API Endpoint Security", () => {
     const tempMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "edcrm-media-delete-"));
     const heroDir = path.join(tempMediaDir, "hero");
     fs.mkdirSync(heroDir, { recursive: true });
-    const filePath = path.join(heroDir, "unused.jpg");
+    const storageName = `${TEST_ORG_ID}--unused.jpg`;
+    const filePath = path.join(heroDir, storageName);
     fs.writeFileSync(filePath, "unused");
     process.env.MEDIA_DRIVER = "local";
     delete process.env.NEXT_PUBLIC_MEDIA_DRIVER;
@@ -411,15 +418,15 @@ describe("Media API Endpoint Security", () => {
     vi.mocked(createSupabaseAdminClient).mockReturnValue(mockAdmin as any);
 
     try {
-      const req = new NextRequest("http://localhost:3000/api/crm/media?path=hero/unused.jpg", { method: "DELETE" });
+      const req = new NextRequest(`http://localhost:3000/api/crm/media?path=hero/${storageName}`, { method: "DELETE" });
       const response = await DELETE(req);
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ ok: true, path: "hero/unused.jpg" });
+      await expect(response.json()).resolves.toMatchObject({ ok: true, path: `hero/${storageName}` });
       expect(fs.existsSync(filePath)).toBe(false);
       expect(insertAudit).toHaveBeenCalledWith(expect.objectContaining({
         action: "delete_media",
         entity_table: "media_files",
-        entity_title: "hero/unused.jpg",
+        entity_title: `hero/${storageName}`,
       }));
     } finally {
       if (originalMediaDriver === undefined) {

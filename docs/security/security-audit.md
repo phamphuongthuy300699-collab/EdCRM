@@ -72,7 +72,7 @@ browser -> Next.js -> Supabase -> AlfaBank
 ### High
 
 - **Staff cross-tenant/privilege BOLA.** Body `organizationId` could select a different organization and admin-level users could affect owner/admin accounts. All target memberships are now resolved within the actor organization; only owner may assign or mutate owner/admin. Covered by authorization source/unit contracts and SQL cross-org tests.
-- **Unsafe media upload.** Oversized/polyglot HTML/SVG, client filenames and overwrite were possible. Upload now has an 8 MiB default, JPEG/PNG/WebP/PDF-by-folder magic checks, random UUID name, exclusive local create/`upsert:false`, path guards, rate limit and audit event.
+- **Unsafe media upload and cross-organization object access.** Oversized/polyglot HTML/SVG, client filenames, overwrite and access to another organization's storage name were possible. Upload now has an 8 MiB default, JPEG/PNG/WebP/PDF-by-folder magic checks, organization-prefixed random UUID name, exclusive local create/`upsert:false`, tenant-aware list/delete guards, path guards, rate limit and audit event.
 - **Public lead abuse/PII logging.** Full lead body could be logged and no bounded limit existed. Logs now contain request/result booleans only; submissions are bounded per request fingerprint with cleanup, 429 and `Retry-After`.
 - **Dependency vulnerabilities.** Initial audit: 6 high total, 4 production. Next.js 16.2.10 and aligned tooling were upgraded to 16.3.0; safe transitive fixes applied without `--force`. Final full and production audits report zero vulnerabilities.
 
@@ -97,6 +97,7 @@ browser -> Next.js -> Supabase -> AlfaBank
 - Provider credentials remain in restricted database columns read only by service paths. Migration to Supabase Vault/envelope encryption requires a separate rotation/migration plan.
 - `read_only` Docker filesystem is deferred because Next runtime cache and `/opt/edcrm/media` writes need a dedicated smoke/test design.
 - The in-process body-size guard checks `File.size` before buffering, but the reverse proxy must reject oversized multipart requests before Next parses them.
+- Legacy unnamespaced media remains usable through already stored public URLs, but is deliberately hidden from CRM listing/deletion because ownership cannot be proven. Re-uploading such a file through the CRM creates the organization namespace and is the supported migration path.
 
 ## Payment review
 
@@ -104,6 +105,7 @@ browser -> Next.js -> Supabase -> AlfaBank
 - `/payments/success` performs no database mutation; it calls the server return-status endpoint.
 - Alfa callback status is not trusted. The callback locates an existing payment and calls authenticated `getOrderStatusExtended.do`; only the server response can reach atomic settlement/refund RPCs.
 - Provider amount in minor units is compared to stored CRM amount before settlement. Mismatch emits `payment_amount_mismatch`, returns a generic error and leaves ledger/balance unchanged.
+- Stored gateway URLs are constrained to HTTPS Alfa/paymentgate hosts and the exact REST base path before credentials are sent; redirects are rejected. Additional verified provider hosts require the server-only `ALFABANK_ALLOWED_GATEWAY_HOSTS` allowlist.
 - Existing unique ledger/payment/refund constraints and atomic RPCs make repeated callback/status/reconciliation idempotent; a final status cannot regress to non-final.
 - The reviewed Alfa merchant protocol documents merchant login/password for REST status requests and dynamic callback URL; no compatible callback HMAC/token field was identified for this integration. Therefore no invented signature was added. Callback is a throttled hint followed by an authoritative authenticated bank query.
 

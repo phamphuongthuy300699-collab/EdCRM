@@ -32,6 +32,26 @@ export class AlfaStatusError extends Error {
   }
 }
 
+export function assertAlfaAmountMatches(
+  providerAmount: unknown,
+  payment: { id: string; organization_id: string; amount: unknown },
+  source: "manual_check" | "return_check" | "callback",
+) {
+  const bankAmount = Number(providerAmount);
+  const expectedAmount = Math.round(Number(payment.amount) * 100);
+  if (!Number.isFinite(bankAmount) || !Number.isFinite(expectedAmount) || bankAmount !== expectedAmount) {
+    console.warn("[security]", {
+      scope: "security",
+      event: "payment_amount_mismatch",
+      paymentId: payment.id,
+      organizationId: payment.organization_id,
+      source,
+      providerAmountPresent: providerAmount !== undefined && providerAmount !== null,
+    });
+    throw new AlfaStatusError("Provider amount verification failed", 400, "AMOUNT_MISMATCH");
+  }
+}
+
 function publicOrderId(input: AlfaStatusLookup) {
   return input.providerOrderId || input.orderId || "";
 }
@@ -167,18 +187,7 @@ export async function refreshAlfabankPaymentStatus(
     paymentStage: (settings.payment_stage === "two_step" ? "two_step" : "one_step") as "one_step" | "two_step",
   });
 
-  const bankAmount = Number(statusResponse.amount);
-  const expectedAmount = Math.round(Number(payment.amount) * 100);
-  if (Number.isFinite(bankAmount) && bankAmount !== expectedAmount) {
-    console.warn("[security]", {
-      scope: "security",
-      event: "payment_amount_mismatch",
-      paymentId: payment.id,
-      organizationId: payment.organization_id,
-      source,
-    });
-    throw new AlfaStatusError("Сумма платежа в банке не совпадает с CRM", 400, "AMOUNT_MISMATCH");
-  }
+  assertAlfaAmountMatches(statusResponse.amount, payment, source);
 
   const newStatus = mapAlfaStatusToCrmStatus(statusResponse.orderStatus);
   if (isFinalPaymentStatus(payment.status) && !isFinalPaymentStatus(newStatus)) {

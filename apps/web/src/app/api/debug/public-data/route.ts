@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 
-const DEFAULT_ORG_SLUG = process.env.NEXT_PUBLIC_DEFAULT_ORG_SLUG || "robotics-lipetsk";
-
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -46,7 +44,7 @@ export async function GET() {
   }
 
   const { data: membership } = await (authClient.from("org_memberships") as any)
-    .select("role")
+    .select("organization_id, role")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .maybeSingle();
@@ -59,7 +57,6 @@ export async function GET() {
     hasSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
     hasPublishableKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
     hasSecretKey: Boolean(process.env.SUPABASE_SECRET_KEY),
-    defaultOrgSlug: process.env.NEXT_PUBLIC_DEFAULT_ORG_SLUG || null,
     demoMode: process.env.NEXT_PUBLIC_DEMO_MODE || null,
     mediaDriver: process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || null,
     mediaBucket: process.env.NEXT_PUBLIC_MEDIA_BUCKET || null,
@@ -83,7 +80,7 @@ export async function GET() {
     const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("id, name")
-      .eq("slug", DEFAULT_ORG_SLUG)
+      .eq("id", membership.organization_id)
       .maybeSingle();
 
     if (orgError) throw orgError;
@@ -118,7 +115,8 @@ export async function GET() {
       );
     }
   } catch (error) {
-    db.error = error instanceof Error ? error.message : "Unknown database error";
+    console.error("Organization diagnostics failed", error);
+    db.error = "Database diagnostics unavailable";
   }
 
   return NextResponse.json({ env, db });

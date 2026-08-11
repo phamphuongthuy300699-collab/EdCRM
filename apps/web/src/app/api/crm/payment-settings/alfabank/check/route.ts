@@ -2,23 +2,14 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requirePaymentAdmin } from "../_shared";
-
-function isValidUrl(value: string | null | undefined) {
-  if (!value) return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { isAllowedAlfaGatewayUrl, normalizeGatewayUrl } from "@/lib/payments/alfabank/mapper";
 
 async function assertGatewayDoesNotReturnHtml404(gatewayUrl: string) {
-  const checkUrl = new URL("getOrderStatusExtended.do", gatewayUrl.endsWith("/") ? gatewayUrl : `${gatewayUrl}/`).toString();
+  const checkUrl = new URL("getOrderStatusExtended.do", normalizeGatewayUrl(gatewayUrl)).toString();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(checkUrl, { method: "GET", cache: "no-store", signal: controller.signal });
+    const response = await fetch(checkUrl, { method: "GET", cache: "no-store", signal: controller.signal, redirect: "error" });
     const contentType = response.headers.get("content-type") || "";
     if (response.status === 404 && contentType.toLowerCase().includes("text/html")) {
       throw new Error(`Gateway ${gatewayUrl} возвращает HTML 404. Проверьте URL платежного шлюза.`);
@@ -57,7 +48,7 @@ export async function POST() {
     const missing = [
       !data.api_login ? "API login" : "",
       !data.api_password_secret ? "API password" : "",
-      !isValidUrl(gatewayUrl) ? "gateway URL" : "",
+      !isAllowedAlfaGatewayUrl(gatewayUrl) ? "разрешённый gateway URL" : "",
     ].filter(Boolean);
 
     let gatewayError: string | null = null;

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import { buildPaymentReturnUrl } from "../app/api/payments/alfabank/create/route";
+import { buildPaymentReturnUrl } from "../lib/payments/alfabank/return-url";
 
 describe("Alfabank payment flow production hotfixes", () => {
   it("builds return URLs from NEXT_PUBLIC_APP_URL before request origin", () => {

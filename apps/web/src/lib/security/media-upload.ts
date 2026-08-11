@@ -29,3 +29,11 @@ export function inspectMediaUpload(input: Input): Acceptance | Rejection {
   if (!folderAllowed || input.declaredType !== detected.contentType) return { ok: false, status: 400, code: "MEDIA_TYPE_MISMATCH" };
   return { ok: true, ...detected, storageName: `${crypto.randomUUID()}.${detected.extension}` };
 }
+
+export function namespaceMediaStorageName(organizationId: string, storageName: string) {
+  return `${organizationId}--${storageName}`;
+}
+
+export function mediaStorageNameBelongsToOrganization(storageName: string, organizationId: string) {
+  return storageName.startsWith(`${organizationId}--`);
+}
