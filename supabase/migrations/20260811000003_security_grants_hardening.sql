@@ -7,6 +7,21 @@ revoke all privileges on table public.payment_provider_settings from anon, authe
 alter default privileges for role postgres in schema public revoke all on tables from anon;
 alter default privileges for role postgres in schema public revoke truncate, references, trigger on tables from authenticated;
 
+-- Existing staff identities are assigned only when exactly one organization can own them.
+-- Ambiguous multi-organization identities stay unassigned and must use account recovery.
+with single_organization_staff as (
+  select user_id, max(organization_id::text) as organization_id
+  from public.org_memberships
+  group by user_id
+  having count(distinct organization_id) = 1
+)
+update auth.users as users
+set raw_app_meta_data = coalesce(users.raw_app_meta_data, '{}'::jsonb)
+  || jsonb_build_object('edcrm_staff_organization_id', staff.organization_id)
+from single_organization_staff as staff
+where users.id = staff.user_id
+  and not coalesce(users.raw_app_meta_data, '{}'::jsonb) ? 'edcrm_staff_organization_id';
+
 do $$
 declare fn record;
 begin

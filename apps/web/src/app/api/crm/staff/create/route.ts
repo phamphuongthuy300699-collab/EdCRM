@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
-import { requireStaffAdmin, resolveOrganizationId, staffPayloadSchema, temporaryPassword } from "../_shared";
+import { requireStaffAdmin, resolveOrganizationId, staffIdentityMetadata, staffPayloadSchema, temporaryPassword } from "../_shared";
 
 export async function POST(request: Request) {
   try {
@@ -39,18 +39,25 @@ export async function POST(request: Request) {
       user_metadata: {
         full_name: input.fullName,
       },
+      app_metadata: staffIdentityMetadata(organizationId),
     });
 
-    let userId = authUser.user?.id || null;
     if (createError) {
-      if (!createError.message.includes("already registered")) {
-        throw createError;
+      const isExistingIdentity = createError.code === "email_exists"
+        || createError.code === "user_already_exists"
+        || createError.message.toLowerCase().includes("already registered");
+      if (isExistingIdentity) {
+        return NextResponse.json({
+          ok: false,
+          error: "Этот email уже зарегистрирован. Используйте безопасное приглашение или восстановление доступа.",
+          code: "STAFF_IDENTITY_ALREADY_EXISTS",
+        }, { status: 409 });
       }
-      const { data: users } = await admin.auth.admin.listUsers();
-      userId = users.users.find((user) => user.email?.toLowerCase() === input.email.toLowerCase())?.id || null;
+      throw createError;
     }
 
-    if (!userId) throw new Error("Не удалось создать или найти Auth user");
+    const userId = authUser.user?.id || null;
+    if (!userId) throw new Error("Не удалось создать Auth user");
 
     const { error: profileError } = await (admin.from("profiles") as any).upsert({
       id: userId,

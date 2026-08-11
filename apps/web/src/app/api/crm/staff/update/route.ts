@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
-import { postgresUuidSchema, requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
+import { isStaffIdentityOwnedByOrganization, postgresUuidSchema, requireStaffAdmin, resolveOrganizationId, staffPayloadSchema } from "../_shared";
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +27,12 @@ export async function POST(request: Request) {
     if (!currentMembership) return NextResponse.json({ ok: false, error: "Сотрудник не найден в этой организации" }, { status: 404 });
     if (access.role !== "owner" && ["owner", "admin"].includes(currentMembership.role)) {
       return NextResponse.json({ ok: false, error: "Только владелец может изменять этого сотрудника" }, { status: 403 });
+    }
+
+    const { data: targetIdentity, error: identityError } = await admin.auth.admin.getUserById(input.userId);
+    if (identityError || !targetIdentity.user) return NextResponse.json({ ok: false, error: "Учётная запись сотрудника не найдена" }, { status: 404 });
+    if (!isStaffIdentityOwnedByOrganization(targetIdentity.user, organizationId)) {
+      return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись без подтверждённого владения", code: "STAFF_IDENTITY_OWNERSHIP_REQUIRED" }, { status: 403 });
     }
 
     try {

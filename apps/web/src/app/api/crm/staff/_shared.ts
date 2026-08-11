@@ -92,3 +92,16 @@ export async function resolveOrganizationId(preferred?: string) {
 export function temporaryPassword() {
   return temporaryPortalPassword("Roboks");
 }
+
+const staffOrganizationMetadataKey = "edcrm_staff_organization_id";
+
+export function staffIdentityMetadata(organizationId: string) {
+  return { [staffOrganizationMetadataKey]: organizationId };
+}
+
+export function isStaffIdentityOwnedByOrganization(
+  user: { app_metadata?: Record<string, unknown> | null } | null | undefined,
+  organizationId: string,
+) {
+  return user?.app_metadata?.[staffOrganizationMetadataKey] === organizationId;
+}

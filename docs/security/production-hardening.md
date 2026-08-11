@@ -23,6 +23,7 @@
 - `.env.production` хранится только на сервере с mode `0600`, не входит в Git и backup, доступный разработчикам.
 - `SUPABASE_SECRET_KEY`, Alfa password, MAX token/webhook secret и cron secrets никогда не имеют `NEXT_PUBLIC_` prefix. После подозрения на утечку — rotation у провайдера, затем controlled redeploy.
 - `DEMO_AUTH_BYPASS` отсутствует в Docker production. `NEXT_PUBLIC_DEMO_MODE` может включать только демонстрационный UI и не выдаёт права.
+- Повторно зарегистрированный staff email нельзя присоединять вручную к другой организации. Для shared/multi-organization identity использовать отдельный подтверждаемый invitation flow; для legacy identity без ownership metadata — Supabase account recovery, а не административный reset.
 - Проверить canonical `APP_URL`/`NEXT_PUBLIC_APP_URL`; payment return/callback URLs не должны указывать на внешний origin.
 - Alfa gateway должен использовать один из встроенных HTTPS-hosts Альфа/paymentgate и путь `/payment/rest/`. Если банк документированно выдаёт другой host, добавить только hostname в server-only `ALFABANK_ALLOWED_GATEWAY_HOSTS` (через запятую), затем повторить provider check; IP, HTTP, credentials-in-URL и redirect не разрешаются. `registerEndpoint` может быть только `register.do` или `registerPreAuth.do`.
 - Emergency response: `PAYMENTS_EMERGENCY_DISABLED=true` и/или `MAX_EMERGENCY_DISABLED=true`, затем restart. Switches fail closed и не меняют ledger.

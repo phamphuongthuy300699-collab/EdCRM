@@ -61,4 +61,20 @@ describe("representative BOLA defenses", () => {
     expect(diagnostics).toContain('.eq("id", membership.organization_id)');
     expect(diagnostics).not.toContain("DEFAULT_ORG_SLUG");
   });
+
+  it("never attaches an existing global Auth identity through staff creation", () => {
+    const create = read("app/api/crm/staff/create/route.ts");
+    expect(create).not.toContain("listUsers");
+    expect(create).toContain("STAFF_IDENTITY_ALREADY_EXISTS");
+    expect(create).toContain("staffIdentityMetadata");
+  });
+
+  it("requires organization ownership proof before global staff identity mutations", () => {
+    for (const file of ["app/api/crm/staff/reset-password/route.ts", "app/api/crm/staff/update/route.ts"]) {
+      const source = read(file);
+      expect(source).toContain("getUserById");
+      expect(source).toContain("isStaffIdentityOwnedByOrganization");
+      expect(source.indexOf("isStaffIdentityOwnedByOrganization")).toBeLessThan(source.indexOf("updateUserById"));
+    }
+  });
 });
