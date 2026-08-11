@@ -79,4 +79,11 @@ describe("representative BOLA defenses", () => {
       expect(source.indexOf("hasExclusiveStaffIdentityScope")).toBeLessThan(source.indexOf("updateUserById"));
     }
   });
+
+  it("deactivates only the scoped active membership and leaves the global profile unchanged", () => {
+    const deactivate = read("app/api/crm/staff/deactivate/route.ts");
+    expect(deactivate).toContain('.eq("is_active", true)');
+    expect(deactivate).not.toContain('.from("profiles")');
+    expect(deactivate).not.toContain("show_on_site");
+  });
 });

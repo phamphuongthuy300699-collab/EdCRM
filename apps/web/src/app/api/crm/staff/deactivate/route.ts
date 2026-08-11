@@ -22,19 +22,16 @@ export async function POST(request: Request) {
     }
     const organizationId = await resolveOrganizationId(access.organizationId);
     const admin = createSupabaseAdminClient();
-    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", organizationId).eq("user_id", parsed.data.userId).maybeSingle();
+    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", organizationId).eq("user_id", parsed.data.userId).eq("is_active", true).maybeSingle();
     if (!currentMembership) return NextResponse.json({ ok: false, error: "Сотрудник не найден в этой организации" }, { status: 404 });
     if (access.role !== "owner" && ["owner", "admin"].includes(currentMembership.role)) return NextResponse.json({ ok: false, error: "Только владелец может отключить этого сотрудника" }, { status: 403 });
 
     const { error: membershipError } = await (admin.from("org_memberships") as any)
-      .update({ is_active: false })
-      .eq("organization_id", organizationId)
-      .eq("user_id", parsed.data.userId);
-    if (membershipError) throw membershipError;
-
-    await (admin.from("profiles") as any)
-      .update({ show_on_site: false, updated_at: new Date().toISOString() })
-      .eq("id", parsed.data.userId);
+       .update({ is_active: false })
+       .eq("organization_id", organizationId)
+       .eq("user_id", parsed.data.userId)
+       .eq("is_active", true);
+     if (membershipError) throw membershipError;
 
     await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.userId, action: "deactivate_staff", entity_table: "org_memberships", entity_id: parsed.data.userId, metadata: { previousRole: currentMembership.role, result: "success" } });
 
