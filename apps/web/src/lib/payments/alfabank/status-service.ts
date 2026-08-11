@@ -170,6 +170,13 @@ export async function refreshAlfabankPaymentStatus(
   const bankAmount = Number(statusResponse.amount);
   const expectedAmount = Math.round(Number(payment.amount) * 100);
   if (Number.isFinite(bankAmount) && bankAmount !== expectedAmount) {
+    console.warn("[security]", {
+      scope: "security",
+      event: "payment_amount_mismatch",
+      paymentId: payment.id,
+      organizationId: payment.organization_id,
+      source,
+    });
     throw new AlfaStatusError("Сумма платежа в банке не совпадает с CRM", 400, "AMOUNT_MISMATCH");
   }
 

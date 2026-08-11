@@ -10,13 +10,14 @@ import {
   toPublicStatusResponse,
   verifyAnonymousReturnMatch,
 } from "@/lib/payments/alfabank/status-service";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const returnStatusSchema = z.object({
   paymentId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
   providerOrderId: z.string().optional(),
   orderId: z.string().optional(),
-});
+}).strict();
 
 function jsonError(message: string, status = 400, code = "RETURN_STATUS_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -37,6 +38,9 @@ async function parsePayload(request: NextRequest) {
 }
 
 async function handleReturnStatus(request: NextRequest) {
+  if (process.env.PAYMENTS_EMERGENCY_DISABLED === "true") return jsonError("Онлайн-оплата временно отключена", 503, "PAYMENTS_EMERGENCY_DISABLED");
+  const rate = checkRateLimit({ key: `payment-return-status:${requestFingerprint(request)}`, limit: 20, windowMs: 60_000 });
+  if (!rate.allowed) return rateLimitResponse(rate);
   try {
     const parsed = returnStatusSchema.safeParse(await parsePayload(request));
     if (!parsed.success) {
@@ -72,11 +76,7 @@ async function handleReturnStatus(request: NextRequest) {
       return jsonError(error.message, error.status, error.code);
     }
     console.error("[Alfabank Return Status] Error:", error);
-    return jsonError(
-      error instanceof Error ? error.message : "Не удалось уточнить статус платежа",
-      500,
-      "INTERNAL_ERROR",
-    );
+    return jsonError("Не удалось уточнить статус платежа", 500, "INTERNAL_ERROR");
   }
 }
 

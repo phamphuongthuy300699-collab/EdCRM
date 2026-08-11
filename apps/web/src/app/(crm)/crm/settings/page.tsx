@@ -289,6 +289,7 @@ export default function CrmSettingsPage() {
     isEnabled: false,
     tokenConfigured: false,
     webhookSecret: "",
+    webhookSecretConfigured: false,
     webhookUrl: "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook",
     botUsername: "",
     settings: {},
@@ -466,6 +467,7 @@ export default function CrmSettingsPage() {
           isEnabled: Boolean(maxSettingsRes.settings?.isEnabled),
           tokenConfigured: Boolean(maxSettingsRes.settings?.tokenConfigured),
           webhookSecret: maxSettingsRes.settings?.webhookSecret || "",
+          webhookSecretConfigured: Boolean(maxSettingsRes.settings?.webhookSecretConfigured),
           webhookUrl: maxSettingsRes.settings?.webhookUrl || "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook",
           botUsername: maxSettingsRes.settings?.botUsername || "",
           settings: maxSettingsRes.settings?.settings || {},
@@ -1339,6 +1341,7 @@ export default function CrmSettingsPage() {
         ...maxSettings,
         ...payload.settings,
         tokenConfigured: Boolean(payload.settings?.tokenConfigured),
+        webhookSecretConfigured: Boolean(payload.settings?.webhookSecretConfigured),
       });
       setMaxBotToken("");
       setNotice("Настройки MAX сохранены. Токен скрыт и больше не показывается в интерфейсе.");
@@ -2087,7 +2090,7 @@ export default function CrmSettingsPage() {
                     </Field>
                     <Field label="Webhook secret">
                       <div className="settings-actions" style={{ alignItems: "stretch" }}>
-                        <TextInput style={{ flex: 1 }} value={maxSettings.webhookSecret || ""} onChange={(event) => setMaxSettings({ ...maxSettings, webhookSecret: event.target.value })} />
+                        <TextInput style={{ flex: 1 }} type="password" value={maxSettings.webhookSecret || ""} placeholder={maxSettings.webhookSecretConfigured ? "Сохранён на сервере; оставьте пустым, чтобы не менять" : "Будет создан сервером при сохранении"} onChange={(event) => setMaxSettings({ ...maxSettings, webhookSecret: event.target.value })} />
                         <Button type="button" variant="secondary-crm" onClick={() => setMaxSettings({ ...maxSettings, webhookSecret: generateClientSecret() })}>Сгенерировать</Button>
                       </div>
                     </Field>
@@ -2100,7 +2103,7 @@ export default function CrmSettingsPage() {
                     <Button type="button" variant="secondary-crm" onClick={checkMaxBotToken} disabled={saving || !maxSettings.tokenConfigured}>
                       <CheckCircle2 size={16} /> Проверить токен
                     </Button>
-                    <Button type="button" variant="secondary-crm" onClick={subscribeMaxWebhookAction} disabled={saving || !maxSettings.tokenConfigured || !maxSettings.webhookUrl || !maxSettings.webhookSecret}>
+                    <Button type="button" variant="secondary-crm" onClick={subscribeMaxWebhookAction} disabled={saving || !maxSettings.tokenConfigured || !maxSettings.webhookUrl || !(maxSettings.webhookSecretConfigured || maxSettings.webhookSecret)}>
                       <LinkIcon size={16} /> Подписать webhook
                     </Button>
                     <Button type="button" variant="secondary-crm" disabled title="Станет доступно после привязки тестового MAX аккаунта">

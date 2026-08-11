@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { requirePaymentAdmin } from "./_shared";
+import { writeSecurityAudit } from "@/lib/security/audit";
 
 const gatewayUrl = z.string().url().optional().nullable().or(z.literal(""));
 const pathValue = z.string().max(240).optional().nullable().or(z.literal(""));
@@ -26,7 +27,7 @@ const payloadSchema = z.object({
   fiscalizationEnabled: z.boolean(),
   taxationSystem: z.string().max(80).optional().nullable(),
   vatRate: z.string().max(80).optional().nullable(),
-});
+}).strict();
 
 type AlfabankSettingsResponse = {
   provider: "alfabank";
@@ -183,6 +184,14 @@ export async function POST(request: Request) {
       { onConflict: "organization_id,provider" },
     );
     if (error) throw error;
+
+    await writeSecurityAudit(admin, {
+      organizationId,
+      actorId: access.userId,
+      action: "update_payment_provider_settings",
+      entityTable: "payment_provider_settings",
+      metadata: { provider: "alfabank", enabled: input.enabled, mode: input.mode, passwordChanged: Boolean(input.apiPassword?.trim()) },
+    });
 
     return NextResponse.json({ ok: true, passwordConfigured: Boolean(password) });
   } catch (error: any) {

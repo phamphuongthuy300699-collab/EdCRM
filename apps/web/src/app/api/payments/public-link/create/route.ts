@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAlfaOrder } from "@/lib/payments/alfabank/client";
-import { alfaErrorMessage, AlfaBankError } from "@/lib/payments/alfabank/errors";
+import { AlfaBankError } from "@/lib/payments/alfabank/errors";
 import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { verifyInvoicePaymentPublicId } from "@/lib/payments/invoice-payment-links";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 import { buildPaymentReturnUrl } from "../../alfabank/create/route";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
   publicId: z.string().min(16),
-});
+}).strict();
 
 const reusablePaymentStatuses = ["pending", "redirected", "authorized"];
 
@@ -54,6 +55,9 @@ async function findActiveAlfabankPayment(admin: ReturnType<typeof createSupabase
 }
 
 export async function POST(request: NextRequest) {
+  if (process.env.PAYMENTS_EMERGENCY_DISABLED === "true") return jsonError("Онлайн-оплата временно отключена", 503, "PAYMENTS_EMERGENCY_DISABLED");
+  const rate = checkRateLimit({ key: `public-payment-create:${requestFingerprint(request)}`, limit: 10, windowMs: 10 * 60_000 });
+  if (!rate.allowed) return rateLimitResponse(rate);
   try {
     const parsed = bodySchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -122,7 +126,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (paymentError || !payment) {
-      return jsonError("Не удалось создать запись платежа: " + (paymentError?.message || ""), 500, "PAYMENT_CREATE_FAILED");
+      return jsonError("Не удалось создать оплату", 500, "PAYMENT_CREATE_FAILED");
     }
 
     const orderNumber = `${invoice.number || `INV-${invoice.id.slice(0, 8)}`}-${payment.id.slice(0, 8)}`;
@@ -186,12 +190,15 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", payment.id);
 
-      return jsonError(alfaErrorMessage(error), 502, error instanceof AlfaBankError ? error.code : "ALFABANK_REGISTER_FAILED");
+      const code = error instanceof AlfaBankError ? error.code : "ALFABANK_REGISTER_FAILED";
+      console.error("[Public Payment Link] Registration failed", { code });
+      return jsonError("Не удалось создать оплату", 502, code);
     }
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("PAY_LINK_")) {
       return jsonError("Ссылка оплаты недействительна или устарела", 404, error.message);
     }
-    return jsonError(alfaErrorMessage(error), 500, "PAY_LINK_PAYMENT_UNEXPECTED_ERROR");
+    console.error("[Public Payment Link] Unexpected error", { code: error instanceof AlfaBankError ? error.code : "INTERNAL_ERROR" });
+    return jsonError("Не удалось создать оплату", 500, "PAY_LINK_PAYMENT_UNEXPECTED_ERROR");
   }
 }

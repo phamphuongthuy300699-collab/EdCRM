@@ -11,6 +11,7 @@ import {
 } from "@/lib/bots/max/utils";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isMaxEventEnabled } from "@/lib/bots/max/events";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const PUBLIC_APP_URL = "https://xn--48-9kc0bsblm.xn--p1ai";
 
@@ -435,8 +436,14 @@ async function handleBotStarted(admin: ReturnType<typeof createSupabaseAdminClie
 
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
+  if (process.env.MAX_EMERGENCY_DISABLED === "true") return NextResponse.json({ ok: false, code: "MAX_EMERGENCY_DISABLED" }, { status: 503 });
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 256 * 1024) return NextResponse.json({ ok: false, code: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   const secret = request.headers.get("x-max-bot-api-secret") || "";
   if (!secret) return NextResponse.json({ ok: false }, { status: 401 });
+  const secretFingerprint = crypto.createHash("sha256").update(secret).digest("hex").slice(0, 16);
+  const rate = checkRateLimit({ key: `max-webhook:${secretFingerprint}:${requestFingerprint(request)}`, limit: 120, windowMs: 60_000 });
+  if (!rate.allowed) return rateLimitResponse(rate);
 
   const { admin, settings } = await loadSettingsBySecret(secret);
   if (!settings?.bot_token_secret) return NextResponse.json({ ok: false }, { status: 401 });

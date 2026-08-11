@@ -15,6 +15,11 @@ services:
         NEXT_PUBLIC_MEDIA_BUCKET: ${NEXT_PUBLIC_MEDIA_BUCKET}
     image: edcrm-web:prod
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file:
       - .env.production
     environment:

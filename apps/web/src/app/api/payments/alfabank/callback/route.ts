@@ -8,6 +8,7 @@ import {
   refreshAlfabankPaymentStatus,
   toPublicStatusResponse,
 } from "@/lib/payments/alfabank/status-service";
+import { checkRateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 
 function jsonError(message: string, status = 400, code = "CALLBACK_ERROR") {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -39,6 +40,9 @@ async function collectPayload(request: NextRequest) {
 }
 
 async function processCallback(request: NextRequest) {
+  if (process.env.PAYMENTS_EMERGENCY_DISABLED === "true") return jsonError("Payment processing disabled", 503, "PAYMENTS_EMERGENCY_DISABLED");
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 256 * 1024) return jsonError("Payload too large", 413, "PAYLOAD_TOO_LARGE");
   const admin = createSupabaseAdminClient();
   const rawPayload = await collectPayload(request);
   const orderId = rawPayload.mdOrder || rawPayload.orderId;
@@ -46,6 +50,11 @@ async function processCallback(request: NextRequest) {
 
   if (!orderId && !orderNumber) {
     return jsonError("Missing mdOrder or orderNumber in webhook payload", 400, "MISSING_ORDER_ID");
+  }
+  const rate = checkRateLimit({ key: `alfa-callback:order:${String(orderId || orderNumber).slice(0, 160)}`, limit: 30, windowMs: 60_000 });
+  if (!rate.allowed) {
+    console.warn("[security]", { scope: "security", event: "rate_limit_exceeded", endpoint: "alfa_callback" });
+    return rateLimitResponse(rate);
   }
 
   try {
@@ -73,12 +82,12 @@ async function processCallback(request: NextRequest) {
       if (error.code === "PAYMENT_NOT_FOUND") {
         console.error("[Alfabank Callback] Payment not found for:", { orderId, orderNumber });
       }
-      return jsonError(error.message, error.status, error.code);
+      return jsonError(error.status < 500 ? error.message : "Payment verification failed", error.status, error.code);
     }
 
     console.error("[Alfabank Callback] Error:", error);
     return jsonError(
-      error instanceof Error ? error.message : "Failed to verify payment status with bank",
+      "Failed to verify payment status with bank",
       502,
       "ALFABANK_STATUS_VERIFICATION_FAILED",
     );

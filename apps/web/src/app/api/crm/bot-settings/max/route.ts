@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { newWebhookSecret, requireBotStaff } from "@/lib/bots/max/utils";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
+import { writeSecurityAudit } from "@/lib/security/audit";
 
 const DEFAULT_MAX_WEBHOOK_URL = "https://xn--48-9kc0bsblm.xn--p1ai/api/bots/max/webhook";
 
@@ -13,13 +14,14 @@ const payloadSchema = z.object({
   webhookUrl: z.string().optional(),
   botUsername: z.string().optional(),
   events: z.record(z.string(), z.boolean()).optional(),
-});
+}).strict();
 
 function sanitize(row: any) {
   return {
     isEnabled: row?.is_enabled === true,
     tokenConfigured: Boolean(row?.bot_token_secret),
-    webhookSecret: row?.webhook_secret || "",
+    webhookSecret: "",
+    webhookSecretConfigured: Boolean(row?.webhook_secret),
     webhookUrl: row?.webhook_url || DEFAULT_MAX_WEBHOOK_URL,
     botUsername: row?.bot_username || "",
     settings: { ...(row?.settings || {}), events: normalizeMaxEvents(row?.settings?.events) },
@@ -68,6 +70,19 @@ export async function POST(request: Request) {
     { onConflict: "organization_id,provider" },
   );
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+  await writeSecurityAudit(admin, {
+    organizationId: access.organizationId,
+    actorId: access.userId,
+    action: "update_max_provider_settings",
+    entityTable: "bot_settings",
+    metadata: {
+      provider: "max",
+      enabled: parsed.data.isEnabled,
+      tokenChanged: Boolean(parsed.data.botToken?.trim()),
+      webhookSecretChanged: Boolean(parsed.data.webhookSecret?.trim()),
+    },
+  });
 
   const { data } = await (admin.from("bot_settings") as any)
     .select("*")

@@ -6,6 +6,8 @@ import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { resolveMediaUsages } from "./media-usages";
+import { inspectMediaUpload } from "@/lib/security/media-upload";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
 const WHITELIST_FOLDERS = [
@@ -134,7 +136,7 @@ export async function GET(req: NextRequest) {
     }
   } catch (err: any) {
     console.error("List files error:", err);
-    return NextResponse.json({ error: err.message || "Failed to list files" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to list files" }, { status: 500 });
   }
 }
 
@@ -143,6 +145,8 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+  const rate = checkRateLimit({ key: `media-upload:${(auth as any).user?.id || requestFingerprint(req)}`, limit: 30, windowMs: 10 * 60_000 });
+  if (!rate.allowed) return rateLimitResponse(rate);
 
   const driver = process.env.MEDIA_DRIVER || process.env.NEXT_PUBLIC_MEDIA_DRIVER || "supabase";
 
@@ -159,8 +163,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Folder '${folder}' is not whitelisted` }, { status: 400 });
     }
 
+    const maxBytes = Number(process.env.MAX_MEDIA_UPLOAD_BYTES || 8 * 1024 * 1024);
+    if (file.size > maxBytes) {
+      console.warn("[security]", { scope: "security", event: "media_upload_rejected", code: "MEDIA_TOO_LARGE" });
+      return NextResponse.json({ error: "Файл слишком большой", code: "MEDIA_TOO_LARGE" }, { status: 413 });
+    }
     const buffer = Buffer.from(await file.arrayBuffer());
-    const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const inspection = inspectMediaUpload({ folder, originalName: file.name, declaredType: file.type, size: file.size, bytes: buffer, maxBytes });
+    if (!inspection.ok) {
+      console.warn("[security]", { scope: "security", event: "media_upload_rejected", code: inspection.code });
+      return NextResponse.json({ error: "Недопустимый файл", code: inspection.code }, { status: inspection.status });
+    }
+    const storageName = inspection.storageName;
 
     if (driver === "local") {
       const resolvedDir = path.join(getLocalMediaDir(), folder);
@@ -168,9 +182,10 @@ export async function POST(req: NextRequest) {
         fs.mkdirSync(resolvedDir, { recursive: true });
       }
 
-      fs.writeFileSync(path.join(resolvedDir, sanitizedFilename), buffer);
+      fs.writeFileSync(path.join(resolvedDir, storageName), buffer, { flag: "wx" });
       
-      const relativePath = `${folder}/${sanitizedFilename}`;
+      const relativePath = `${folder}/${storageName}`;
+      if ((auth as any).organizationId) await createSupabaseAdminClient().from("crm_audit_log").insert({ organization_id: (auth as any).organizationId, actor_id: (auth as any).user?.id || null, action: "upload_media", entity_table: "media_files", entity_title: relativePath, metadata: { path: relativePath, contentType: inspection.contentType, size: file.size } });
       return NextResponse.json({
         success: true,
         path: relativePath,
@@ -183,14 +198,15 @@ export async function POST(req: NextRequest) {
       
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(`${folder}/${sanitizedFilename}`, buffer, {
-          contentType: file.type,
-          upsert: true
+        .upload(`${folder}/${storageName}`, buffer, {
+          contentType: inspection.contentType,
+          upsert: false
         });
 
       if (error) throw error;
 
-      const relativePath = `${folder}/${sanitizedFilename}`;
+      const relativePath = `${folder}/${storageName}`;
+      if ((auth as any).organizationId) await supabase.from("crm_audit_log").insert({ organization_id: (auth as any).organizationId, actor_id: (auth as any).user?.id || null, action: "upload_media", entity_table: "media_files", entity_title: relativePath, metadata: { path: relativePath, contentType: inspection.contentType, size: file.size } });
       return NextResponse.json({
         success: true,
         path: relativePath,
@@ -199,7 +215,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     console.error("Upload error:", err);
-    return NextResponse.json({ error: err.message || "Failed to upload file" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 }
 
@@ -256,6 +272,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, path: mediaPath });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Не удалось удалить файл" }, { status: 500 });
+    console.error("Delete media error:", err);
+    return NextResponse.json({ error: "Не удалось удалить файл" }, { status: 500 });
   }
 }

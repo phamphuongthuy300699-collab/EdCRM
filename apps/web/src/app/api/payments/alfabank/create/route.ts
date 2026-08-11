@@ -6,10 +6,11 @@ import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { redactSensitivePaymentPayload } from "@/lib/payments/alfabank/mapper";
 import { shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
+import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
-});
+}).strict();
 
 const financeRoles = new Set(["owner", "admin", "manager", "accountant"]);
 const reusablePaymentStatuses = ["pending", "redirected", "authorized"];
@@ -47,6 +48,9 @@ export function buildPaymentReturnUrl(pathOrUrl: string | null | undefined, inpu
     ? new URL(raw)
     : new URL(raw.startsWith("/") ? raw : `/${raw}`, originUrl);
   assertPublicProductionUrl(url);
+  if (input.nodeEnv === "production" && url.origin !== originUrl.origin) {
+    throw new AlfaBankError("Payment return URL must use the configured application origin", { code: "PAYMENT_RETURN_ORIGIN_REJECTED" });
+  }
 
   url.searchParams.set("invoiceId", input.invoiceId);
   url.searchParams.set("paymentId", input.paymentId);
@@ -136,6 +140,12 @@ async function canUserPayInvoice(admin: ReturnType<typeof createSupabaseAdminCli
 }
 
 export async function POST(request: NextRequest) {
+  if (process.env.PAYMENTS_EMERGENCY_DISABLED === "true") return jsonError("Онлайн-оплата временно отключена", 503, "PAYMENTS_EMERGENCY_DISABLED");
+  const rate = checkRateLimit({ key: `payment-create:${requestFingerprint(request)}`, limit: 10, windowMs: 10 * 60_000 });
+  if (!rate.allowed) {
+    console.warn("[security]", { scope: "security", event: "rate_limit_exceeded", endpoint: "payment_create" });
+    return rateLimitResponse(rate);
+  }
   try {
     const parsed = bodySchema.safeParse(await request.json());
     if (!parsed.success) {

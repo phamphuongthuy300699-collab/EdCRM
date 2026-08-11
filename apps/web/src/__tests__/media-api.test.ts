@@ -257,7 +257,8 @@ describe("Media API Endpoint Security", () => {
             return {
               name: "teacher photo.jpg",
               type: "image/jpeg",
-              arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("teacher-photo")),
+              size: 7,
+              arrayBuffer: vi.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a])),
             };
           }
           return null;
@@ -270,12 +271,10 @@ describe("Media API Endpoint Security", () => {
       const response = await POST(req);
       expect(response.status).toBe(200);
       const json = await response.json();
-      expect(json).toMatchObject({
-        success: true,
-        path: "teachers/teacher_photo.jpg",
-        url: "/media/teachers/teacher_photo.jpg",
-      });
-      expect(fs.existsSync(path.join(tempMediaDir, "teachers", "teacher_photo.jpg"))).toBe(true);
+      expect(json.success).toBe(true);
+      expect(json.path).toMatch(/^teachers\/[0-9a-f-]{36}\.jpg$/);
+      expect(json.url).toBe(`/media/${json.path}`);
+      expect(fs.existsSync(path.join(tempMediaDir, json.path))).toBe(true);
     } finally {
       if (originalMediaDriver === undefined) {
         delete process.env.MEDIA_DRIVER;

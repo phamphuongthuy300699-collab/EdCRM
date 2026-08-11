@@ -4,7 +4,7 @@ import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 
 export async function requirePaymentAdmin() {
   if (isDemoAuthBypassAllowed()) {
-    return { ok: true as const, organizationId: "demo-org" };
+    return { ok: true as const, userId: "demo-user", organizationId: "demo-org" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -32,5 +32,5 @@ export async function requirePaymentAdmin() {
     };
   }
 
-  return { ok: true as const, organizationId: membership.organization_id as string };
+  return { ok: true as const, userId: user.id, organizationId: membership.organization_id as string };
 }
