@@ -44,4 +44,26 @@ describe("staff settings contracts", () => {
     expect(source).toContain('formData.append("folder", "teachers")');
     expect(source).toContain("Загрузить фото");
   });
+
+  it("separates teacher pay schemes and scopes access feedback to each card", () => {
+    const page = fs.readFileSync(path.join(process.cwd(), "src/app/(crm)/crm/settings/page.tsx"), "utf8");
+    const listRoute = fs.readFileSync(path.join(process.cwd(), "src/app/api/crm/staff/list/route.ts"), "utf8");
+
+    expect(page).toContain("За присутствующего");
+    expect(page).toContain("За занятие");
+    expect(page).toContain("staffAccessState[person.user_id]");
+    expect(page).toContain("Нет доступа в ЛК");
+    expect(listRoute).toContain("admin.auth.admin.listUsers");
+    expect(listRoute).toContain("hasAuthAccount: authUserIds.has(membership.user_id)");
+  });
+
+  it("keeps a newly issued password visible when saving the teacher rate fails", () => {
+    const page = fs.readFileSync(path.join(process.cwd(), "src/app/(crm)/crm/settings/page.tsx"), "utf8");
+    const passwordIndex = page.indexOf("if (payload.temporaryPassword) setTemporaryPassword(payload.temporaryPassword)");
+    const rateRequestIndex = page.indexOf("const rateRequest = buildTeacherRatePayload");
+
+    expect(passwordIndex).toBeGreaterThan(-1);
+    expect(passwordIndex).toBeLessThan(rateRequestIndex);
+    expect(page).toContain("Сотрудник сохранён, ставка не сохранена:");
+  });
 });

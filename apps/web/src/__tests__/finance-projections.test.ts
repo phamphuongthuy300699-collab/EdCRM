@@ -25,9 +25,11 @@ describe("role-specific finance projections", () => {
     expect(parentRoute).toContain('from("billing_accounts")');
     expect(parentRoute).not.toContain("teacher_payroll_entries");
     expect(teacherRoute).toContain('from("teacher_payroll_entries")');
+    expect(teacherRoute).toContain("pay_mode");
     expect(teacherRoute).toContain("access.userId");
     expect(parentPage).toContain("Текущий баланс");
     expect(teacherPage).toContain("Мои начисления");
+    expect(teacherPage).toContain("Фикс за занятие");
   });
 
   it("projects a student balance through the explicit billing guardian", () => {

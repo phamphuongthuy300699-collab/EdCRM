@@ -36,9 +36,16 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    const { data: payRules } = await admin.from("teacher_pay_rules").select("teacher_id, effective_from, rate_per_attendee").eq("organization_id", organizationId).order("effective_from", { ascending: false });
+    const { data: payRules } = await admin.from("teacher_pay_rules").select("teacher_id, effective_from, pay_mode, rate").eq("organization_id", organizationId).order("effective_from", { ascending: false });
     const latestRate = new Map<string, any>();
     for (const rule of payRules || []) if (!latestRate.has(rule.teacher_id)) latestRate.set(rule.teacher_id, rule);
+    const authUserIds = new Set<string>();
+    for (let page = 1; ; page += 1) {
+      const { data: authPage, error: authError } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (authError) throw authError;
+      for (const user of authPage.users) authUserIds.add(user.id);
+      if (authPage.users.length < 1000) break;
+    }
     const staff = (memberships || []).map((membership: any) => {
       const profile = Array.isArray(membership.profiles) 
         ? membership.profiles[0] 
@@ -58,8 +65,10 @@ export async function GET(request: Request) {
         show_on_site: profile?.show_on_site ?? false,
         show_public_contacts: profile?.show_public_contacts ?? false,
         sort_order: profile?.sort_order ?? 100,
-        pay_rate: latestRate.get(membership.user_id)?.rate_per_attendee ?? null,
+        pay_mode: latestRate.get(membership.user_id)?.pay_mode ?? "per_attendee",
+        pay_rate: latestRate.get(membership.user_id)?.rate ?? null,
         pay_rate_effective_from: latestRate.get(membership.user_id)?.effective_from ?? null,
+        hasAuthAccount: authUserIds.has(membership.user_id),
       };
     });
 

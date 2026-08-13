@@ -42,11 +42,11 @@ export async function GET(request: Request) {
     }
 
     const { data, error } = ids.length
-      ? await admin.from("teacher_payroll_entries").select("attendee_count, rate_snapshot, amount, status, profiles(full_name), lesson_sessions!inner(id, lesson_date, groups(title))").eq("organization_id", access.organizationId).in("lesson_session_id", ids).order("created_at")
+      ? await admin.from("teacher_payroll_entries").select("pay_mode, attendee_count, rate_snapshot, amount, status, profiles(full_name), lesson_sessions!inner(id, lesson_date, groups(title))").eq("organization_id", access.organizationId).in("lesson_session_id", ids).order("created_at")
       : { data: [], error: null };
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return csvResponse("payroll.csv", ["Преподаватель", "Дата", "Группа", "Посетили", "Ставка", "Начислено", "Статус"], (data || []).map((row: any) => [
-      related(row.profiles)?.full_name || "", related(row.lesson_sessions)?.lesson_date || "", related(related(row.lesson_sessions)?.groups)?.title || "", row.attendee_count, row.rate_snapshot, row.amount, row.status,
+    return csvResponse("payroll.csv", ["Преподаватель", "Дата", "Группа", "Схема", "Посетили", "Ставка", "Начислено", "Статус"], (data || []).map((row: any) => [
+      related(row.profiles)?.full_name || "", related(row.lesson_sessions)?.lesson_date || "", related(related(row.lesson_sessions)?.groups)?.title || "", row.pay_mode === "per_lesson" ? "За занятие" : "За ученика", row.attendee_count, row.rate_snapshot, row.amount, row.status,
     ]));
   }
 

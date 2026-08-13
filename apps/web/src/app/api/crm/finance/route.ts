@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     if (view === "payroll") {
       const month = searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
       let query = admin.from("teacher_payroll_entries")
-        .select("id, teacher_id, attendee_count, rate_snapshot, amount, status, created_at, lesson_sessions!inner(lesson_date, starts_at, group_id, groups(title)), profiles(full_name)", { count: "exact" })
+        .select("id, teacher_id, pay_mode, attendee_count, rate_snapshot, amount, status, created_at, lesson_sessions!inner(lesson_date, starts_at, group_id, groups(title)), profiles(full_name)", { count: "exact" })
         .eq("organization_id", access.organizationId).order("created_at", { ascending: false });
       if (dateFrom) query = query.gte("lesson_sessions.lesson_date", dateFrom);
       if (dateTo) query = query.lte("lesson_sessions.lesson_date", dateTo);

@@ -37,6 +37,8 @@ import { StudentPicker } from "@/shared/ui/StudentPicker";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
 import { getMediaUrl } from "@/shared/utils/media";
 import { maxEventDefinitions, normalizeMaxEvents } from "@/lib/bots/max/events";
+import { buildStaffPayload, buildTeacherRatePayload } from "@/features/staff/payloads";
+import { resolveTeacherName } from "@/features/staff/teachers";
 
 type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "bots" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
@@ -139,6 +141,7 @@ const emptyStaff = {
   avatarUrl: "",
   showOnSite: false,
   sortOrder: 100,
+  payMode: "per_attendee" as const,
   payRate: "",
   payRateEffectiveFrom: new Date().toISOString().slice(0, 10),
 };
@@ -308,6 +311,7 @@ export default function CrmSettingsPage() {
   const [roomDraft, setRoomDraft] = useState<any | null>(null);
   const [courseDraft, setCourseDraft] = useState<any | null>(null);
   const [groupDraft, setGroupDraft] = useState<any | null>(null);
+  const [groupError, setGroupError] = useState("");
   const [scheduleDraft, setScheduleDraft] = useState<any[]>([]);
   const [rebuildFutureSessions, setRebuildFutureSessions] = useState(true);
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
@@ -315,6 +319,7 @@ export default function CrmSettingsPage() {
   const [uploadingStaffAvatar, setUploadingStaffAvatar] = useState(false);
   const [uploadingCourseImage, setUploadingCourseImage] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [staffAccessState, setStaffAccessState] = useState<Record<string, { loading?: boolean; error?: string; message?: string; temporaryPassword?: string }>>({});
 
   const supabase = createSupabaseBrowserClient();
   const demo = isDemoMode();
@@ -925,6 +930,7 @@ export default function CrmSettingsPage() {
   }
 
   function openGroupModal(group?: any) {
+    setGroupError("");
     setRebuildFutureSessions(true);
     setGroupDraft(group ? {
       id: group.id,
@@ -1024,7 +1030,7 @@ export default function CrmSettingsPage() {
       setScheduleDraft([]);
       if (demo) setNotice("Группа и расписание сохранены");
     } catch (err: any) {
-      setError(err.message || "Не удалось сохранить группу");
+      setGroupError(err.message || "Не удалось сохранить группу");
     } finally {
       setSaving(false);
     }
@@ -1060,17 +1066,23 @@ export default function CrmSettingsPage() {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(staffDraft),
+        body: JSON.stringify(buildStaffPayload({ ...staffDraft, organizationId: org.id })),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(staffErrorMessage(payload));
-      const savedUserId = payload.userId || staffDraft.userId;
-      if (!demo && staffDraft.role === "teacher" && staffDraft.payRate !== "" && savedUserId) {
-        const rateResponse = await fetch("/api/crm/finance/teacher-rates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ teacherId: savedUserId, rate: Number(staffDraft.payRate), effectiveFrom: staffDraft.payRateEffectiveFrom }) });
-        const ratePayload = await rateResponse.json();
-        if (!rateResponse.ok || !ratePayload.ok) throw new Error(ratePayload.error || "Сотрудник сохранён, но ставку сохранить не удалось");
-      }
       if (payload.temporaryPassword) setTemporaryPassword(payload.temporaryPassword);
+      const savedUserId = payload.userId || staffDraft.userId;
+      const rateRequest = buildTeacherRatePayload(staffDraft, savedUserId);
+      if (!demo && rateRequest) {
+        const rateResponse = await fetch("/api/crm/finance/teacher-rates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rateRequest) });
+        const ratePayload = await rateResponse.json();
+        if (!rateResponse.ok || !ratePayload.ok) {
+          await loadData();
+          setStaffDraft((current: any) => current ? { ...current, userId: savedUserId } : current);
+          setStaffError(`Сотрудник сохранён, ставка не сохранена: ${ratePayload.error || "проверьте параметры ставки"}`);
+          return;
+        }
+      }
       if (demo) {
         const local = {
           user_id: staffDraft.userId || `demo-staff-${Date.now()}`,
@@ -1130,7 +1142,9 @@ export default function CrmSettingsPage() {
   }
 
   async function resetStaffPassword(person: any) {
+    const key = person.user_id;
     try {
+      setStaffAccessState((current) => ({ ...current, [key]: { loading: true } }));
       const response = await fetch("/api/crm/staff/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1138,11 +1152,19 @@ export default function CrmSettingsPage() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сбросить пароль");
-      setTemporaryPassword(payload.temporaryPassword);
-      setNotice(`Временный пароль для ${person.full_name || person.email}: ${payload.temporaryPassword}`);
+      setStaffAccessState((current) => ({ ...current, [key]: { message: "Пароль сброшен", temporaryPassword: payload.temporaryPassword } }));
     } catch (err: any) {
-      setError(err.message || "Не удалось сбросить пароль");
+      setStaffAccessState((current) => ({ ...current, [key]: { error: err.message || "Не удалось сбросить пароль" } }));
     }
+  }
+
+  function explainLegacyStaffAccess(person: any) {
+    setStaffAccessState((current) => ({
+      ...current,
+      [person.user_id]: {
+        error: "Для сотрудника ещё не создан доступ в личный кабинет. Автоматическое связывание legacy-профиля отложено из-за связанных записей; создайте нового сотрудника обычным способом.",
+      },
+    }));
   }
 
   async function deactivateStaff(person: any) {
@@ -1696,7 +1718,7 @@ export default function CrmSettingsPage() {
                         </div>
                       </div>
                       <div className="settings-meta">
-                        <span>Преподаватель: {group.teacher?.full_name || "не назначен"}</span>
+                        <span>Преподаватель: {resolveTeacherName(group.teacher_id, staff, group.teacher?.full_name)}</span>
                         <span>Возраст: {group.age_from || "?"}-{group.age_to || "?"}</span>
                         <span>Места: {activeEnrollments}/{group.capacity} · свободно {freePlaces}</span>
                         <span>Цена: {group.price_monthly ? formatMoney(group.price_monthly) : `курс ${formatMoney(group.course?.price_monthly)}`}</span>
@@ -1734,8 +1756,10 @@ export default function CrmSettingsPage() {
                 </Button>
               </div>
               <div className="settings-card-list">
-                {staff.map((person) => (
-                  <div key={person.user_id} className="settings-card">
+                {staff.map((person) => {
+                  const accessState = staffAccessState[person.user_id] || {};
+                  const hasAuthAccount = person.hasAuthAccount !== false;
+                  return <div key={person.user_id} className="settings-card">
                     <div className="settings-card-head">
                       <div>
                         <h3>{person.full_name || person.email || "Без имени"}</h3>
@@ -1744,6 +1768,7 @@ export default function CrmSettingsPage() {
                       <div className="settings-actions">
                         <span className="badge badge-blue">{roleLabels[person.role] || person.role}</span>
                         <span className={`badge ${person.is_active ? "badge-green" : "badge-gray"}`}>{person.is_active ? "Доступ активен" : "Доступ выключен"}</span>
+                        {!hasAuthAccount && <span className="badge badge-amber">Нет доступа в ЛК</span>}
                         <span className={`badge ${person.show_on_site ? "badge-green" : "badge-gray"}`}>{person.show_on_site ? "На сайте" : "Скрыт"}</span>
                       </div>
                     </div>
@@ -1755,6 +1780,8 @@ export default function CrmSettingsPage() {
                         <strong>О себе на сайте:</strong> {person.public_bio ? (person.public_bio.length > 120 ? person.public_bio.slice(0, 120) + "..." : person.public_bio) : "нет описания"}
                       </p>
                     </div>
+                    {accessState.error && <div className="settings-alert error" style={{ margin: "8px 0" }}>✕ {accessState.error}</div>}
+                    {accessState.message && <div className="settings-alert success" style={{ margin: "8px 0" }}>✓ {accessState.message}{accessState.temporaryPassword ? <> · временный пароль: <strong>{accessState.temporaryPassword}</strong></> : null}</div>}
                     <div className="settings-actions">
                       <Button
                         type="button"
@@ -1771,17 +1798,22 @@ export default function CrmSettingsPage() {
                           avatarUrl: person.avatar_url || "",
                           showOnSite: Boolean(person.show_on_site),
                           sortOrder: person.sort_order || 100,
+                          payMode: person.pay_mode || "per_attendee",
                           payRate: person.pay_rate == null ? "" : String(person.pay_rate),
                           payRateEffectiveFrom: person.pay_rate_effective_from || new Date().toISOString().slice(0, 10),
                         })}
                       >
                         Редактировать
                       </Button>
-                      <Button type="button" variant="secondary-crm" onClick={() => resetStaffPassword(person)}><KeyRound size={14} /> Сбросить пароль</Button>
+                      {hasAuthAccount ? (
+                        <Button type="button" variant="secondary-crm" disabled={accessState.loading} onClick={() => resetStaffPassword(person)}><KeyRound size={14} /> {accessState.loading ? "Сброс..." : "Сбросить пароль"}</Button>
+                      ) : (
+                        <Button type="button" variant="secondary-crm" onClick={() => explainLegacyStaffAccess(person)}><KeyRound size={14} /> Создать доступ</Button>
+                      )}
                       <Button type="button" variant="secondary-crm" onClick={() => deactivateStaff(person)}><ShieldCheck size={14} /> Деактивировать</Button>
                     </div>
-                  </div>
-                ))}
+                  </div>;
+                })}
               </div>
             </>
           )}
@@ -2264,6 +2296,7 @@ export default function CrmSettingsPage() {
       {groupDraft && (
         <Modal title={groupDraft.id ? "Редактировать группу" : "Новая группа"} onClose={() => setGroupDraft(null)} width={880}>
           <form onSubmit={saveGroup} className="settings-card-list">
+            {groupError && <div className="settings-alert error">✕ {groupError}</div>}
             <div className="settings-grid-3">
               <Field label="Название"><TextInput required value={groupDraft.title} onChange={(e) => setGroupDraft({ ...groupDraft, title: e.target.value })} /></Field>
               <Field label="Курс">
@@ -2401,7 +2434,16 @@ export default function CrmSettingsPage() {
                 </div>
               </Field>
               <Field label="Порядок"><TextInput type="number" value={staffDraft.sortOrder} onChange={(e) => setStaffDraft({ ...staffDraft, sortOrder: e.target.value })} /></Field>
-              {staffDraft.role === "teacher" && <><Field label="Ставка за присутствующего ученика, ₽"><TextInput type="number" min="0" step="0.01" value={staffDraft.payRate} onChange={(e) => setStaffDraft({ ...staffDraft, payRate: e.target.value })} /></Field><Field label="Действует с"><TextInput type="date" value={staffDraft.payRateEffectiveFrom} onChange={(e) => setStaffDraft({ ...staffDraft, payRateEffectiveFrom: e.target.value })} /></Field></>}
+              {staffDraft.role === "teacher" && <>
+                <Field label="Схема оплаты">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }} role="group" aria-label="Схема оплаты преподавателя">
+                    <Button type="button" variant={staffDraft.payMode === "per_attendee" ? "primary-crm" : "secondary-crm"} onClick={() => setStaffDraft({ ...staffDraft, payMode: "per_attendee" })}>За присутствующего</Button>
+                    <Button type="button" variant={staffDraft.payMode === "per_lesson" ? "primary-crm" : "secondary-crm"} onClick={() => setStaffDraft({ ...staffDraft, payMode: "per_lesson" })}>За занятие</Button>
+                  </div>
+                </Field>
+                <Field label={staffDraft.payMode === "per_lesson" ? "Ставка за проведённое занятие, ₽" : "Ставка за присутствующего ученика, ₽"}><TextInput type="number" min="0" step="0.01" value={staffDraft.payRate} onChange={(e) => setStaffDraft({ ...staffDraft, payRate: e.target.value })} /></Field>
+                <Field label="Действует с"><TextInput type="date" value={staffDraft.payRateEffectiveFrom} onChange={(e) => setStaffDraft({ ...staffDraft, payRateEffectiveFrom: e.target.value })} /></Field>
+              </>}
             </div>
             <Field label="Публичное описание"><TextArea value={staffDraft.publicBio} onChange={(e) => setStaffDraft({ ...staffDraft, publicBio: e.target.value })} /></Field>
             <Field label="Внутренний комментарий"><TextArea value={staffDraft.internalComment} onChange={(e) => setStaffDraft({ ...staffDraft, internalComment: e.target.value })} /></Field>
