@@ -9,16 +9,16 @@ export type StudentOperationalInput = {
   enrollments?: StudentEnrollmentState[] | null;
 };
 
-export type NormalizedStudentStatus = "active" | "paused" | "archived";
+export type NormalizedStudentStatus = "prospect" | "active" | "paused" | "inactive" | "archived";
 
 export function studentOperationalState(student: StudentOperationalInput) {
-  const known = student.status === "active" || student.status === "paused" || student.status === "archived";
+  const known = student.status === "prospect" || student.status === "active" || student.status === "paused" || student.status === "inactive" || student.status === "archived";
   const status: NormalizedStudentStatus = known ? student.status as NormalizedStudentStatus : "active";
   const activeEnrollments = (student.enrollments || []).filter((enrollment) => enrollment.status === "active");
   return {
     status,
     activeEnrollments,
-    withoutGroup: status === "active" && activeEnrollments.length === 0,
+    withoutGroup: status !== "archived" && activeEnrollments.length === 0,
     wasLegacyStatus: !known,
   };
 }
@@ -31,7 +31,7 @@ export function summarizeStudents(students: StudentOperationalInput[]) {
     summary.activeEnrollments += state.activeEnrollments.length;
     if (state.withoutGroup) summary.withoutGroup += 1;
     return summary;
-  }, { total: 0, active: 0, withoutGroup: 0, paused: 0, archived: 0, activeEnrollments: 0 });
+  }, { total: 0, prospect: 0, active: 0, withoutGroup: 0, paused: 0, inactive: 0, archived: 0, activeEnrollments: 0 });
 }
 
 function searchable(value: unknown) {

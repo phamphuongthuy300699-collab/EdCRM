@@ -105,11 +105,11 @@ export function evaluateDeleteSafety(entity: LifecycleEntity, record: Record<str
     return { allowed: false, message: "Тариф уже использован в истории. Можно скрыть/архивировать.", fallbackAction: "archive" };
   }
 
-  if (entity === "students" && hasAny(counts, ["enrollments", "invoices", "payments", "attendance", "lessonSessions", "homeworkAssignments"])) {
+  if (entity === "students" && hasAny(counts, ["enrollments", "invoices", "payments", "attendance", "lessonSessions", "homeworkAssignments", "interactions"])) {
     return { allowed: false, message: "У ученика есть учебная или финансовая история. Можно архивировать или анонимизировать персональные данные.", fallbackAction: "anonymize" };
   }
 
-  if (entity === "guardians" && hasAny(counts, ["students", "invoices", "payments"])) {
+  if (entity === "guardians" && hasAny(counts, ["students", "invoices", "payments", "interactions"])) {
     return { allowed: false, message: "У родителя есть связи с учениками или платежами. Можно очистить персональные данные.", fallbackAction: "anonymize" };
   }
 

@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
 import { normalizeEmail, normalizeRuPhone } from "@/shared/utils/contacts";
+import { guardianSchema } from "@/features/clients/contracts";
 
-const guardianSchema = z.object({
-  id: z.string().uuid().optional(),
-  fullName: z.string().min(1),
-  phone: z.string().optional().nullable(),
-  email: z.string().optional().nullable(),
-  status: z.string().optional().default("active"),
-  notes: z.string().optional().nullable(),
-}).strict();
+const guardianMutationSchema = guardianSchema.strict();
 
 function duplicateWarning(row: any) {
   return {
@@ -34,7 +27,7 @@ export async function GET() {
 
   const [{ data: guardians, error: guardiansError }, { data: links }, { data: accounts }, { data: invoices }, { data: payments }, { data: portalLinks }] = await Promise.all([
     (admin.from("guardians") as any)
-      .select("id, full_name, phone, phone_normalized, email, email_normalized, status, notes, archived_at, deleted_at, anonymized_at, merged_into_guardian_id")
+      .select("id, full_name, phone, phone_normalized, email, email_normalized, status, source, tags, interest_notes, responsible_manager_id, notes, archived_at, deleted_at, anonymized_at, merged_into_guardian_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("full_name", { ascending: true }),
@@ -136,6 +129,10 @@ export async function GET() {
       emailNormalized: guardian.email_normalized,
       status: guardian.archived_at ? "archived" : guardian.status || "active",
       notes: guardian.notes,
+      source: guardian.source,
+      tags: guardian.tags || [],
+      interestNotes: guardian.interest_notes,
+      responsibleManagerId: guardian.responsible_manager_id,
       children: guardianLinks.map((link) => ({
         id: link.student_id,
         fullName: link.students?.full_name || "Без имени",
@@ -164,7 +161,7 @@ export async function POST(request: Request) {
   const access = await requireCrmStaff();
   if (!access.ok) return access.response;
 
-  const input = guardianSchema.parse(await request.json());
+  const input = guardianMutationSchema.parse(await request.json());
   const admin = crmAdmin();
   const phoneNormalized = normalizeRuPhone(input.phone);
   const emailNormalized = normalizeEmail(input.email);
@@ -178,14 +175,11 @@ export async function POST(request: Request) {
     email_normalized: emailNormalized,
     status: input.status || "active",
     notes: input.notes?.trim() || null,
+    source: input.source?.trim() || null,
+    tags: input.tags || [],
+    interest_notes: input.interestNotes?.trim() || null,
+    responsible_manager_id: input.responsibleManagerId || null,
   };
-
-  const query = input.id
-    ? (admin.from("guardians") as any).update(payload).eq("id", input.id).eq("organization_id", access.organizationId).select().single()
-    : (admin.from("guardians") as any).insert(payload).select().single();
-
-  const { data: guardian, error } = await query;
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   let duplicateQuery = (admin.from("guardians") as any)
     .select("id, full_name, phone, email")
@@ -204,6 +198,17 @@ export async function POST(request: Request) {
     const { data: duplicates } = await duplicateQuery.or(duplicateFilters.join(","));
     warnings.push(...(duplicates || []).map(duplicateWarning));
   }
+
+  if (warnings.length > 0 && !input.allowDuplicate) {
+    return NextResponse.json({ ok:false, code:"DUPLICATE_GUARDIAN_FOUND", error:"Найден похожий родитель", candidates:warnings }, { status:409 });
+  }
+
+  const query = input.id
+    ? (admin.from("guardians") as any).update(payload).eq("id", input.id).eq("organization_id", access.organizationId).select().single()
+    : (admin.from("guardians") as any).insert(payload).select().single();
+
+  const { data: guardian, error } = await query;
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, guardian, warnings });
 }

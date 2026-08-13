@@ -209,6 +209,7 @@ async function dependencyCounts(admin: any, entity: LifecycleEntity, id: string,
       attendance: await countRows(admin, "attendance", { organization_id: organizationId, student_id: id }),
       lessonSessions: 0,
       homeworkAssignments: 0,
+      interactions: await countRows(admin, "lead_interactions", { organization_id: organizationId, student_id: id }),
     };
   }
 
@@ -217,6 +218,7 @@ async function dependencyCounts(admin: any, entity: LifecycleEntity, id: string,
       students: await countRows(admin, "student_guardians", { organization_id: organizationId, guardian_id: id }),
       invoices: await countRows(admin, "invoices", { organization_id: organizationId, guardian_id: id }),
       payments: await countRows(admin, "payments", { organization_id: organizationId, guardian_id: id }),
+      interactions: await countRows(admin, "lead_interactions", { organization_id: organizationId, guardian_id: id }),
     };
   }
 

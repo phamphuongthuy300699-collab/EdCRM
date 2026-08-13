@@ -17,8 +17,9 @@ const createStudentSchema = z.object({
   fullName: z.string().min(1),
   birthDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  status: z.enum(["prospect","active","paused","inactive","archived"]).optional(),
   groupId: z.string().uuid().optional().nullable(),
-  guardians: z.array(guardianInputSchema).min(1).max(4),
+  guardians: z.array(guardianInputSchema).max(4).default([]),
   allowDuplicate: z.boolean().optional(),
 }).strict();
 
@@ -36,8 +37,8 @@ export async function POST(request: Request) {
   const admin = crmAdmin();
 
   const billingCount = input.guardians.filter((guardian) => guardian.isBillingContact).length;
-  if (billingCount !== 1) {
-    return NextResponse.json({ ok: false, error: "Выберите ровно одного получателя счетов" }, { status: 400 });
+  if (billingCount > 1) {
+    return NextResponse.json({ ok: false, error: "Можно выбрать не более одного получателя счетов" }, { status: 400 });
   }
 
   const guardians = input.guardians.map((guardian, index) => {
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
     p_student: {
       full_name: input.fullName,
       birth_date: input.birthDate || null,
-      status: "active",
+      status: input.status || "prospect",
       notes: input.notes || null,
     },
     p_guardians: guardians,
