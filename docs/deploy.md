@@ -66,3 +66,22 @@ Do not store secrets in Git. Keep these only in Vercel environment variables or 
 - Supabase service key;
 - Alfabank credentials;
 - any future payment, email, or storage credentials.
+# Production 502 and full-GET smoke
+
+If nginx reports `upstream sent too big header while reading response header from upstream` while Next.js is healthy, keep the production proxy buffers at least:
+
+```nginx
+proxy_buffer_size 16k;
+proxy_buffers 8 16k;
+proxy_busy_buffers_size 32k;
+```
+
+After every deployment, check response bodies rather than only `HEAD` or `/api/health`:
+
+```bash
+curl --fail --show-error --silent https://robototehnika-lipetsk.ru/ >/dev/null
+curl --fail --show-error --silent https://robototehnika-lipetsk.ru/login >/dev/null
+curl --fail --show-error --silent --location https://robototehnika-lipetsk.ru/crm >/dev/null
+```
+
+Any `502` on a full GET blocks the release. Do not use `docker system prune`, `docker volume prune`, or remove database volumes during this check.
