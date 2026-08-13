@@ -15,6 +15,7 @@ type GuardianRow = {
   source?: string | null;
   tags?: string[];
   interestNotes?: string | null;
+  responsibleManagerId?: string | null;
   children: Array<{ id: string; fullName: string; relation: string | null; isPrimary: boolean; isBillingContact: boolean }>;
   childCount: number;
   portalStatus: "active" | "not_issued";
@@ -52,7 +53,7 @@ export default function CrmGuardiansPage() {
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<GuardianRow | null>(null);
   const [creating, setCreating] = useState(false);
-  const emptyForm = { fullName: "", phone: "", email: "", notes: "", status: "prospect", source: "manual", tags: "", interestNotes: "" };
+  const emptyForm = { fullName: "", phone: "", email: "", notes: "", status: "prospect", source: "manual", tags: "", interestNotes: "", responsibleManagerId: "" };
   const [form, setForm] = useState(emptyForm);
   const [duplicateCandidates,setDuplicateCandidates]=useState<any[]>([]);
   const [interactions,setInteractions]=useState<any[]>([]);
@@ -63,6 +64,11 @@ export default function CrmGuardiansPage() {
   const [mergeConfirmation, setMergeConfirmation] = useState("");
   const [mergePreview, setMergePreview] = useState<Record<string, number> | null>(null);
   const [merging, setMerging] = useState(false);
+  const [managers,setManagers]=useState<Array<{id:string;fullName:string}>>([]);
+  const [studentOptions,setStudentOptions]=useState<Array<{id:string;fullName:string}>>([]);
+  const [studentToLink,setStudentToLink]=useState("");
+  const [newChildName,setNewChildName]=useState("");
+  const [linkingChild,setLinkingChild]=useState(false);
 
   async function loadGuardians() {
     setLoading(true);
@@ -85,6 +91,8 @@ export default function CrmGuardiansPage() {
 
   useEffect(() => {
     loadGuardians();
+    fetch("/api/crm/staff/managers").then((response)=>response.json()).then((payload)=>setManagers(payload.ok?payload.managers||[]:[]));
+    fetch("/api/crm/students/search").then((response)=>response.json()).then((payload)=>setStudentOptions(payload.ok?payload.students||[]:[]));
   }, []);
 
   useEffect(() => {
@@ -99,12 +107,14 @@ export default function CrmGuardiansPage() {
       email: selected.email || "",
       notes: selected.notes || "",
       status: selected.status === "archived" ? "archived" : selected.status || "active",
-      source:selected.source||"manual",tags:(selected.tags||[]).join(", "),interestNotes:selected.interestNotes||"",
+      source:selected.source||"manual",tags:(selected.tags||[]).join(", "),interestNotes:selected.interestNotes||"",responsibleManagerId:selected.responsibleManagerId||"",
     });
     fetch(`/api/crm/interactions?guardianId=${selected.id}`).then(response=>response.json()).then(payload=>setInteractions(payload.ok?payload.interactions||[]:[]));
   }, [selected]);
 
-  async function addInteraction(event:React.FormEvent){event.preventDefault();if(!selected)return;const response=await fetch("/api/crm/interactions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({guardianId:selected.id,type:interactionForm.type,result:interactionForm.result,summary:interactionForm.summary||null,nextActionAt:interactionForm.nextActionAt?new Date(interactionForm.nextActionAt).toISOString():null})});const payload=await response.json();if(!response.ok){setMessage(payload.error||"Не удалось добавить взаимодействие");return}setInteractions([payload.interaction,...interactions]);setInteractionForm({type:"call",result:"answered",summary:"",nextActionAt:""});setMessage("Взаимодействие сохранено")}
+  async function addInteraction(event:React.FormEvent){event.preventDefault();if(!selected)return;const response=await fetch("/api/crm/interactions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({guardianId:selected.id,type:interactionForm.type,result:interactionForm.result,summary:interactionForm.summary||null,nextActionAt:interactionForm.nextActionAt?new Date(interactionForm.nextActionAt).toISOString():null})});const payload=await response.json();if(!response.ok){setMessage(payload.error||"Не удалось добавить взаимодействие");return}const refreshed=await fetch(`/api/crm/interactions?guardianId=${selected.id}`).then(value=>value.json());setInteractions(refreshed.ok?refreshed.interactions||[]:[]);setInteractionForm({type:"call",result:"answered",summary:"",nextActionAt:""});setMessage("Взаимодействие сохранено")}
+
+  async function connectChild(mode:"link"|"createStudent") {if(!selected||linkingChild)return;setLinkingChild(true);const body=mode==="link"?{mode,guardianId:selected.id,studentId:studentToLink,relation:"Родитель",isPrimary:false,isBillingContact:false}:{mode,guardianId:selected.id,student:{fullName:newChildName},relation:"Родитель",isPrimary:true,isBillingContact:true};const response=await fetch("/api/crm/client-relations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const payload=await response.json();setLinkingChild(false);if(!response.ok){setMessage(payload.error||"Не удалось связать ребёнка");return}setStudentToLink("");setNewChildName("");setSelected(null);setMessage("Ребёнок связан с родителем");await loadGuardians();}
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -326,6 +336,11 @@ export default function CrmGuardiansPage() {
               <input className="form-input" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder="ФИО" required />
               <input className="form-input" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Телефон" />
               <input className="form-input" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="Email" />
+              <select className="form-input" value={form.status} onChange={(event)=>setForm({...form,status:event.target.value})}><option value="prospect">Потенциальный</option><option value="active">Активный</option><option value="inactive">Неактивный</option><option value="do_not_contact">Не связываться</option></select>
+              <select className="form-input" value={form.source} onChange={(event)=>setForm({...form,source:event.target.value})}><option value="site">Сайт</option><option value="call">Звонок</option><option value="referral">Рекомендация</option><option value="social">Соцсети</option><option value="event">Мероприятие</option><option value="manual">Вручную</option><option value="other">Другое</option></select>
+              <input className="form-input" value={form.tags} onChange={(event)=>setForm({...form,tags:event.target.value})} placeholder="Теги через запятую" />
+              <textarea className="form-input" value={form.interestNotes} onChange={(event)=>setForm({...form,interestNotes:event.target.value})} placeholder="Интересы" rows={2} />
+              <select className="form-input" value={form.responsibleManagerId} onChange={(event)=>setForm({...form,responsibleManagerId:event.target.value})}><option value="">Без ответственного</option>{managers.map((manager)=><option key={manager.id} value={manager.id}>{manager.fullName}</option>)}</select>
               <textarea className="form-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Заметки" rows={3} />
               <Button type="submit" variant="primary-crm">Сохранить контакты</Button>
             </form>
@@ -340,6 +355,7 @@ export default function CrmGuardiansPage() {
                   </div>
                 </div>
               ))}
+              <div className="card-crm" style={{padding:12,display:"grid",gap:8}}><strong>Добавить ребёнка</strong><select className="form-input" value={studentToLink} onChange={(event)=>setStudentToLink(event.target.value)}><option value="">Привязать существующего</option>{studentOptions.filter((student)=>!selected.children.some((child)=>child.id===student.id)).map((student)=><option key={student.id} value={student.id}>{student.fullName}</option>)}</select><Button type="button" variant="secondary-crm" disabled={!studentToLink||linkingChild} onClick={()=>connectChild("link")}>Привязать существующего</Button><input className="form-input" value={newChildName} onChange={(event)=>setNewChildName(event.target.value)} placeholder="ФИО нового ребёнка"/><Button type="button" variant="secondary-crm" disabled={!newChildName.trim()||linkingChild} onClick={()=>connectChild("createStudent")}>Создать и привязать</Button></div>
             </section>
             {selected.childCount===0&&<div className="card-crm" style={{marginTop:16,padding:14,background:"#FFFBEB"}}>ЛК родителя станет доступен после привязки ребёнка.</div>}
             <section style={{marginTop:28,display:"grid",gap:12}}><h3 style={{margin:0}}>Работа с клиентом</h3><form onSubmit={addInteraction} style={{display:"grid",gap:10}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><select className="form-input" value={interactionForm.type} onChange={e=>setInteractionForm({...interactionForm,type:e.target.value})}><option value="call">Звонок</option><option value="message">Сообщение</option><option value="email">Email</option><option value="max">MAX</option><option value="comment">Заметка</option></select><select className="form-input" value={interactionForm.result} onChange={e=>setInteractionForm({...interactionForm,result:e.target.value})}><option value="answered">Ответил</option><option value="no_answer">Не дозвонились</option><option value="interested">Интересуется</option><option value="thinking">Думает</option><option value="rejected">Отказ</option></select></div><textarea className="form-input" value={interactionForm.summary} onChange={e=>setInteractionForm({...interactionForm,summary:e.target.value})} placeholder="Итог / заметка"/><label style={{fontSize:13,fontWeight:700}}>Следующий контакт<input className="form-input" type="datetime-local" value={interactionForm.nextActionAt} onChange={e=>setInteractionForm({...interactionForm,nextActionAt:e.target.value})}/></label><Button type="submit" variant="primary-crm">Добавить взаимодействие</Button></form>{interactions.map(item=><div key={item.id} className="card-crm" style={{padding:12,background:"var(--color-bg)"}}><strong>{item.type} · {item.result||"без результата"}</strong><p style={{margin:"4px 0"}}>{item.summary||"—"}</p><small>{new Date(item.created_at).toLocaleString("ru-RU")}{item.next_action_at?` · следующий: ${new Date(item.next_action_at).toLocaleString("ru-RU")}`:""}</small></div>)}</section>

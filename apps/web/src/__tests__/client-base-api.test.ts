@@ -29,6 +29,20 @@ describe("client base API contracts", () => {
     expect(read("src/app/api/crm/followups/route.ts")).toContain('admin.rpc("crm_followup_queue"');
   });
 
+  it("records and completes follow-ups through one tenant-scoped RPC", () => {
+    const route = read("src/app/api/crm/interactions/route.ts");
+    expect(route).toContain('admin.rpc("crm_record_interaction"');
+    expect(route).toContain("p_complete_interaction_id");
+    expect(route).not.toContain('.from("lead_interactions").insert');
+  });
+
+  it("validates responsible managers inside the organization", () => {
+    const route = read("src/app/api/crm/guardians/route.ts");
+    expect(route).toContain("validateResponsibleManager");
+    expect(route).toContain('eq("organization_id", access.organizationId)');
+    expect(route).toContain('eq("is_active", true)');
+  });
+
   it("does not provision Auth identities during CRM person creation", () => {
     const sources = read("src/app/api/crm/guardians/route.ts") + read("src/app/api/crm/students/manage/route.ts");
     expect(sources).not.toContain("auth.admin.createUser");
