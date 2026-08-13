@@ -35,6 +35,42 @@ create index if not exists idx_crm_interactions_guardian_created
 create index if not exists idx_crm_interactions_student_created
   on public.lead_interactions (organization_id, student_id, created_at desc) where student_id is not null;
 
+create or replace function public.enforce_crm_interaction_tenant()
+returns trigger language plpgsql set search_path=public as $$
+begin
+  if new.guardian_id is not null and not exists (
+    select 1 from public.guardians where id=new.guardian_id and organization_id=new.organization_id
+  ) then raise exception 'interaction_guardian_wrong_organization'; end if;
+  if new.student_id is not null and not exists (
+    select 1 from public.students where id=new.student_id and organization_id=new.organization_id
+  ) then raise exception 'interaction_student_wrong_organization'; end if;
+  if new.lead_id is not null and not exists (
+    select 1 from public.leads where id=new.lead_id and organization_id=new.organization_id
+  ) then raise exception 'interaction_lead_wrong_organization'; end if;
+  return new;
+end $$;
+drop trigger if exists trg_enforce_crm_interaction_tenant on public.lead_interactions;
+create trigger trg_enforce_crm_interaction_tenant
+before insert or update of organization_id,guardian_id,student_id,lead_id on public.lead_interactions
+for each row execute function public.enforce_crm_interaction_tenant();
+
+create or replace function public.enforce_guardian_responsible_manager()
+returns trigger language plpgsql set search_path=public as $$
+begin
+  if new.responsible_manager_id is not null and not exists (
+    select 1 from public.org_memberships
+    where organization_id=new.organization_id
+      and user_id=new.responsible_manager_id
+      and is_active=true
+      and role in ('owner','admin','manager')
+  ) then raise exception 'guardian_responsible_manager_not_active_staff'; end if;
+  return new;
+end $$;
+drop trigger if exists trg_enforce_guardian_responsible_manager on public.guardians;
+create trigger trg_enforce_guardian_responsible_manager
+before insert or update of organization_id,responsible_manager_id on public.guardians
+for each row execute function public.enforce_guardian_responsible_manager();
+
 alter table public.leads
   add column if not exists guardian_id uuid references public.guardians(id) on delete set null,
   add column if not exists student_id uuid references public.students(id) on delete set null;
@@ -87,6 +123,18 @@ begin
   return jsonb_build_object('student_guardian_id',link_id,'student_id',p_student_id,'guardian_id',p_guardian_id);
 end $$;
 
+create or replace function public.crm_create_guardian_and_link_student(
+ p_organization_id uuid,p_student_id uuid,p_guardian jsonb,p_relation text default 'Родитель',p_is_primary boolean default false,p_is_billing_contact boolean default false
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare guardian_id uuid;
+begin
+  if nullif(trim(p_guardian->>'full_name'),'') is null then raise exception 'guardian_name_required'; end if;
+  insert into public.guardians(organization_id,full_name,phone,email,status,source,interest_notes)
+  values(p_organization_id,trim(p_guardian->>'full_name'),nullif(p_guardian->>'phone',''),nullif(p_guardian->>'email',''),coalesce(nullif(p_guardian->>'status',''),'prospect'),nullif(p_guardian->>'source',''),nullif(p_guardian->>'interest_notes',''))
+  returning id into guardian_id;
+  return public.crm_link_student_guardian(p_organization_id,p_student_id,guardian_id,p_relation,p_is_primary,p_is_billing_contact);
+end $$;
+
 create or replace function public.crm_complete_followup(p_organization_id uuid,p_interaction_id uuid,p_actor_id uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare saved public.lead_interactions%rowtype;
@@ -95,6 +143,34 @@ begin
  where id=p_interaction_id and organization_id=p_organization_id returning * into saved;
  if not found then raise exception 'interaction_not_found'; end if;
  return jsonb_build_object('interaction_id',saved.id,'completed_at',saved.next_action_completed_at);
+end $$;
+
+create or replace function public.crm_record_interaction(
+  p_organization_id uuid,
+  p_guardian_id uuid,
+  p_student_id uuid,
+  p_lead_id uuid,
+  p_actor_id uuid,
+  p_type text,
+  p_result text,
+  p_summary text,
+  p_next_action_at timestamptz,
+  p_complete_interaction_id uuid default null
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare saved public.lead_interactions%rowtype;
+begin
+  if p_complete_interaction_id is not null then
+    update public.lead_interactions
+       set next_action_completed_at=coalesce(next_action_completed_at,now()), completed_by=p_actor_id
+     where id=p_complete_interaction_id and organization_id=p_organization_id and next_action_completed_at is null;
+    if not found then raise exception 'followup_not_found_or_completed'; end if;
+  end if;
+  insert into public.lead_interactions(
+    organization_id,guardian_id,student_id,lead_id,manager_id,type,result,summary,next_action_at
+  ) values (
+    p_organization_id,p_guardian_id,p_student_id,p_lead_id,p_actor_id,p_type::public.lead_interaction_type,p_result::public.lead_interaction_result,p_summary,p_next_action_at
+  ) returning * into saved;
+  return jsonb_build_object('interaction_id',saved.id,'completed_interaction_id',p_complete_interaction_id);
 end $$;
 
 create or replace function public.crm_followup_queue(p_organization_id uuid)
@@ -118,11 +194,16 @@ create trigger trg_move_merged_guardian_interactions before update of merged_int
 
 revoke all on function public.crm_create_student_with_guardians(uuid,jsonb,jsonb,uuid) from public,anon,authenticated;
 revoke all on function public.crm_link_student_guardian(uuid,uuid,uuid,text,boolean,boolean) from public,anon,authenticated;
+revoke all on function public.crm_create_guardian_and_link_student(uuid,uuid,jsonb,text,boolean,boolean) from public,anon,authenticated;
 revoke all on function public.crm_complete_followup(uuid,uuid,uuid) from public,anon,authenticated;
+revoke all on function public.crm_record_interaction(uuid,uuid,uuid,uuid,uuid,text,text,text,timestamptz,uuid) from public,anon,authenticated;
+revoke all on function public.crm_followup_queue(uuid) from public,anon,authenticated;
 grant execute on function public.crm_create_student_with_guardians(uuid,jsonb,jsonb,uuid) to service_role;
 grant execute on function public.crm_link_student_guardian(uuid,uuid,uuid,text,boolean,boolean) to service_role;
+grant execute on function public.crm_create_guardian_and_link_student(uuid,uuid,jsonb,text,boolean,boolean) to service_role;
 grant execute on function public.crm_complete_followup(uuid,uuid,uuid) to service_role;
-grant execute on function public.crm_followup_queue(uuid) to authenticated,service_role;
+grant execute on function public.crm_record_interaction(uuid,uuid,uuid,uuid,uuid,text,text,text,timestamptz,uuid) to service_role;
+grant execute on function public.crm_followup_queue(uuid) to service_role;
 
 create or replace function public.convert_lead_to_student(p_lead_id uuid,p_group_id uuid default null)
 returns jsonb language plpgsql security definer set search_path=public as $$

@@ -19,9 +19,9 @@ npm --workspace apps/web run build
 
 Required runtime variables are documented in `.env.example`.
 
-### `production` -> server
+### Production — self-hosted server
 
-Production is deployed from a server with Docker and Docker Compose. The image uses Next.js standalone output from the monorepo root.
+Production is deployed from `/opt/edcrm` with Docker and Docker Compose. The image uses Next.js standalone output from the monorepo root. Before deployment follow the [production hardening](security/production-hardening.md) and [backup/restore](security/backup-restore.md) runbooks.
 
 Server files:
 
@@ -39,15 +39,9 @@ cp .env.example .env.production
 
 Fill `.env.production` on the server. Never commit it.
 
-## Production Deploy Command
+## Production deployment
 
-Production is updated only from the `production` branch. Vercel is used for testing `develop`; the server deploy script pulls and restarts the Docker service from `production`.
-
-Run on the production server:
-
-```bash
-sudo /opt/scripts/deploy-edcrm-production.sh
-```
+Use the currently approved server procedure from `/opt/edcrm` and record the deployed Git SHA and migration HEAD. This repository does not prescribe a production branch or an external server script.
 
 Check status:
 
@@ -79,9 +73,10 @@ proxy_busy_buffers_size 32k;
 After every deployment, check response bodies rather than only `HEAD` or `/api/health`:
 
 ```bash
-curl --fail --show-error --silent https://robototehnika-lipetsk.ru/ >/dev/null
-curl --fail --show-error --silent https://robototehnika-lipetsk.ru/login >/dev/null
-curl --fail --show-error --silent --location https://robototehnika-lipetsk.ru/crm >/dev/null
+curl --fail --show-error --silent https://xn--48-9kc0bsblm.xn--p1ai/ >/dev/null
+curl --fail --show-error --silent https://xn--48-9kc0bsblm.xn--p1ai/login >/dev/null
+curl --fail --show-error --silent --location https://xn--48-9kc0bsblm.xn--p1ai/crm >/dev/null
+curl --fail --show-error --silent https://xn--48-9kc0bsblm.xn--p1ai/api/health >/dev/null
 ```
 
 Any `502` on a full GET blocks the release. Do not use `docker system prune`, `docker volume prune`, or remove database volumes during this check.

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(31);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('92000000-0000-4000-8000-000000000001','00000000-0000-0000-0000-000000000000','authenticated','authenticated','manager@client.test','',now(),'{}','{}',now(),now());
@@ -9,6 +9,13 @@ insert into public.organizations (id,name,slug) values
  ('92000000-0000-4000-8000-000000000011','Other tenant','other-client-test');
 insert into public.profiles (id,full_name) values ('92000000-0000-4000-8000-000000000001','Test manager');
 insert into public.org_memberships (organization_id,user_id,role) values ('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000001','manager');
+
+insert into public.guardians (id,organization_id,full_name,status) values
+ ('92000000-0000-4000-8000-000000000090','92000000-0000-4000-8000-000000000011','Other guardian','active');
+insert into public.students (id,organization_id,full_name,status) values
+ ('92000000-0000-4000-8000-000000000091','92000000-0000-4000-8000-000000000011','Other student','active');
+insert into public.leads (id,organization_id,parent_name,parent_phone,status) values
+ ('92000000-0000-4000-8000-000000000092','92000000-0000-4000-8000-000000000011','Other lead','+70000000002','new');
 
 select lives_ok($$insert into public.guardians (id,organization_id,full_name,status,source,tags,interest_notes) values
  ('92000000-0000-4000-8000-000000000020','92000000-0000-4000-8000-000000000010','Анна Тестовая','prospect','manual',array['python'],'Осень'),
@@ -53,6 +60,14 @@ select ok((select count(*) from public.lead_interactions where guardian_id='9200
 select is((select status::text from public.students where full_name='Иван Тестовый'),'prospect','student lifecycle is independent from enrollment');
 select ok((select relrowsecurity from pg_class where oid='public.lead_interactions'::regclass),'interaction table remains protected by RLS');
 select ok(not has_function_privilege('authenticated','public.crm_link_student_guardian(uuid,uuid,uuid,text,boolean,boolean)','execute'),'transactional relation RPC is not browser executable');
+select ok(not has_function_privilege('authenticated','public.crm_followup_queue(uuid)','execute'),'follow-up queue RPC is service-role only');
+select throws_ok($$insert into public.lead_interactions(organization_id,guardian_id,type) values ('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000090','call')$$,'interaction_guardian_wrong_organization','cross-tenant guardian interaction is rejected');
+select throws_ok($$insert into public.lead_interactions(organization_id,student_id,type) values ('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000091','call')$$,'interaction_student_wrong_organization','cross-tenant student interaction is rejected');
+select throws_ok($$insert into public.lead_interactions(organization_id,lead_id,type) values ('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000092','call')$$,'interaction_lead_wrong_organization','cross-tenant lead interaction is rejected');
+select throws_ok($$update public.guardians set responsible_manager_id='92000000-0000-4000-8000-000000000001' where id='92000000-0000-4000-8000-000000000090'$$,'guardian_responsible_manager_not_active_staff','cross-tenant responsible manager is rejected');
+select lives_ok($$update public.guardians set responsible_manager_id='92000000-0000-4000-8000-000000000001' where id='92000000-0000-4000-8000-000000000020'$$,'active same-tenant manager can be assigned');
+select lives_ok($$select public.crm_record_interaction('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000020',null,null,'92000000-0000-4000-8000-000000000001','call','answered','Completed and rescheduled',now()+interval '30 day','92000000-0000-4000-8000-000000000041')$$,'follow-up completion and replacement interaction are atomic');
+select ok((select next_action_completed_at is not null from public.lead_interactions where id='92000000-0000-4000-8000-000000000041'),'atomic follow-up action completes the original interaction');
 
 insert into public.guardians(id,organization_id,full_name,phone,status) values ('92000000-0000-4000-8000-000000000023','92000000-0000-4000-8000-000000000010','Existing guardian','+7 999 000-00-01','prospect');
 insert into public.leads(id,organization_id,parent_name,parent_phone,parent_email,child_name,status) values ('92000000-0000-4000-8000-000000000031','92000000-0000-4000-8000-000000000010','Lead snapshot','89990000001','lead@example.test','Child from lead','contacted');

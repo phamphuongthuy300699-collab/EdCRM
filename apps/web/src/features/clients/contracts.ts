@@ -25,4 +25,5 @@ export const interactionSchema = z.object({
   result: z.enum(["answered", "no_answer", "interested", "scheduled_trial", "thinking", "rejected", "paid"]).optional().nullable(),
   summary: z.string().trim().optional().nullable(),
   nextActionAt: z.string().datetime().optional().nullable(),
+  completeInteractionId: z.string().uuid().optional().nullable(),
 }).refine((value) => value.guardianId || value.studentId || value.leadId, "interaction_subject_required");

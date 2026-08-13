@@ -5,6 +5,18 @@ import { guardianSchema } from "@/features/clients/contracts";
 
 const guardianMutationSchema = guardianSchema.strict();
 
+async function validateResponsibleManager(admin: ReturnType<typeof crmAdmin>, organizationId: string, userId?: string | null) {
+  if (!userId) return true;
+  const { data } = await (admin.from("org_memberships") as any)
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .in("role", ["owner", "admin", "manager"])
+    .maybeSingle();
+  return Boolean(data);
+}
+
 function duplicateWarning(row: any) {
   return {
     id: row.id,
@@ -163,6 +175,9 @@ export async function POST(request: Request) {
 
   const input = guardianMutationSchema.parse(await request.json());
   const admin = crmAdmin();
+  if (!(await validateResponsibleManager(admin, access.organizationId, input.responsibleManagerId))) {
+    return NextResponse.json({ ok: false, error: "Ответственный менеджер не найден в организации" }, { status: 400 });
+  }
   const phoneNormalized = normalizeRuPhone(input.phone);
   const emailNormalized = normalizeEmail(input.email);
 
