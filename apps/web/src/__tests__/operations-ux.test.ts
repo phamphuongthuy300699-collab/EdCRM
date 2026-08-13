@@ -23,7 +23,7 @@ describe("student operational state", () => {
   });
 
   it("counts status separately from active enrollment", () => {
-    expect(summarizeStudents(rows)).toEqual({ total: 5, active: 3, withoutGroup: 2, paused: 1, archived: 1, activeEnrollments: 2 });
+    expect(summarizeStudents(rows)).toEqual({ total: 5, prospect: 0, active: 3, withoutGroup: 2, paused: 1, inactive: 0, archived: 1, activeEnrollments: 2 });
   });
 
   it("normalizes a legacy null status safely to active", () => {
