@@ -8,6 +8,7 @@ import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { StudentPicker } from "@/shared/ui/StudentPicker";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
+import { activeTeacherOptions, resolveTeacherName } from "@/features/staff/teachers";
 
 const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -72,6 +73,8 @@ export default function CrmGroupsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [groupFormError, setGroupFormError] = useState("");
+  const [groupNotice, setGroupNotice] = useState("");
   const [groupActionId, setGroupActionId] = useState<string | null>(null);
   const { askAction, modal: actionModal } = useActionConfirmation();
 
@@ -160,6 +163,15 @@ export default function CrmGroupsPage() {
   async function loadData() {
     try {
       setLoading(true);
+      const demo = isDemoMode();
+      if (demo) {
+        setTeachers([
+          { id: "demo-teacher-1", full_name: "Алексей Дмитриев" },
+          { id: "demo-teacher-2", full_name: "Мария Соколова" },
+          { id: "demo-teacher-3", full_name: "Егор Смирнов" },
+        ]);
+        setGroups(initialGroups);
+      }
 
       // Fetch courses for selection
       const { data: coursesData } = await supabase
@@ -167,11 +179,17 @@ export default function CrmGroupsPage() {
         .select("id, title");
       if (coursesData) setCourses(coursesData);
 
-      // Fetch teachers for selection
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, full_name");
-      if (profilesData) setTeachers(profilesData);
+      // Staff membership is the canonical teacher directory and already
+      // enforces organization scope and active-role semantics.
+      let staffDirectory: any[] = [];
+      if (!demo) {
+        const staffResponse = await fetch("/api/crm/staff/teachers");
+        const staffPayload = await staffResponse.json();
+        if (!staffResponse.ok || !staffPayload.ok) throw new Error(staffPayload.error || "Не удалось загрузить преподавателей");
+        staffDirectory = staffPayload.teachers || [];
+        const teacherOptions = activeTeacherOptions(staffDirectory);
+        setTeachers(teacherOptions);
+      }
 
       // Fetch all active students
       const { data: studentsData } = await supabase
@@ -217,12 +235,9 @@ export default function CrmGroupsPage() {
         enrollCountMap.set(e.group_id, (enrollCountMap.get(e.group_id) || 0) + 1);
       });
 
-      const demo = isDemoMode();
-
       if (demo) {
         setGroups(initialGroups);
-      } else {
-        if (groupsData && groupsData.length > 0) {
+      } else if (groupsData && groupsData.length > 0) {
           const formatted = groupsData.map((g: any) => ({
             id: g.id,
             title: g.title,
@@ -230,7 +245,7 @@ export default function CrmGroupsPage() {
             courseId: g.course_id,
             teacherId: g.teacher_id,
             schedule: formatScheduleRules(g.group_schedule_rules),
-            teacherName: g.profiles?.full_name || "Не назначен",
+            teacherName: resolveTeacherName(g.teacher_id, staffDirectory, g.profiles?.full_name),
             ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
             ageFrom: g.age_from || 6,
             ageTo: g.age_to || 14,
@@ -246,9 +261,8 @@ export default function CrmGroupsPage() {
             chargeAbsentUnexcused: g.charge_absent_unexcused
           }));
           setGroups(formatted);
-        } else {
-          setGroups([]);
-        }
+      } else {
+        setGroups([]);
       }
     } catch (err) {
       console.error("Error loading group list:", err);
@@ -313,6 +327,7 @@ export default function CrmGroupsPage() {
     if (savingGroup) return;
     try {
       setSavingGroup(true);
+      setGroupFormError("");
       const rules = parseSchedule(newSchedule);
       if (isDemoMode()) {
         const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
@@ -353,6 +368,8 @@ export default function CrmGroupsPage() {
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
         await loadData();
+        const counts = result.result?.schedule || {};
+        setGroupNotice(`Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}`);
       }
       setShowAddModal(false);
       
@@ -364,13 +381,14 @@ export default function CrmGroupsPage() {
       setNewCapacity("8");
     } catch (err: any) {
       console.error(err);
-      alert("Не удалось создать группу: " + err.message);
+      setGroupFormError(err.message || "Не удалось создать группу");
     } finally {
       setSavingGroup(false);
     }
   };
 
   const handleOpenEditModal = (group: any) => {
+    setGroupFormError("");
     setEditingGroupId(group.id);
     setEditTitle(group.title);
     setEditCourseId(group.courseId || "");
@@ -429,10 +447,11 @@ export default function CrmGroupsPage() {
 
       await loadData();
       setShowEditModal(false);
-      alert("Группа успешно обновлена!");
+      const counts = result.result?.schedule || {};
+      setGroupNotice(`Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}`);
     } catch (err: any) {
       console.error(err);
-      alert("Не удалось обновить группу: " + err.message);
+      setGroupFormError(err.message || "Не удалось обновить группу");
     } finally {
       setSavingGroup(false);
     }
@@ -576,7 +595,7 @@ export default function CrmGroupsPage() {
             Активных групп в филиале: {groups.filter(group => !group.archivedAt).length}
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <Button onClick={() => { setGroupFormError(""); setShowAddModal(true); }} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Plus size={16} />
           <span>Создать группу</span>
         </Button>
@@ -586,6 +605,11 @@ export default function CrmGroupsPage() {
       {actionError && (
         <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 700 }}>
           {actionError}
+        </div>
+      )}
+      {groupNotice && (
+        <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 700 }}>
+          {groupNotice}
         </div>
       )}
       <div style={{
@@ -704,6 +728,7 @@ export default function CrmGroupsPage() {
       {showAddModal && (
         <CrmDialog title="Создать новую группу" description="Заполните параметры учебного класса" onClose={() => setShowAddModal(false)} width={520}>
             <form onSubmit={handleCreateGroup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {groupFormError && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", padding: 12, borderRadius: 8, fontSize: 13 }}>{groupFormError}</div>}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Название группы *</label>
                 <input 
@@ -894,6 +919,7 @@ export default function CrmGroupsPage() {
       {showEditModal && (
         <CrmDialog title="Редактировать группу" description="Обновление параметров учебного класса" onClose={() => setShowEditModal(false)} width={520}>
             <form onSubmit={handleUpdateGroup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {groupFormError && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", padding: 12, borderRadius: 8, fontSize: 13 }}>{groupFormError}</div>}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Название группы *</label>
                 <input 

@@ -269,12 +269,16 @@ export async function POST(request: Request) {
 
     if (input.action === "materialize") {
       const [{ data: group, error: groupError }, { data: rules, error: rulesError }] = await Promise.all([
-        admin.from("groups").select("id, organization_id, course_id, teacher_id, room_id").eq("organization_id", access.organizationId).eq("id", input.groupId).single(),
+        admin.from("groups").select("id, organization_id, course_id, teacher_id, room_id, starts_on, ends_on").eq("organization_id", access.organizationId).eq("id", input.groupId).single(),
         admin.from("group_schedule_rules").select("id, weekday, starts_at, ends_at").eq("organization_id", access.organizationId).eq("group_id", input.groupId),
       ]);
       if (groupError || !group) throw groupError || new Error("Группа не найдена");
       if (rulesError) throw rulesError;
-      const occurrences = materializeRuleOccurrences((rules || []).map((rule: any) => ({ id: rule.id, weekday: rule.weekday, startsAt: rule.starts_at, endsAt: rule.ends_at })), input.dateFrom, input.dateTo);
+      const boundedFrom = group.starts_on && group.starts_on > input.dateFrom ? group.starts_on : input.dateFrom;
+      const boundedTo = group.ends_on && group.ends_on < input.dateTo ? group.ends_on : input.dateTo;
+      const occurrences = boundedFrom <= boundedTo
+        ? materializeRuleOccurrences((rules || []).map((rule: any) => ({ id: rule.id, weekday: rule.weekday, startsAt: rule.starts_at, endsAt: rule.ends_at })), boundedFrom, boundedTo)
+        : [];
       const rows = occurrences.map((item) => ({
         organization_id: access.organizationId,
         group_id: group.id,
