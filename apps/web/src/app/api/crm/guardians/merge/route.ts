@@ -16,6 +16,7 @@ async function buildPreview(admin: any, organizationId: string, duplicateGuardia
     ["payments", "guardian_id"],
     ["discount_assignments", "guardian_id"],
     ["guardian_users", "guardian_id"],
+    ["lead_interactions", "guardian_id"],
     ["guardian_messenger_accounts", "guardian_id"],
     ["notification_outbox", "guardian_id"],
     ["invoice_payment_links", "guardian_id"],

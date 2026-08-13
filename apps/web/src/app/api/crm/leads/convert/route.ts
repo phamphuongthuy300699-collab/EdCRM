@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
-import { temporaryPortalPassword } from "@/shared/utils/passwords";
 
 export async function POST(request: Request) {
   try {
@@ -133,53 +132,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Create Auth user for parent (for parent portal) if not already created
-    const cleanPhone = lead.parent_phone.replace(/\D/g, "");
-    const parentEmail = lead.parent_email || `parent-${cleanPhone || leadId.slice(0, 8)}@robotics-crm.ru`;
-    const parentTemporaryPassword = temporaryPortalPassword();
-
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: parentEmail,
-      password: parentTemporaryPassword,
-      email_confirm: true
-    });
-
-    let parentUserId: string | null = null;
-    let createdParentUser = false;
-
-    if (authError) {
-      if (authError.message && authError.message.includes("already registered")) {
-        const { data: listUsers } = await supabase.auth.admin.listUsers();
-        const existing = listUsers?.users.find(u => u.email === parentEmail);
-        if (existing) {
-          parentUserId = existing.id;
-        }
-      } else {
-        console.error("Auth user creation failed during lead conversion:", authError.message);
-      }
-    } else if (authUser?.user) {
-      parentUserId = authUser.user.id;
-      createdParentUser = true;
-    }
-
-    // 5. Link parent user to guardian in guardian_users
-    if (parentUserId) {
-      await supabase
-        .from("guardian_users")
-        .upsert({
-          organization_id: lead.organization_id,
-          guardian_id: guardianId,
-          user_id: parentUserId
-        }, { onConflict: "organization_id,guardian_id,user_id" });
-    }
-
     return NextResponse.json({
       ok: true,
       studentId,
       guardianId,
-      alreadyConverted: false,
-      parentEmail,
-      parentTemporaryPassword: createdParentUser ? parentTemporaryPassword : null
+      alreadyConverted: false
     });
   } catch (err: any) {
     console.error("Lead conversion API error:", err);
