@@ -37,7 +37,7 @@ interface Student {
   paymentStatus: "paid" | "pending" | "overdue";
   attendance: string; // Rate string (e.g. "95%")
   attendanceValue: number; // Numeric rate (e.g. 95)
-  status: "active" | "paused" | "archived";
+  status: "prospect" | "active" | "paused" | "inactive" | "archived";
   level: string;
   project: string;
   homeworkProgress: number; // Homework score (0-100)
@@ -46,7 +46,7 @@ interface Student {
 export default function CrmStudentsPage() {
   const { askAction, modal: actionModal } = useActionConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "without_group" | "paused" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "prospect" | "active" | "without_group" | "paused" | "inactive" | "archived">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState("");
@@ -61,7 +61,7 @@ export default function CrmStudentsPage() {
   const [newParentPhone, setNewParentPhone] = useState("");
   const [newParentEmail, setNewParentEmail] = useState("");
   const [newParentRelation, setNewParentRelation] = useState("Родитель");
-  const [newGuardianMode, setNewGuardianMode] = useState<"new" | "existing">("new");
+  const [newGuardianMode, setNewGuardianMode] = useState<"none" | "new" | "existing">("none");
   const [selectedExistingGuardianId, setSelectedExistingGuardianId] = useState("");
   const [secondGuardianMode, setSecondGuardianMode] = useState<"none" | "new" | "existing">("none");
   const [secondExistingGuardianId, setSecondExistingGuardianId] = useState("");
@@ -76,6 +76,7 @@ export default function CrmStudentsPage() {
   const [guardianOptions, setGuardianOptions] = useState<any[]>([]);
   const [duplicateGuardianCandidates, setDuplicateGuardianCandidates] = useState<any[]>([]);
   const [allowDuplicateGuardian, setAllowDuplicateGuardian] = useState(false);
+  const [guardianToLink,setGuardianToLink]=useState("");
 
   // Drawer details state
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -450,6 +451,8 @@ export default function CrmStudentsPage() {
     }
   };
 
+  const linkGuardian=async()=>{if(!selectedStudent||!guardianToLink)return;const response=await fetch("/api/crm/client-relations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({studentId:selectedStudent.id,guardianId:guardianToLink,relation:"Родитель",isPrimary:!selectedStudent.guardianId,isBillingContact:!selectedStudent.guardianId})});const payload=await response.json();setStudentOperationMessage(response.ok?"Родитель привязан":payload.error||"Не удалось привязать родителя");if(response.ok){setGuardianToLink("");setReloadKey(value=>value+1)}};
+
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -461,7 +464,7 @@ export default function CrmStudentsPage() {
         }
       }
 
-      const guardianPayloads: any[] = [{
+      const guardianPayloads: any[] = newGuardianMode === "none" ? [] : [{
         guardianId: newGuardianMode === "existing" ? selectedExistingGuardianId : null,
         fullName: newGuardianMode === "new" ? newParentName : null,
         phone: newGuardianMode === "new" ? newParentPhone : null,
@@ -495,6 +498,7 @@ export default function CrmStudentsPage() {
           fullName: newStudentName,
           birthDate: newBirthDate || null,
           notes: newNotes || null,
+          status: "prospect",
           groupId: selectedGroupId || null,
           guardians: guardianPayloads,
           allowDuplicate: allowDuplicateGuardian,
@@ -510,9 +514,9 @@ export default function CrmStudentsPage() {
       const selectedGuardian = guardianOptions.find((guardian) => guardian.id === selectedExistingGuardianId);
       const guardian = {
         id: payload.result?.guardians?.[0]?.guardian_id || selectedExistingGuardianId,
-        full_name: newGuardianMode === "existing" ? selectedGuardian?.full_name : newParentName,
-        phone: newGuardianMode === "existing" ? selectedGuardian?.phone : newParentPhone,
-        email: newGuardianMode === "existing" ? selectedGuardian?.email : newParentEmail,
+        full_name: newGuardianMode === "none" ? "Не указан" : newGuardianMode === "existing" ? selectedGuardian?.full_name : newParentName,
+        phone: newGuardianMode === "none" ? "—" : newGuardianMode === "existing" ? selectedGuardian?.phone : newParentPhone,
+        email: newGuardianMode === "none" ? null : newGuardianMode === "existing" ? selectedGuardian?.email : newParentEmail,
       };
       const student = { id: payload.result?.student_id, full_name: newStudentName, notes: newNotes };
 
@@ -540,7 +544,7 @@ export default function CrmStudentsPage() {
         paymentStatus: "paid",
         attendance: "100%",
         attendanceValue: 100,
-        status: "active",
+        status: "prospect",
         level,
         project: student.notes || "Первый проект",
         homeworkProgress: 100
@@ -557,7 +561,7 @@ export default function CrmStudentsPage() {
       setNewParentPhone("");
       setNewParentEmail("");
       setNewParentRelation("Родитель");
-      setNewGuardianMode("new");
+      setNewGuardianMode("none");
       setSelectedExistingGuardianId("");
       setSecondGuardianMode("none");
       setSecondExistingGuardianId("");
@@ -643,7 +647,7 @@ export default function CrmStudentsPage() {
 
   const diagnostics = summarizeStudents(students.map((student) => ({ status: student.status, enrollments: student.groupId ? [{ status: "active", groupId: student.groupId }] : [] })));
   const filteredStudents = students.filter(student => {
-    const matchesStatus = statusFilter === "all" ? true : statusFilter === "without_group" ? student.status === "active" && !student.groupId : student.status === statusFilter;
+    const matchesStatus = statusFilter === "all" ? student.status !== "archived" : statusFilter === "without_group" ? student.status !== "archived" && !student.groupId : student.status === statusFilter;
     const matchesSearch = 
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       student.parent.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -682,9 +686,11 @@ export default function CrmStudentsPage() {
         <div style={{ display: "flex", gap: "8px" }}>
           {[
             { id: "all", label: `Все ${diagnostics.total}` },
+            { id: "prospect", label: `Потенциальные ${diagnostics.prospect}` },
             { id: "active", label: `Активные ${diagnostics.active}` },
             { id: "without_group", label: `Без группы ${diagnostics.withoutGroup}` },
             { id: "paused", label: `Приостановлены ${diagnostics.paused}` },
+            { id: "inactive", label: `Неактивные ${diagnostics.inactive}` },
             { id: "archived", label: `Архив ${diagnostics.archived}` }
           ].map((tab) => (
             <button
@@ -947,7 +953,7 @@ export default function CrmStudentsPage() {
       {actionModal}
       {/* Add Student Modal */}
       {showAddModal && (
-        <CrmDialog title="Добавить ученика вручную" description="Создание карточки ученика и родителя" onClose={() => setShowAddModal(false)} width={620}>
+        <CrmDialog title="Добавить ученика вручную" description="Родителя и группу можно добавить позже" onClose={() => setShowAddModal(false)} width={620}>
             <form onSubmit={handleCreateStudent} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1006,7 +1012,8 @@ export default function CrmStudentsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Первый родитель</label>
-                  <select className="form-input" value={newGuardianMode} onChange={(e) => setNewGuardianMode(e.target.value as "new" | "existing")}>
+                  <select className="form-input" value={newGuardianMode} onChange={(e) => setNewGuardianMode(e.target.value as "none" | "new" | "existing")}>
+                    <option value="none">Пока не указывать</option>
                     <option value="new">Новый родитель</option>
                     <option value="existing">Выбрать из CRM</option>
                   </select>
@@ -1102,7 +1109,7 @@ export default function CrmStudentsPage() {
                 )}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              {newGuardianMode !== "none" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Основной представитель</label>
                   <select className="form-input" value={primaryGuardianSlot} onChange={(e) => setPrimaryGuardianSlot(e.target.value as "primary" | "second")}>
@@ -1117,7 +1124,7 @@ export default function CrmStudentsPage() {
                     <option value="second">Второй</option>
                   </select>
                 </div>
-              </div>
+              </div>}
 
               <div className="crm-dialog-actions" style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <Button 
@@ -1143,6 +1150,7 @@ export default function CrmStudentsPage() {
       {/* Details Drawer */}
       {selectedStudent && (
         <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
+          <section className="card-crm" style={{padding:14,marginBottom:16,display:"grid",gap:10}}><strong>Родители</strong><div>{selectedStudent.parent&&selectedStudent.parent!=="Не указан"?selectedStudent.parent:"Родитель пока не указан"}</div><select className="form-input" value={guardianToLink} onChange={event=>setGuardianToLink(event.target.value)}><option value="">Выбрать существующего родителя</option>{guardianOptions.filter(item=>item.status!=="archived").map(item=><option key={item.id} value={item.id}>{item.full_name} · {item.phone||item.email||"без контакта"}</option>)}</select><Button type="button" variant="secondary-crm" disabled={!guardianToLink} onClick={linkGuardian}>Привязать родителя</Button></section>
           {/* Student Info Body */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ background: "var(--color-primary-soft)", padding: 16, borderRadius: 10, display: "grid", gap: 12 }}>
