@@ -41,12 +41,13 @@ describe("operational schedule", () => {
   it("saves group attributes and schedule rules in one database transaction", () => {
     const migration = read("../../supabase/migrations/20260807000004_atomic_group_schedule_save.sql");
     const route = read("src/app/api/crm/schedule/route.ts");
+    const schemas = read("src/features/scheduling/schemas.ts");
     const groupsPage = read("src/app/(crm)/crm/groups/page.tsx");
     const settingsPage = read("src/app/(crm)/crm/settings/page.tsx");
     expect(migration).toContain("save_group_with_schedule");
     expect(migration).toContain("for update");
     expect(migration).toContain("replace_group_schedule");
-    expect(route).toContain('action: z.literal("save_group")');
+    expect(schemas).toContain('action: z.literal("save_group")');
     expect(route).toContain('admin.rpc("save_group_with_schedule"');
     expect(groupsPage).toContain('action: "save_group"');
     expect(settingsPage).toContain('action: "save_group"');

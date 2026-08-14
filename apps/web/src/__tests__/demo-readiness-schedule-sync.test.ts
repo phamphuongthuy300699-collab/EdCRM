@@ -24,10 +24,11 @@ describe("transactional group schedule replacement", () => {
 
   it("keeps the low-level rule action and saves editor changes through one atomic group RPC", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
+    const schemas = read("src/features/scheduling/schemas.ts");
     const atomicMigration = read("../../supabase/migrations/20260807000004_atomic_group_schedule_save.sql");
-    expect(route).toContain('action: z.literal("replace_group_rules")');
+    expect(schemas).toContain('action: z.literal("replace_group_rules")');
     expect(route).toContain('admin.rpc("replace_group_schedule"');
-    expect(route).toContain('action: z.literal("save_group")');
+    expect(schemas).toContain('action: z.literal("save_group")');
     expect(route).toContain('admin.rpc("save_group_with_schedule"');
     expect(atomicMigration).toContain("replace_group_schedule");
     expect(route).toContain("adminRoles.has(access.role)");

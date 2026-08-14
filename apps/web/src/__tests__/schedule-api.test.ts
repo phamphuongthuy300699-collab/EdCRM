@@ -7,14 +7,15 @@ const read = (relative: string) => fs.readFileSync(path.resolve(process.cwd(), r
 describe("CRM scheduling API contract", () => {
   it("keeps all schedule mutations behind organization-scoped staff auth", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
+    const schemas = read("src/features/scheduling/schemas.ts");
     const lifecycle = read("../../supabase/migrations/20260807000003_lesson_session_lifecycle.sql");
     expect(route).toContain("requireCrmStaff");
-    expect(route).toContain('action: z.literal("materialize")');
-    expect(route).toContain('action: z.literal("create_session")');
-    expect(route).toContain('action: z.literal("reschedule")');
-    expect(route).toContain('action: z.literal("cancel")');
-    expect(route).toContain('action: z.literal("schedule_makeup")');
-    expect(route).toContain('action: z.literal("save_attendance")');
+    expect(schemas).toContain('action: z.literal("materialize")');
+    expect(schemas).toContain('action: z.literal("create_session")');
+    expect(schemas).toContain('action: z.literal("reschedule")');
+    expect(schemas).toContain('action: z.literal("cancel")');
+    expect(schemas).toContain('action: z.literal("schedule_makeup")');
+    expect(schemas).toContain('action: z.literal("save_attendance")');
     expect(route).toContain('admin.rpc("save_lesson_attendance"');
     expect(lifecycle).toContain("status = 'completed'");
     expect(lifecycle).toContain("completed_at = coalesce(completed_at, now())");

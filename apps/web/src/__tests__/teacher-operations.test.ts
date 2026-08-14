@@ -40,9 +40,10 @@ describe("lesson session lifecycle", () => {
 
   it("exposes server actions without allowing teachers to mutate foreign sessions", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
+    const schemas = read("src/features/scheduling/schemas.ts");
     const attendanceMigration = read("../../supabase/migrations/20260807000005_atomic_attendance_save.sql");
-    expect(route).toContain('action: z.literal("start_session")');
-    expect(route).toContain('action: z.literal("complete_session")');
+    expect(schemas).toContain('action: z.literal("start_session")');
+    expect(schemas).toContain('action: z.literal("complete_session")');
     expect(route).toContain('admin.rpc("transition_lesson_session"');
     expect(route).toContain("p_is_admin: adminRoles.has(access.role)");
     expect(route).toContain('admin.rpc("save_lesson_attendance"');

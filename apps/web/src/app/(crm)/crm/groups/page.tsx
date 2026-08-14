@@ -9,6 +9,11 @@ import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { StudentPicker } from "@/shared/ui/StudentPicker";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
 import { activeTeacherOptions, resolveTeacherName } from "@/features/staff/teachers";
+import {
+  normalizeGroupStatus,
+  parseScheduleText,
+  type GroupStatus,
+} from "@/features/scheduling/group-editor";
 
 const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -32,39 +37,6 @@ function formatScheduleRules(rules: any[]) {
       return `${daysStr} ${time}`;
     })
     .join(", ");
-}
-
-function parseSchedule(scheduleText: string): { weekday: number; starts_at: string; ends_at: string }[] {
-  const timeMatch = scheduleText.match(/(\d{2}):(\d{2})/);
-  const time = timeMatch ? timeMatch[0] : "18:00";
-  const starts_at = `${time}:00`;
-  const [h, m] = time.split(":").map(Number);
-  const endH = String((h + 1) % 24).padStart(2, '0');
-  const ends_at = `${endH}:${String(m).padStart(2, '0')}:00`;
-
-  const dayNames = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-  const rules: { weekday: number; starts_at: string; ends_at: string }[] = [];
-  
-  const textLower = scheduleText.toLowerCase();
-  dayNames.forEach((day, index) => {
-    if (textLower.includes(day)) {
-      rules.push({
-        weekday: index + 1,
-        starts_at,
-        ends_at
-      });
-    }
-  });
-
-  if (rules.length === 0) {
-    rules.push({
-      weekday: 1,
-      starts_at,
-      ends_at
-    });
-  }
-
-  return rules;
 }
 
 export default function CrmGroupsPage() {
@@ -94,6 +66,7 @@ export default function CrmGroupsPage() {
   const [editCourseId, setEditCourseId] = useState("");
   const [editSchedule, setEditSchedule] = useState("");
   const [editTeacherId, setEditTeacherId] = useState("");
+  const [editStatus, setEditStatus] = useState<GroupStatus>("active");
   const [editCapacity, setEditCapacity] = useState("8");
   const [editAgeFrom, setEditAgeFrom] = useState("6");
   const [editAgeTo, setEditAgeTo] = useState("9");
@@ -328,7 +301,7 @@ export default function CrmGroupsPage() {
     try {
       setSavingGroup(true);
       setGroupFormError("");
-      const rules = parseSchedule(newSchedule);
+      const rules = parseScheduleText(newSchedule);
       if (isDemoMode()) {
         const orgRes = await supabase.from("organizations").select("id").eq("slug", "robotics-lipetsk").single() as any;
         if (!orgRes.data) throw new Error("Org not found");
@@ -394,6 +367,7 @@ export default function CrmGroupsPage() {
     setEditCourseId(group.courseId || "");
     setEditSchedule(group.schedule);
     setEditTeacherId(group.teacherId || "");
+    setEditStatus(normalizeGroupStatus(group.status));
     setEditCapacity(String(group.capacity));
     setEditAgeFrom(String(group.ageFrom));
     setEditAgeTo(String(group.ageTo));
@@ -412,7 +386,7 @@ export default function CrmGroupsPage() {
       const demo = isDemoMode();
       const isMockId = typeof editingGroupId === "string" && editingGroupId.startsWith("g");
 
-      const rules = parseSchedule(editSchedule);
+      const rules = parseScheduleText(editSchedule);
       const selCourse = courses.find(c => c.id === editCourseId);
       const selTeacher = teachers.find(t => t.id === editTeacherId);
 
@@ -423,6 +397,7 @@ export default function CrmGroupsPage() {
           courseName: selCourse ? selCourse.title : "Не указан",
           courseId: editCourseId,
           teacherId: editTeacherId,
+          status: editStatus,
           schedule: formatScheduleRules(rules),
           teacherName: selTeacher ? selTeacher.full_name : "Не назначен",
           ageRange: `${editAgeFrom}–${editAgeTo} лет`,
@@ -438,12 +413,15 @@ export default function CrmGroupsPage() {
       const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         action: "save_group",
         groupId: editingGroupId,
-        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
+        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
         rules,
         rebuildFuture: rebuildFutureSessions,
       }) });
       const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
+      if (!response.ok || !result.ok) {
+        const fieldMessage = result.fieldErrors ? Object.values(result.fieldErrors)[0] : null;
+        throw new Error(String(fieldMessage || result.error || "Не удалось сохранить группу и расписание"));
+      }
 
       await loadData();
       setShowEditModal(false);
@@ -944,6 +922,24 @@ export default function CrmGroupsPage() {
                     <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="group-edit-status">Статус</label>
+                <select
+                  id="group-edit-status"
+                  className="form-input"
+                  value={editStatus}
+                  onChange={(event) => setEditStatus(event.target.value as GroupStatus)}
+                >
+                  <option value="active">Активная</option>
+                  <option value="draft">Черновик</option>
+                  <option value="paused">Приостановлена</option>
+                  <option value="closed">Закрыта</option>
+                </select>
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                  Только активные группы доступны для назначения ученику.
+                </span>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>

@@ -1,68 +1,15 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
 import { materializeRuleOccurrences } from "@/features/scheduling/domain";
 import { enqueueScheduleNotifications } from "@/features/scheduling/server";
+import {
+  scheduleActionSchema,
+  scheduleValidationPayload,
+} from "@/features/scheduling/schemas";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
 
 const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
-
-const actionSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("save_group"),
-    groupId: z.string().uuid().nullable().optional(),
-    group: z.object({
-      title: z.string().min(1).max(200),
-      courseId: z.string().uuid(),
-      branchId: z.string().uuid().nullable().optional(),
-      roomId: z.string().uuid().nullable().optional(),
-      teacherId: z.string().uuid().nullable().optional(),
-      status: z.enum(["draft", "active", "paused", "closed"]).optional(),
-      ageFrom: z.number().int().min(0).max(100).nullable().optional(),
-      ageTo: z.number().int().min(0).max(100).nullable().optional(),
-      capacity: z.number().int().positive().max(1000).optional(),
-      startsOn: z.string().nullable().optional(),
-      endsOn: z.string().nullable().optional(),
-      priceMonthly: z.number().nonnegative().nullable().optional(),
-      billingEnabled: z.boolean().optional(),
-      lessonPrice: z.number().positive().nullable().optional(),
-      chargeAbsentExcused: z.boolean().optional(),
-      chargeAbsentUnexcused: z.boolean().optional(),
-      showOnSite: z.boolean().optional(),
-      sortOrder: z.number().int().optional(),
-    }),
-    rules: z.array(z.object({ weekday: z.number().int().min(1).max(7), starts_at: z.string(), ends_at: z.string() })),
-    rebuildFuture: z.boolean().default(true),
-  }),
-  z.object({
-    action: z.literal("replace_group_rules"),
-    groupId: z.string().uuid(),
-    rules: z.array(z.object({ weekday: z.number().int().min(1).max(7), starts_at: z.string(), ends_at: z.string() })),
-    rebuildFuture: z.boolean().default(true),
-  }),
-  z.object({ action: z.literal("materialize"), groupId: z.string().uuid(), dateFrom: z.string(), dateTo: z.string() }),
-  z.object({
-    action: z.literal("create_session"),
-    groupId: z.string().uuid(),
-    startsAt: z.string().datetime(),
-    endsAt: z.string().datetime(),
-    kind: z.enum(["regular", "extra", "trial"]).default("extra"),
-    topic: z.string().max(500).optional(),
-    reason: z.string().max(500).optional(),
-    notifyGuardians: z.boolean().default(true),
-  }),
-  z.object({ action: z.literal("reschedule"), sessionId: z.string().uuid(), startsAt: z.string().datetime(), endsAt: z.string().datetime().nullable().optional(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
-  z.object({ action: z.literal("cancel"), sessionId: z.string().uuid(), reason: z.string().min(1).max(500), notifyGuardians: z.boolean().default(true) }),
-  z.object({ action: z.literal("schedule_makeup"), makeupAssignmentId: z.string().uuid(), targetSessionId: z.string().uuid(), notes: z.string().max(500).optional() }),
-  z.object({ action: z.literal("start_session"), sessionId: z.string().uuid() }),
-  z.object({ action: z.literal("complete_session"), sessionId: z.string().uuid() }),
-  z.object({
-    action: z.literal("save_attendance"),
-    sessionId: z.string().uuid(),
-    records: z.array(z.object({ studentId: z.string().uuid(), status: z.enum(["unmarked", "present", "late", "absent_excused", "absent_unexcused"]), comment: z.string().max(1000).optional(), absenceReason: z.string().max(500).optional() })),
-  }),
-]);
 
 async function loadSession(admin: any, organizationId: string, sessionId: string) {
   const { data, error } = await admin.from("lesson_sessions")
@@ -148,8 +95,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const access = await requireCrmStaff(staffRoles);
   if (!access.ok) return access.response;
-  const parsed = actionSchema.safeParse(await request.json());
-  if (!parsed.success) return NextResponse.json({ ok: false, error: "Некорректные данные операции расписания" }, { status: 400 });
+  const parsed = scheduleActionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    const validation = scheduleValidationPayload(parsed.error);
+    return NextResponse.json(validation, { status: 400 });
+  }
   const input = parsed.data;
   const admin = crmAdmin();
   const teacherActions = new Set(["save_attendance", "start_session", "complete_session"]);
