@@ -35,18 +35,21 @@ export async function POST(request: Request) {
 
   const input = interactionSchema.parse(await request.json());
   const admin = crmAdmin();
-  const { data, error } = await (admin.rpc("crm_record_interaction", {
-    p_organization_id: access.organizationId,
-    p_guardian_id: input.guardianId || null,
-    p_student_id: input.studentId || null,
-    p_lead_id: input.leadId || null,
-    p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
-    p_type: input.type,
-    p_result: input.result || null,
-    p_summary: input.summary || null,
-    p_next_action_at: input.nextActionAt || null,
-    p_complete_interaction_id: input.completeInteractionId || null,
-  }) as any);
+  const { data, error } = await (admin.rpc(
+    "crm_record_interaction",
+    {
+      p_organization_id: access.organizationId,
+      p_guardian_id: input.guardianId || null,
+      p_student_id: input.studentId || null,
+      p_lead_id: input.leadId || null,
+      p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
+      p_type: input.type,
+      p_result: input.result || null,
+      p_summary: input.summary || null,
+      p_next_action_at: input.nextActionAt || null,
+      p_complete_interaction_id: input.completeInteractionId || null,
+    },
+  ) as any);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true, result: data });
 }
@@ -57,11 +60,14 @@ export async function PATCH(request: Request) {
 
   const input = completeSchema.parse(await request.json());
   const admin = crmAdmin();
-  const { data, error } = await (admin.rpc("crm_complete_followup", {
-    p_organization_id: access.organizationId,
-    p_interaction_id: input.interactionId,
-    p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
-  }) as any);
+  const { data, error } = await (admin.rpc(
+    "crm_complete_followup",
+    {
+      p_organization_id: access.organizationId,
+      p_interaction_id: input.interactionId,
+      p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
+    },
+  ) as any);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true, result: data, next_action_completed_at: data?.completed_at });
 }

@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, XCircle, Settings, ShieldAlert, Activity } from
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoMode } from "@/shared/utils/demo";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 async function getDiagnosticsData() {
   if (isDemoMode()) {
@@ -26,23 +27,17 @@ async function getDiagnosticsData() {
 
   if (!user) redirect("/login");
 
-  // Get active organization membership
-  const { data: membership } = await (supabase.from("org_memberships") as any)
-    .select("role, organization_id")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  const allowed = ["owner", "admin"].includes(membership?.role);
+  const admin = createSupabaseAdminClient();
+  const context = await loadStaffAuthContext(admin, user.id);
+  const allowed = ["owner", "admin"].includes(context?.role || "");
   if (!allowed) {
     return { allowed: false, settings: null };
   }
 
   // Load Alfabank acquiring provider settings using admin client to read securely
-  const admin = createSupabaseAdminClient();
   const { data: settings } = await (admin.from("payment_provider_settings") as any)
     .select("*")
-    .eq("organization_id", membership.organization_id)
+    .eq("organization_id", context!.organizationId)
     .eq("provider", "alfabank")
     .maybeSingle();
 

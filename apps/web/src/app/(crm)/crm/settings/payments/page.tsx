@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { isDemoMode } from "@/shared/utils/demo";
 import PaymentsSettingsClient from "./PaymentsSettingsClient";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 async function canManagePayments() {
   if (isDemoMode()) return true;
@@ -13,13 +15,8 @@ async function canManagePayments() {
 
   if (!user) redirect("/login");
 
-  const { data: membership } = await (supabase.from("org_memberships") as any)
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  return ["owner", "admin"].includes(membership?.role);
+  const context = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
+  return ["owner", "admin"].includes(context?.role || "");
 }
 
 export default async function CrmPaymentSettingsPage() {

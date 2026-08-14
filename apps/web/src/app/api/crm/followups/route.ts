@@ -6,7 +6,9 @@ export async function GET() {
   if (!access.ok) return access.response;
 
   const admin = crmAdmin();
-  const { data, error } = await (admin.rpc("crm_followup_queue", { p_organization_id: access.organizationId }) as any);
+  const { data, error } = await (admin.rpc("crm_followup_queue", {
+    p_organization_id: access.organizationId,
+  }) as any);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   const rows = data || [];
@@ -14,10 +16,16 @@ export async function GET() {
   const studentIds = rows.map((row: any) => row.student_id).filter(Boolean);
   const [{ data: guardians }, { data: students }] = await Promise.all([
     guardianIds.length
-      ? (admin.from("guardians") as any).select("id,full_name,phone,status,responsible_manager_id").eq("organization_id", access.organizationId).in("id", guardianIds)
+      ? (admin.from("guardians") as any)
+          .select("id,full_name,phone,status,responsible_manager_id")
+          .eq("organization_id", access.organizationId)
+          .in("id", guardianIds)
       : Promise.resolve({ data: [] }),
     studentIds.length
-      ? (admin.from("students") as any).select("id,full_name,status").eq("organization_id", access.organizationId).in("id", studentIds)
+      ? (admin.from("students") as any)
+          .select("id,full_name,status")
+          .eq("organization_id", access.organizationId)
+          .in("id", studentIds)
       : Promise.resolve({ data: [] }),
   ]);
   const guardianMap = new Map((guardians || []).map((item: any) => [item.id, item]));

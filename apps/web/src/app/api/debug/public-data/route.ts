@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,13 +44,10 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Необходима авторизация" }, { status: 401 });
   }
 
-  const { data: membership } = await (authClient.from("org_memberships") as any)
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const admin = createSupabaseAdminClient();
+  const context = await loadStaffAuthContext(admin, user.id);
 
-  if (!membership || !["owner", "admin"].includes(membership.role)) {
+  if (!context || !["owner", "admin"].includes(context.role)) {
     return NextResponse.json({ ok: false, error: "Недостаточно прав" }, { status: 403 });
   }
 
@@ -76,11 +74,11 @@ export async function GET() {
   };
 
   try {
-    const supabase = createSupabaseAdminClient();
+    const supabase = admin;
     const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("id, name")
-      .eq("id", membership.organization_id)
+      .eq("id", context.organizationId)
       .maybeSingle();
 
     if (orgError) throw orgError;

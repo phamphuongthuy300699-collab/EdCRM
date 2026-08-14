@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 
 export default function CrmPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,13 +79,16 @@ export default function CrmPaymentsPage() {
         // Fetch user and role
         if (isDemoMode()) {
           setUserRole("admin");
+          setPayments(initialPayments);
+          return;
         } else {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
+            const staffProfileId = await resolveStaffProfileId(supabase as any, session.user.id);
             const { data: membership } = await supabase
               .from("org_memberships")
               .select("role")
-              .eq("user_id", session.user.id)
+              .eq("user_id", staffProfileId)
               .eq("is_active", true)
               .maybeSingle() as any;
             if (membership) {
@@ -124,10 +128,7 @@ export default function CrmPaymentsPage() {
 
         if (error) throw error;
 
-        if (isDemoMode()) {
-          setPayments(initialPayments);
-        } else {
-          if (paymentsData && paymentsData.length > 0) {
+        if (paymentsData && paymentsData.length > 0) {
             const formatted = paymentsData.map((pay: any) => {
               const firstGuardian = pay.students?.student_guardians?.[0]?.guardians;
               return {
@@ -145,9 +146,8 @@ export default function CrmPaymentsPage() {
               };
             });
             setPayments(formatted);
-          } else {
-            setPayments([]);
-          }
+        } else {
+          setPayments([]);
         }
       } catch (err) {
         console.error("Error loading payments registry:", err);

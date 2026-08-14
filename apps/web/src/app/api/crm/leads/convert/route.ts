@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 export async function POST(request: Request) {
   try {
@@ -42,14 +43,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: membership } = await (authClient.from("org_memberships") as any)
-      .select("role")
-      .eq("organization_id", lead.organization_id)
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+    const staffContext = await loadStaffAuthContext(supabase, user.id);
 
-    if (!membership || !["owner", "admin", "manager"].includes(membership.role)) {
+    if (
+      !staffContext
+      || staffContext.organizationId !== lead.organization_id
+      || !["owner", "admin", "manager"].includes(staffContext.role)
+    ) {
       return NextResponse.json(
         { ok: false, error: "Недостаточно прав" },
         { status: 403 }

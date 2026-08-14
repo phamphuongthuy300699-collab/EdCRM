@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../app/api/crm/entities/[entity]/[action]/route";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 vi.mock("@/shared/db/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
@@ -10,6 +11,10 @@ vi.mock("@/shared/db/supabase/server", () => ({
 
 vi.mock("@/shared/db/supabase/admin", () => ({
   createSupabaseAdminClient: vi.fn(),
+}));
+
+vi.mock("@/features/staff/auth-context", () => ({
+  loadStaffAuthContext: vi.fn(),
 }));
 
 const orgId = "11111111-1111-4111-8111-111111111111";
@@ -126,6 +131,12 @@ describe("CRM lifecycle API safety", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(createSupabaseServerClient).mockResolvedValue(authClient() as any);
+    vi.mocked(loadStaffAuthContext).mockResolvedValue({
+      authUserId: userId,
+      staffProfileId: userId,
+      organizationId: orgId,
+      role: "admin",
+    });
   });
 
   it("archives a branch without selecting a missing status column", async () => {

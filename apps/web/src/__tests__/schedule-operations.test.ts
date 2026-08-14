@@ -49,7 +49,7 @@ describe("operational schedule", () => {
     expect(migration).toContain("replace_group_schedule");
     expect(schemas).toContain('action: z.literal("save_group")');
     expect(route).toContain('admin.rpc("save_group_with_schedule"');
-    expect(groupsPage).toContain('action: "save_group"');
-    expect(settingsPage).toContain('action: "save_group"');
+    expect(groupsPage).toContain("buildGroupSaveOperation");
+    expect(settingsPage).toContain("buildGroupSaveOperation");
   });
 });

@@ -19,7 +19,8 @@ describe("representative BOLA defenses", () => {
     const lesson = read("app/api/crm/schedule/session/[sessionId]/route.ts");
     const payroll = read("app/api/teacher/payroll/route.ts");
     expect(lesson).toContain('access.role === "teacher" && session.teacher_id !== access.staffProfileId');
-    expect(payroll).toContain('.eq("teacher_id", access.staffProfileId)');
+    expect(payroll).toContain('const teacherProfileId = previewTeacherId || access.staffProfileId');
+    expect(payroll).toContain('.eq("teacher_id", teacherProfileId)');
   });
 
   it("derives guardian children/accounts from guardian_users rather than request IDs", () => {
@@ -57,8 +58,8 @@ describe("representative BOLA defenses", () => {
 
   it("scopes database diagnostics to the authenticated administrator organization", () => {
     const diagnostics = read("app/api/debug/public-data/route.ts");
-    expect(diagnostics).toContain('.select("organization_id, role")');
-    expect(diagnostics).toContain('.eq("id", membership.organization_id)');
+    expect(diagnostics).toContain("loadStaffAuthContext");
+    expect(diagnostics).toContain('.eq("id", context.organizationId)');
     expect(diagnostics).not.toContain("DEFAULT_ORG_SLUG");
   });
 

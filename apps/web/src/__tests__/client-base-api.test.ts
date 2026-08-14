@@ -31,7 +31,7 @@ describe("client base API contracts", () => {
 
   it("records and completes follow-ups through one tenant-scoped RPC", () => {
     const route = read("src/app/api/crm/interactions/route.ts");
-    expect(route).toContain('admin.rpc("crm_record_interaction"');
+    expect(route).toMatch(/admin\.rpc\(\s*"crm_record_interaction"/);
     expect(route).toContain("p_complete_interaction_id");
     expect(route).not.toContain('.from("lead_interactions").insert');
   });

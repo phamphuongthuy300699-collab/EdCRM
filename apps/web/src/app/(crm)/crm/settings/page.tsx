@@ -39,6 +39,7 @@ import { getMediaUrl } from "@/shared/utils/media";
 import { maxEventDefinitions, normalizeMaxEvents } from "@/lib/bots/max/events";
 import { buildStaffPayload, buildTeacherRatePayload } from "@/features/staff/payloads";
 import { resolveTeacherName } from "@/features/staff/teachers";
+import { buildGroupSaveOperation } from "@/features/scheduling/group-save-contract";
 
 type TabId = "organization" | "branches" | "courses" | "groups" | "staff" | "payments" | "discounts" | "bots" | "system";
 type GroupStatus = "draft" | "active" | "paused" | "closed";
@@ -383,6 +384,7 @@ export default function CrmSettingsPage() {
             show_on_site: true,
             sort_order: 10,
             is_active: true,
+            hasAuthAccount: false,
           },
         ];
         setOrg(demoOrg);
@@ -998,8 +1000,7 @@ export default function CrmSettingsPage() {
         const scheduleResponse = await fetch("/api/crm/schedule", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save_group",
+          body: JSON.stringify(buildGroupSaveOperation({
             groupId: groupDraft.id || null,
             group: {
               title: payload.title,
@@ -1019,7 +1020,7 @@ export default function CrmSettingsPage() {
             },
             rules: scheduleDraft.map((rule) => ({ weekday: Number(rule.weekday), starts_at: rule.starts_at, ends_at: rule.ends_at })),
             rebuildFuture: rebuildFutureSessions,
-          }),
+          })),
         });
         const scheduleResult = await scheduleResponse.json();
         if (!scheduleResponse.ok || !scheduleResult.ok) throw new Error(scheduleResult.error || "Не удалось сохранить группу и расписание");
@@ -2494,6 +2495,11 @@ export default function CrmSettingsPage() {
                 placeholder="teacher.portal@example.ru"
               />
             </Field>
+            {staffAccessState[staffAccessDraft.person.user_id]?.error && (
+              <div role="alert" className="settings-alert error">
+                {staffAccessState[staffAccessDraft.person.user_id]?.error}
+              </div>
+            )}
             <div className="settings-form-actions">
               <Button type="button" variant="secondary-crm" onClick={() => setStaffAccessDraft(null)}>Отмена</Button>
               <Button type="submit" variant="primary-crm" disabled={staffAccessState[staffAccessDraft.person.user_id]?.loading}>

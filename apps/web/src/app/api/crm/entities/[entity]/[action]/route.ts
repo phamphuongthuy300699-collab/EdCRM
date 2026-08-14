@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 import {
   buildArchivePayload,
   buildRestorePayload,
@@ -105,14 +106,12 @@ async function requireLifecycleRole(action: LifecycleAction, preferredOrganizati
     };
   }
 
-  let query = (supabase.from("org_memberships") as any)
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true);
-  if (preferredOrganizationId) query = query.eq("organization_id", preferredOrganizationId);
-
-  const { data: membership } = await query.maybeSingle();
-  if (!membership || !roleCanPerformLifecycleAction(membership.role, action)) {
+  const staffContext = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
+  if (
+    !staffContext
+    || (preferredOrganizationId && staffContext.organizationId !== preferredOrganizationId)
+    || !roleCanPerformLifecycleAction(staffContext.role, action)
+  ) {
     return {
       ok: false as const,
       response: NextResponse.json({ ok: false, error: "Недостаточно прав для операции" }, { status: 403 }),
@@ -121,9 +120,10 @@ async function requireLifecycleRole(action: LifecycleAction, preferredOrganizati
 
   return {
     ok: true as const,
-    userId: user.id,
-    role: membership.role as string,
-    organizationId: membership.organization_id as string,
+    authUserId: staffContext.authUserId,
+    staffProfileId: staffContext.staffProfileId,
+    role: staffContext.role,
+    organizationId: staffContext.organizationId,
   };
 }
 
@@ -333,7 +333,7 @@ export async function POST(
   const entityTitle = titleFor(lifecycleRecord, metadata);
   if (action === "archive" || action === "restore") {
     const payload = action === "archive"
-      ? buildArchivePayload(entity, auth.userId)
+      ? buildArchivePayload(entity, auth.staffProfileId)
       : buildRestorePayload(entity);
     const { error } = await mutationQuery(admin, metadata, lifecycleRecord.id, organizationId, "update", payload);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
@@ -344,7 +344,7 @@ export async function POST(
         .eq("organization_id", organizationId)
         .eq("user_id", lifecycleRecord.id);
     }
-    await logAction(admin, { organizationId, actorId: auth.userId, action, entity, entityId: lifecycleRecord.id, entityTitle });
+    await logAction(admin, { organizationId, actorId: auth.staffProfileId, action, entity, entityId: lifecycleRecord.id, entityTitle });
     return NextResponse.json({ ok: true, action, entity, id: lifecycleRecord.id });
   }
 
@@ -357,7 +357,7 @@ export async function POST(
         notes: null,
         status: "archived",
         anonymized_at: new Date().toISOString(),
-        anonymized_by: auth.userId,
+        anonymized_by: auth.staffProfileId,
       };
     } else if (entity === "guardians") {
       payload = {
@@ -368,7 +368,7 @@ export async function POST(
         max_contact: null,
         notes: null,
         anonymized_at: new Date().toISOString(),
-        anonymized_by: auth.userId,
+        anonymized_by: auth.staffProfileId,
       };
     } else if (entity === "profiles") {
       payload = {
@@ -379,13 +379,13 @@ export async function POST(
         specialty: null,
         show_on_site: false,
         personal_data_cleared_at: new Date().toISOString(),
-        personal_data_cleared_by: auth.userId,
+        personal_data_cleared_by: auth.staffProfileId,
       };
     }
     if (!payload) return NextResponse.json({ ok: false, error: "Для этой сущности очистка персональных данных не поддерживается" }, { status: 400 });
     const { error } = await mutationQuery(admin, metadata, lifecycleRecord.id, organizationId, "update", payload);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-    await logAction(admin, { organizationId, actorId: auth.userId, action, entity, entityId: lifecycleRecord.id, entityTitle });
+    await logAction(admin, { organizationId, actorId: auth.staffProfileId, action, entity, entityId: lifecycleRecord.id, entityTitle });
     return NextResponse.json({ ok: true, action, entity, id: lifecycleRecord.id });
   }
 
@@ -396,7 +396,7 @@ export async function POST(
     const message = err.message || "Не удалось проверить зависимости. Удаление заблокировано.";
     await logAction(admin, {
       organizationId,
-      actorId: auth.userId,
+      actorId: auth.staffProfileId,
       action: "delete_blocked",
       entity,
       entityId: lifecycleRecord.id,
@@ -409,7 +409,7 @@ export async function POST(
   if (!safety.allowed) {
     await logAction(admin, {
       organizationId,
-      actorId: auth.userId,
+      actorId: auth.staffProfileId,
       action: "delete_blocked",
       entity,
       entityId: lifecycleRecord.id,
@@ -429,6 +429,6 @@ export async function POST(
 
   const { error } = await mutationQuery(admin, metadata, lifecycleRecord.id, organizationId, "delete");
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-  await logAction(admin, { organizationId, actorId: auth.userId, action, entity, entityId: lifecycleRecord.id, entityTitle, metadata: { dependencyCounts: counts } });
+  await logAction(admin, { organizationId, actorId: auth.staffProfileId, action, entity, entityId: lifecycleRecord.id, entityTitle, metadata: { dependencyCounts: counts } });
   return NextResponse.json({ ok: true, action, entity, id: lifecycleRecord.id });
 }

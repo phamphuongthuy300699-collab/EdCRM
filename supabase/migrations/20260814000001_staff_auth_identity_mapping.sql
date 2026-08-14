@@ -69,7 +69,6 @@ join exclusive_identities identity
   on identity.user_id = membership.user_id
  and identity.organization_id = membership.organization_id
 join auth.users auth_user on auth_user.id = membership.user_id
-where membership.is_active = true
 on conflict do nothing;
 
 create or replace function public.current_staff_profile_id(target_org_id uuid)

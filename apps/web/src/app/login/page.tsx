@@ -8,6 +8,7 @@ import { Lock, Mail, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { isDemoMode } from "@/shared/utils/demo";
+import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,11 +53,12 @@ export default function LoginPage() {
       }
 
       const user = data.user;
+      const staffProfileId = await resolveStaffProfileId(supabase as any, user.id);
 
       // Query membership
       const { data: membership } = await (supabase.from("org_memberships") as any)
         .select("role")
-        .eq("user_id", user?.id)
+        .eq("user_id", staffProfileId)
         .eq("is_active", true)
         .maybeSingle();
 

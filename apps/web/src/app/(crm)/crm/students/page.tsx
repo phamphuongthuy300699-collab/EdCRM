@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { studentOperationalState, summarizeStudents } from "@/features/students/domain";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
@@ -134,9 +135,12 @@ export default function CrmStudentsPage() {
       try {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
+        const staffProfileId = session?.user
+          ? await resolveStaffProfileId(supabase as any, session.user.id)
+          : "";
         const { data: membership } = await (supabase.from("org_memberships") as any)
           .select("organization_id")
-          .eq("user_id", session?.user?.id || "")
+          .eq("user_id", staffProfileId)
           .eq("is_active", true)
           .maybeSingle();
         if (!membership?.organization_id && !isDemoMode()) throw new Error("Organization not found");

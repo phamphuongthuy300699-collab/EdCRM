@@ -3,6 +3,7 @@ import { z } from "zod";
 import { publishInvoiceForParent } from "@/lib/payments/publish-invoice";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 const bodySchema = z.object({
   invoiceId: z.string().uuid(),
@@ -32,14 +33,13 @@ export async function POST(request: NextRequest) {
 
     if (invoiceError || !invoice) return jsonError("Счет не найден", 404, "INVOICE_NOT_FOUND");
 
-    const { data: membership } = await (admin.from("org_memberships") as any)
-      .select("role")
-      .eq("organization_id", invoice.organization_id)
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+    const staffContext = await loadStaffAuthContext(admin, user.id);
 
-    if (!membership?.role || !financeRoles.has(membership.role)) {
+    if (
+      !staffContext
+      || staffContext.organizationId !== invoice.organization_id
+      || !financeRoles.has(staffContext.role)
+    ) {
       return jsonError("Недостаточно прав для выставления счета", 403, "FORBIDDEN");
     }
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       origin: request.nextUrl.origin,
       regenerate: parsed.data.regenerate === true,
       source: "crm_publish_action",
-      actorId: user.id,
+      actorId: staffContext.staffProfileId,
     });
 
     return NextResponse.json({

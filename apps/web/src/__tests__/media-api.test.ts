@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { getMediaUrl } from "@/shared/utils/media";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 const TEST_ORG_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -22,9 +23,19 @@ vi.mock("@/shared/utils/demo", () => ({
   isDemoMode: () => false,
 }));
 
+vi.mock("@/features/staff/auth-context", () => ({
+  loadStaffAuthContext: vi.fn(),
+}));
+
 describe("Media API Endpoint Security", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(loadStaffAuthContext).mockResolvedValue({
+      authUserId: "admin-id",
+      staffProfileId: "admin-id",
+      organizationId: TEST_ORG_ID,
+      role: "admin",
+    });
   });
 
   it("returns 401 Unauthorized for POST without user session", async () => {
@@ -59,6 +70,12 @@ describe("Media API Endpoint Security", () => {
       }),
     };
     vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(loadStaffAuthContext).mockResolvedValue({
+      authUserId: "test-user-id",
+      staffProfileId: "test-user-id",
+      organizationId: TEST_ORG_ID,
+      role: "teacher",
+    });
 
     const req = new NextRequest("http://localhost:3000/api/crm/media", {
       method: "POST",
@@ -181,6 +198,12 @@ describe("Media API Endpoint Security", () => {
     fs.writeFileSync(path.join(heroDir, mediaName), "image");
     process.env.MEDIA_DRIVER = "local";
     process.env.MEDIA_LOCAL_DIR = tempMediaDir;
+    vi.mocked(loadStaffAuthContext).mockResolvedValue({
+      authUserId: "admin-id",
+      staffProfileId: "admin-id",
+      organizationId: "org-id",
+      role: "admin",
+    });
 
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-id" } } }) },

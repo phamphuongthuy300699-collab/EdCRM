@@ -32,6 +32,7 @@ describe("legacy staff portal provisioning", () => {
   });
 
   it("maps modern staff and resolves reset/list through the mapping", () => {
+    const migration = read("../../supabase/migrations/20260814000001_staff_auth_identity_mapping.sql");
     const create = read("src/app/api/crm/staff/create/route.ts");
     const reset = read("src/app/api/crm/staff/reset-password/route.ts");
     const list = read("src/app/api/crm/staff/list/route.ts");
@@ -41,6 +42,7 @@ describe("legacy staff portal provisioning", () => {
     expect(reset).toContain("updateUserById(targetAuthUserId");
     expect(list).toContain('.from("staff_auth_identities")');
     expect(list).not.toContain("admin.auth.admin.listUsers");
+    expect(migration).not.toMatch(/join auth\.users[\s\S]{0,120}where membership\.is_active = true/);
   });
 
   it("edits and reactivates the canonical profile without requiring a matching Auth UUID", () => {

@@ -14,6 +14,7 @@ import {
   parseScheduleText,
   type GroupStatus,
 } from "@/features/scheduling/group-editor";
+import { buildGroupSaveOperation } from "@/features/scheduling/group-save-contract";
 
 const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -331,12 +332,11 @@ export default function CrmGroupsPage() {
         const response = await fetch("/api/crm/schedule", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save_group",
+          body: JSON.stringify(buildGroupSaveOperation({
             group: { title: newTitle, courseId: newCourseId, teacherId: newTeacherId || null, capacity: parseInt(newCapacity, 10), ageFrom: parseInt(newAgeFrom, 10), ageTo: parseInt(newAgeTo, 10), status: "active" },
             rules,
             rebuildFuture: rebuildFutureSessions,
-          }),
+          })),
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
@@ -410,13 +410,12 @@ export default function CrmGroupsPage() {
         return;
       }
 
-      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        action: "save_group",
+      const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildGroupSaveOperation({
         groupId: editingGroupId,
         group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
         rules,
         rebuildFuture: rebuildFutureSessions,
-      }) });
+      })) });
       const result = await response.json();
       if (!response.ok || !result.ok) {
         const fieldMessage = result.fieldErrors ? Object.values(result.fieldErrors)[0] : null;

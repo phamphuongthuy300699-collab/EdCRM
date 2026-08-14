@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/shared/db/types";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { assertSameOriginMutation } from "@/lib/security/origin";
+import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 
 const cookieMutationPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
 const cookiePaymentMutations = new Set(["/api/payments/alfabank/create", "/api/payments/alfabank/status", "/api/payments/alfabank/return-status"]);
@@ -93,10 +94,11 @@ export async function middleware(request: NextRequest) {
 
     // User is authenticated, check their role
     try {
+      const staffProfileId = await resolveStaffProfileId(supabase as any, user.id);
       // Query membership
       const { data: membership } = await (supabase.from("org_memberships") as any)
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", staffProfileId)
         .eq("is_active", true)
         .maybeSingle();
 

@@ -35,7 +35,7 @@ describe("transactional group schedule replacement", () => {
     for (const file of ["src/app/(crm)/crm/settings/page.tsx", "src/app/(crm)/crm/groups/page.tsx"]) {
       const source = read(file);
       expect(source).toContain("Пересчитать будущие занятия");
-      expect(source).toContain('action: "save_group"');
+      expect(source).toContain("buildGroupSaveOperation");
     }
   });
 });

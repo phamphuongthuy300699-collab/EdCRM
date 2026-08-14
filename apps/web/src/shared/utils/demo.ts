@@ -9,6 +9,11 @@
  * this indicates a configuration error.
  */
 export function isDemoMode(): boolean {
+  // Production must never render demo records, even if a stale public flag is present.
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
   // Explicit demo mode flag takes priority
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
     return true;
@@ -18,11 +23,6 @@ export function isDemoMode(): boolean {
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
   );
-
-  // In production, we NEVER fall back to demo mode
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
 
   // In development/test, allow demo mode if no Supabase config
   return !hasSupabaseConfig;

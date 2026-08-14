@@ -16,6 +16,7 @@ function isExistingIdentity(error: { code?: string; message?: string }) {
 }
 
 export async function POST(request: Request) {
+  try {
   const parsed = provisionStaffAccessSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Некорректные данные доступа" }, { status: 400 });
@@ -96,4 +97,11 @@ export async function POST(request: Request) {
     metadata: { result: "success" },
   });
   return NextResponse.json({ ok: true, temporaryPassword: password });
+  } catch (error: any) {
+    console.error("Staff access provisioning error:", error);
+    return NextResponse.json(
+      { ok: false, error: "Не удалось создать доступ сотруднику" },
+      { status: 500 },
+    );
+  }
 }

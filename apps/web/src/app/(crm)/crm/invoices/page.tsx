@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
+import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 import { calculateDiscountedInvoiceAmount, shouldReuseAlfabankPaymentUrl } from "@/shared/utils/payments";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { StudentPicker } from "@/shared/ui/StudentPicker";
@@ -143,10 +144,11 @@ export default function CrmInvoicesPage() {
         } else {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
+            const staffProfileId = await resolveStaffProfileId(supabase as any, session.user.id);
             const { data: membership } = await supabase
               .from("org_memberships")
               .select("role")
-              .eq("user_id", session.user.id)
+              .eq("user_id", staffProfileId)
               .eq("is_active", true)
               .maybeSingle() as any;
             if (membership) {

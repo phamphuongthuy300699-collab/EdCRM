@@ -1,11 +1,13 @@
 import fs from "fs";
 import path from "path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isDemoMode } from "@/shared/utils/demo";
 
 const root = process.cwd();
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
 describe("parent access management", () => {
+  afterEach(() => vi.unstubAllEnvs());
   it("issues parent access through auth user and guardian_users without duplicates", () => {
     const source = read("src/app/api/crm/parent-access/issue/route.ts");
 
@@ -38,12 +40,17 @@ describe("parent access management", () => {
     expect(disable).toContain("parent_access_disabled");
   });
 
-  it("parent production pages do not show demo payments when guardian access is missing", () => {
+  it("parent production pages cannot enter demo mode and show the missing-access state", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_DEMO_MODE", "true");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://production.supabase.invalid");
+    expect(isDemoMode()).toBe(false);
+
     const payments = read("src/app/parent/payments/page.tsx");
     const dashboard = read("src/app/parent/page.tsx");
 
     expect(payments).toContain("Доступ к личному кабинету не привязан");
-    expect(payments).not.toContain("setInvoices(demoInvoices);\n          setPayments(demoPayments);");
+    expect(payments).toContain("if (isDemoMode())");
     expect(dashboard).toContain("Доступ к личному кабинету не привязан");
     expect(dashboard).not.toContain("No linked guardian found");
   });

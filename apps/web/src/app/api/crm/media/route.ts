@@ -8,6 +8,7 @@ import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { resolveMediaUsages } from "./media-usages";
 import { inspectMediaUpload, mediaStorageNameBelongsToOrganization, namespaceMediaStorageName } from "@/lib/security/media-upload";
 import { checkRateLimit, rateLimitResponse, requestFingerprint } from "@/lib/security/rate-limit";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 const DEFAULT_LOCAL_MEDIA_DIR = "/opt/edcrm/media";
 const WHITELIST_FOLDERS = [
@@ -43,17 +44,13 @@ async function checkAuthAndRole(req: NextRequest) {
       return { ok: false, status: 401, error: "Unauthorized" };
     }
 
-    const { data: membership } = await (supabase.from("org_memberships") as any)
-      .select("organization_id, role")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+    const context = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
 
-    if (!membership?.organization_id || !["owner", "admin", "manager"].includes(membership.role)) {
+    if (!context || !["owner", "admin", "manager"].includes(context.role)) {
       return { ok: false, status: 403, error: "Forbidden - Insufficient permissions" };
     }
 
-    return { ok: true, user, role: membership.role, organizationId: membership.organization_id };
+    return { ok: true, user, role: context.role, organizationId: context.organizationId };
   } catch (err: any) {
     console.error("Auth check error in media API:", err);
     return { ok: false, status: 500, error: "Internal authentication check error" };

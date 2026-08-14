@@ -80,3 +80,7 @@ curl --fail --show-error --silent https://xn--48-9kc0bsblm.xn--p1ai/api/health >
 ```
 
 Any `502` on a full GET blocks the release. Do not use `docker system prune`, `docker volume prune`, or remove database volumes during this check.
+
+## Security-header ownership
+
+Application security headers (CSP, `X-Frame-Options`, HSTS, content-type, referrer and permissions policies) are currently defined in `apps/web/next.config.ts`. The production nginx configuration is maintained outside this repository, so changing either side without comparing the live full-GET response is unsafe. Keep nginx from adding duplicate values for these headers; after deployment inspect `curl -sS -D- -o /dev/null` for `/` and `/login`. Consolidating nginx and application ownership remains an operations follow-up once the live nginx config is versioned.

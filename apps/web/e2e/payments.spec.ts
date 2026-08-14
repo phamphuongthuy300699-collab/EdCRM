@@ -5,6 +5,7 @@ test.describe("Invoicing and Payments Page", () => {
 
   test("should render payments page with bills list", async ({ page }) => {
     await page.goto("/crm/payments");
-    await expect(page.locator("h1")).toContainText("Счета и Оплаты");
+    await expect(page.getByRole("heading", { level: 1, name: "Платежи (Payments Registry)" })).toBeVisible();
+    await expect(page.getByText("Игорь Петров")).toBeVisible();
   });
 });
