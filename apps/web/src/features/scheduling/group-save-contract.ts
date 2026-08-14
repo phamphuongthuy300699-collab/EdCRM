@@ -30,18 +30,20 @@ export type GroupScheduleRuleInput = {
 export function buildGroupSaveOperation(input: {
   groupId?: string | null;
   group: GroupSaveFields;
-  rules: GroupScheduleRuleInput[];
+  rules?: GroupScheduleRuleInput[];
   rebuildFuture: boolean;
 }) {
   return {
     action: "save_group" as const,
     ...(input.groupId !== undefined ? { groupId: input.groupId } : {}),
     group: input.group,
-    rules: input.rules.map((rule) => ({
-      weekday: Number(rule.weekday),
-      starts_at: rule.starts_at,
-      ends_at: rule.ends_at,
-    })),
+    ...(input.rules !== undefined ? {
+      rules: input.rules.map((rule) => ({
+        weekday: Number(rule.weekday),
+        starts_at: rule.starts_at,
+        ends_at: rule.ends_at,
+      })),
+    } : {}),
     rebuildFuture: input.rebuildFuture,
   };
 }

@@ -34,7 +34,7 @@ export const scheduleActionSchema = z.discriminatedUnion("action", [
       showOnSite: z.boolean().optional(),
       sortOrder: z.number().int().optional(),
     }),
-    rules: z.array(scheduleRuleSchema),
+    rules: z.array(scheduleRuleSchema).optional(),
     rebuildFuture: z.boolean().default(true),
   }),
   z.object({

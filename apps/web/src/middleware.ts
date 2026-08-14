@@ -4,6 +4,7 @@ import type { Database } from "@/shared/db/types";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { assertSameOriginMutation } from "@/lib/security/origin";
 import { resolveStaffProfileId } from "@/features/staff/browser-auth";
+import { resolveProtectedPortalAccess } from "@/features/auth/portal-route-access";
 
 const cookieMutationPrefixes = ["/api/crm/", "/api/parent/", "/api/teacher/", "/api/student/"];
 const cookiePaymentMutations = new Set(["/api/payments/alfabank/create", "/api/payments/alfabank/status", "/api/payments/alfabank/return-status"]);
@@ -78,7 +79,7 @@ export async function middleware(request: NextRequest) {
 
   // Check authentication for protected paths
   const isCrmPath = pathname.startsWith("/crm");
-  const isTeacherPath = pathname.startsWith("/teacher");
+  const isTeacherPath = pathname === "/teacher" || pathname.startsWith("/teacher/");
   const isParentPath = pathname.startsWith("/parent");
   const isStudentPath = pathname.startsWith("/student");
   const isLoginPath = pathname === "/login";
@@ -152,17 +153,16 @@ export async function middleware(request: NextRequest) {
 
       // Restrict Teacher paths
       if (isTeacherPath) {
-        if (role === "teacher") {
-          return response;
-        } else if (role === "owner" || role === "admin" || role === "manager") {
-          return NextResponse.redirect(new URL("/crm", request.url));
-        } else if (isStudent) {
-          return NextResponse.redirect(new URL("/student", request.url));
-        } else if (isGuardian) {
-          return NextResponse.redirect(new URL("/parent", request.url));
-        } else {
-          return NextResponse.redirect(new URL("/login?error=role_check_failed", request.url));
-        }
+        const decision = resolveProtectedPortalAccess({
+          pathname,
+          role: role || null,
+          isGuardian,
+          isStudent,
+          hasTeacherPreview: request.nextUrl.searchParams.has("previewTeacherId"),
+        });
+        return decision.allow
+          ? response
+          : NextResponse.redirect(new URL(decision.redirectTo, request.url));
       }
 
       // Restrict Parent paths

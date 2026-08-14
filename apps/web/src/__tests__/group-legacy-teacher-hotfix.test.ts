@@ -8,6 +8,8 @@ import {
   scheduleValidationPayload,
 } from "@/features/scheduling/schemas";
 import {
+  countActiveGroups,
+  groupStatusLabel,
   groupStatuses,
   normalizeGroupStatus,
   parseScheduleText,
@@ -85,6 +87,29 @@ describe("group legacy teacher hotfix", () => {
     ]);
   });
 
+  it("never invents a Monday 18:00 schedule", () => {
+    expect(parseScheduleText("")).toEqual([]);
+    expect(parseScheduleText("Не задано")).toEqual([]);
+    expect(() => parseScheduleText("невалидный текст")).toThrow("Некорректный формат расписания");
+  });
+
+  it("uses correct shared status labels", () => {
+    expect(groupStatusLabel("active")).toBe("Активна");
+    expect(groupStatusLabel("draft")).toBe("Черновик");
+    expect(groupStatusLabel("paused")).toBe("Приостановлена");
+    expect(groupStatusLabel("closed")).toBe("Закрыта");
+    expect(groupStatusLabel("active", true)).toBe("Архив");
+  });
+
+  it("counts only non-archived active groups", () => {
+    expect(countActiveGroups([
+      { status: "active", archivedAt: null },
+      { status: "draft", archivedAt: null },
+      { status: "paused", archivedAt: null },
+      { status: "active", archivedAt: "2026-08-14T00:00:00Z" },
+    ])).toBe(1);
+  });
+
   it("preserves all editable group statuses", () => {
     expect(groupStatuses).toEqual(["active", "draft", "paused", "closed"]);
     for (const status of groupStatuses) expect(normalizeGroupStatus(status)).toBe(status);
@@ -94,6 +119,7 @@ describe("group legacy teacher hotfix", () => {
     const groupsPage = read("src/app/(crm)/crm/groups/page.tsx");
     expect(groupsPage).toContain("setEditStatus(normalizeGroupStatus(group.status))");
     expect(groupsPage).toContain("status: editStatus");
+    expect(groupsPage).toContain("scheduleChanged ? rules : undefined");
     for (const label of ["Активная", "Черновик", "Приостановлена", "Закрыта"]) {
       expect(groupsPage).toContain(label);
     }

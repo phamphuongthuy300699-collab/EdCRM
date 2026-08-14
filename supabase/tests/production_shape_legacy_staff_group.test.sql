@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(15);
 
 select ok(
   exists(select 1 from public.profiles where id = 'a2222222-e222-3333-4444-555555555555'),
@@ -54,6 +54,27 @@ select is(
   (select count(*)::integer from public.group_schedule_rules where group_id = 'fc65dfe3-934f-423f-a8f9-07319c37a0a1'),
   0,
   'production-shape group may start without schedule rules'
+);
+
+select lives_ok(
+  $$select public.save_group_with_schedule(
+    'a3848a60-a292-491a-85eb-7f2824cf4e77',
+    'fc65dfe3-934f-423f-a8f9-07319c37a0a1',
+    '{"title":"1 группа (соревновательная)","course_id":"95000000-0000-4000-8000-000000000010","status":"active"}'::jsonb,
+    null,
+    true
+  )$$,
+  'status-only save accepts an omitted schedule'
+);
+select is(
+  (select status::text from public.groups where id = 'fc65dfe3-934f-423f-a8f9-07319c37a0a1'),
+  'active',
+  'status-only save updates the group'
+);
+select is(
+  (select count(*)::integer from public.group_schedule_rules where group_id = 'fc65dfe3-934f-423f-a8f9-07319c37a0a1'),
+  0,
+  'status-only save leaves a zero-rule group without invented rules'
 );
 
 insert into auth.users (

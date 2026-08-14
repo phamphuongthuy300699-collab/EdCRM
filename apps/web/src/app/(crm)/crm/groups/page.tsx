@@ -10,6 +10,8 @@ import { StudentPicker } from "@/shared/ui/StudentPicker";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
 import { activeTeacherOptions, resolveTeacherName } from "@/features/staff/teachers";
 import {
+  countActiveGroups,
+  groupStatusLabel,
   normalizeGroupStatus,
   parseScheduleText,
   type GroupStatus,
@@ -66,6 +68,7 @@ export default function CrmGroupsPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editCourseId, setEditCourseId] = useState("");
   const [editSchedule, setEditSchedule] = useState("");
+  const [initialEditSchedule, setInitialEditSchedule] = useState("");
   const [editTeacherId, setEditTeacherId] = useState("");
   const [editStatus, setEditStatus] = useState<GroupStatus>("active");
   const [editCapacity, setEditCapacity] = useState("8");
@@ -366,6 +369,7 @@ export default function CrmGroupsPage() {
     setEditTitle(group.title);
     setEditCourseId(group.courseId || "");
     setEditSchedule(group.schedule);
+    setInitialEditSchedule(group.schedule);
     setEditTeacherId(group.teacherId || "");
     setEditStatus(normalizeGroupStatus(group.status));
     setEditCapacity(String(group.capacity));
@@ -386,7 +390,8 @@ export default function CrmGroupsPage() {
       const demo = isDemoMode();
       const isMockId = typeof editingGroupId === "string" && editingGroupId.startsWith("g");
 
-      const rules = parseScheduleText(editSchedule);
+      const scheduleChanged = editSchedule.trim() !== initialEditSchedule.trim();
+      const rules = scheduleChanged ? parseScheduleText(editSchedule) : [];
       const selCourse = courses.find(c => c.id === editCourseId);
       const selTeacher = teachers.find(t => t.id === editTeacherId);
 
@@ -398,7 +403,7 @@ export default function CrmGroupsPage() {
           courseId: editCourseId,
           teacherId: editTeacherId,
           status: editStatus,
-          schedule: formatScheduleRules(rules),
+          schedule: scheduleChanged ? formatScheduleRules(rules) : g.schedule,
           teacherName: selTeacher ? selTeacher.full_name : "Не назначен",
           ageRange: `${editAgeFrom}–${editAgeTo} лет`,
           ageFrom: parseInt(editAgeFrom, 10),
@@ -413,7 +418,7 @@ export default function CrmGroupsPage() {
       const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildGroupSaveOperation({
         groupId: editingGroupId,
         group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
-        rules,
+        rules: scheduleChanged ? rules : undefined,
         rebuildFuture: rebuildFutureSessions,
       })) });
       const result = await response.json();
@@ -569,7 +574,7 @@ export default function CrmGroupsPage() {
             Группы обучения
           </h1>
           <p style={{ fontSize: "var(--font-small)", color: "var(--color-text-muted)" }}>
-            Активных групп в филиале: {groups.filter(group => !group.archivedAt).length}
+            Активных групп в филиале: {countActiveGroups(groups)}
           </p>
         </div>
         <Button onClick={() => { setGroupFormError(""); setShowAddModal(true); }} variant="primary-crm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -641,7 +646,7 @@ export default function CrmGroupsPage() {
                 <span className="badge badge-gray" style={{ fontSize: "11px" }}>{group.courseName}</span>
               </div>
               <span className={`badge ${group.archivedAt ? "badge-gray" : group.status === "active" ? "badge-green" : "badge-amber"}`}>
-                {group.archivedAt ? "Архив" : group.status === "active" ? "Активна" : group.status === "closed" ? "Закрыта" : "Черновик"}
+                {groupStatusLabel(group.status, Boolean(group.archivedAt))}
               </span>
             </div>
 
@@ -817,7 +822,7 @@ export default function CrmGroupsPage() {
       )}
       {/* Details Drawer */}
       {selectedGroup && (
-        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedGroup.title}<span className={`badge ${selectedGroup.archivedAt ? "badge-gray" : selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>{selectedGroup.archivedAt ? "Архив" : selectedGroup.status === "active" ? "Активна" : selectedGroup.status === "closed" ? "Закрыта" : "Черновик"}</span></span>} description={`Курс: ${selectedGroup.courseName} · Преподаватель: ${selectedGroup.teacherName}`} onClose={() => setSelectedGroup(null)} width={520} variant="drawer">
+        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedGroup.title}<span className={`badge ${selectedGroup.archivedAt ? "badge-gray" : selectedGroup.status === "active" ? "badge-green" : "badge-amber"}`}>{groupStatusLabel(selectedGroup.status, Boolean(selectedGroup.archivedAt))}</span></span>} description={`Курс: ${selectedGroup.courseName} · Преподаватель: ${selectedGroup.teacherName}`} onClose={() => setSelectedGroup(null)} width={520} variant="drawer">
           {/* Group Details / Students List */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ background: "var(--color-bg)", padding: "16px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -942,11 +947,10 @@ export default function CrmGroupsPage() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Расписание (дни и время) *</label>
+                <label className="form-label">Расписание (дни и время)</label>
                 <input 
                   type="text" 
                   className="form-input" 
-                  required 
                   value={editSchedule}
                   onChange={(e) => setEditSchedule(e.target.value)}
                 />

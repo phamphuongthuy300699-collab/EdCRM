@@ -168,7 +168,7 @@ export async function POST(request: Request) {
           ...(input.group.showOnSite !== undefined ? { show_on_site: input.group.showOnSite } : {}),
           ...(input.group.sortOrder !== undefined ? { sort_order: input.group.sortOrder } : {}),
         },
-        p_rules: input.rules,
+        p_rules: input.rules ?? null,
         p_rebuild_future: input.rebuildFuture,
       });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
