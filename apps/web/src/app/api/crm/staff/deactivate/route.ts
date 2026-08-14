@@ -33,7 +33,7 @@ export async function POST(request: Request) {
        .eq("is_active", true);
      if (membershipError) throw membershipError;
 
-    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.userId, action: "deactivate_staff", entity_table: "org_memberships", entity_id: parsed.data.userId, metadata: { previousRole: currentMembership.role, result: "success" } });
+    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.staffProfileId, action: "deactivate_staff", entity_table: "org_memberships", entity_id: parsed.data.userId, metadata: { previousRole: currentMembership.role, result: "success" } });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

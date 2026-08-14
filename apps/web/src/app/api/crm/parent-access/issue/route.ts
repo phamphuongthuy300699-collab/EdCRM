@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
     await writeParentAccessAudit({
       organizationId: parsed.data.organizationId,
-      actorId: access.userId,
+      actorId: access.staffProfileId,
       action: existingLinks.length > 0 ? "parent_access_relinked" : "parent_access_issued",
       guardianId: parsed.data.guardianId,
       title: guardian.full_name,

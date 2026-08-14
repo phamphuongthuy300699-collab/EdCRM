@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     p_amount: Number(input.amount),
     p_due_date: input.dueDate,
     p_discount_assignment_id: input.discountAssignmentId || null,
-    p_created_by: access.userId === "demo-user" ? null : access.userId,
+    p_created_by: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
   }) as any);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       invoiceId: created.invoice.id,
       origin: new URL(request.url).origin,
       source: "crm_create_invoice_publish_now",
-      actorId: access.userId,
+      actorId: access.staffProfileId,
     });
   }
 

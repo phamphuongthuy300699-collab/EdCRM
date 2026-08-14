@@ -63,11 +63,11 @@ describe("lesson session lifecycle", () => {
     const page = read("src/app/teacher/page.tsx");
     const crmLesson = read("src/app/(crm)/crm/lessons/[sessionId]/page.tsx");
     expect(page).toContain("isDemoMode()");
-    expect(page).toContain("teacher_id = auth.uid()");
+    expect(page).toContain("canonical teacher profile");
     expect(page).not.toContain('.from("lesson_sessions").insert');
     expect(page).not.toContain('.from("lesson_sessions").update');
     expect(page).not.toContain("setGroups(demoGroups)");
-    expect(page).toContain('disabled={selected.status !== "live"}');
+    expect(page).toContain('disabled={readOnlyPreview || selected.status !== "live"}');
     expect(crmLesson).toContain('disabled={session.status !== "live"}');
   });
 });

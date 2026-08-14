@@ -23,33 +23,36 @@ export async function POST(request: Request) {
     }
     const organizationId = await resolveOrganizationId(access.organizationId);
     const admin = createSupabaseAdminClient();
-    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role").eq("organization_id", organizationId).eq("user_id", input.userId).eq("is_active", true).maybeSingle();
+    const { data: currentMembership } = await (admin.from("org_memberships") as any).select("role, is_active").eq("organization_id", organizationId).eq("user_id", input.userId).maybeSingle();
     if (!currentMembership) return NextResponse.json({ ok: false, error: "Сотрудник не найден в этой организации" }, { status: 404 });
     if (access.role !== "owner" && ["owner", "admin"].includes(currentMembership.role)) {
       return NextResponse.json({ ok: false, error: "Только владелец может изменять этого сотрудника" }, { status: 403 });
     }
 
-    const { data: targetIdentity, error: identityError } = await admin.auth.admin.getUserById(input.userId);
-    if (identityError || !targetIdentity.user) return NextResponse.json({ ok: false, error: "Учётная запись сотрудника не найдена" }, { status: 404 });
-    if (!isStaffIdentityOwnedByOrganization(targetIdentity.user, organizationId)) {
-      return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись без подтверждённого владения", code: "STAFF_IDENTITY_OWNERSHIP_REQUIRED" }, { status: 403 });
-    }
-    if (!await hasExclusiveStaffIdentityScope(admin, input.userId, organizationId)) {
-      return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись из CRM организации", code: "STAFF_IDENTITY_SHARED" }, { status: 403 });
-    }
-
-    try {
-      const { error: authError } = await admin.auth.admin.updateUserById(input.userId, {
-        email: input.email,
-        user_metadata: {
-          full_name: input.fullName,
-        },
-      });
-      if (authError) {
-        console.warn("Auth user update warning (non-fatal):", authError);
+    const { data: mapping } = await (admin.from("staff_auth_identities") as any)
+      .select("auth_user_id")
+      .eq("organization_id", organizationId)
+      .eq("staff_profile_id", input.userId)
+      .maybeSingle();
+    const targetAuthUserId = mapping?.auth_user_id as string | undefined;
+    if (targetAuthUserId) {
+      const { data: targetIdentity, error: identityError } = await admin.auth.admin.getUserById(targetAuthUserId);
+      if (identityError || !targetIdentity.user) return NextResponse.json({ ok: false, error: "Учётная запись сотрудника не найдена" }, { status: 404 });
+      if (!isStaffIdentityOwnedByOrganization(targetIdentity.user, organizationId)) {
+        return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись без подтверждённого владения", code: "STAFF_IDENTITY_OWNERSHIP_REQUIRED" }, { status: 403 });
       }
-    } catch (e) {
-      console.warn("Auth user update exception (non-fatal):", e);
+      if (!await hasExclusiveStaffIdentityScope(admin, targetAuthUserId, organizationId)) {
+        return NextResponse.json({ ok: false, error: "Нельзя изменять общую учётную запись из CRM организации", code: "STAFF_IDENTITY_SHARED" }, { status: 403 });
+      }
+
+      try {
+        const { error: authError } = await admin.auth.admin.updateUserById(targetAuthUserId, {
+          user_metadata: { full_name: input.fullName },
+        });
+        if (authError) console.warn("Auth user update warning (non-fatal):", authError);
+      } catch (error) {
+        console.warn("Auth user update exception (non-fatal):", error);
+      }
     }
 
     const { error: profileError } = await (admin.from("profiles") as any).upsert({
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
     );
     if (membershipError) throw membershipError;
 
-    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.userId, action: "update_staff", entity_table: "org_memberships", entity_id: input.userId, metadata: { role: input.role, result: "success" } });
+    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.staffProfileId, action: "update_staff", entity_table: "org_memberships", entity_id: input.userId, metadata: { role: input.role, result: "success" } });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

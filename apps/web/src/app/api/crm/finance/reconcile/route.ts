@@ -20,9 +20,9 @@ export async function POST(request: Request) {
   const admin = crmAdmin() as any;
 
   if (input.action === "lesson") {
-    const call = await admin.rpc("reconcile_lesson_finance", { p_organization_id: access.organizationId, p_lesson_session_id: input.lessonSessionId, p_actor_id: access.userId });
+    const call = await admin.rpc("reconcile_lesson_finance", { p_organization_id: access.organizationId, p_lesson_session_id: input.lessonSessionId, p_actor_id: access.staffProfileId });
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
-    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "historical_lesson_reconciliation", entityTable: "lesson_sessions", entityId: input.lessonSessionId });
+    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.staffProfileId, action: "historical_lesson_reconciliation", entityTable: "lesson_sessions", entityId: input.lessonSessionId });
     return NextResponse.json({ ok: true, result: call.data });
   }
 
@@ -32,10 +32,10 @@ export async function POST(request: Request) {
       p_guardian_id: input.guardianId,
       p_amount: input.amount,
       p_reason: "Начальный остаток при запуске CRM",
-      p_actor_id: access.userId,
+      p_actor_id: access.staffProfileId,
     });
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
-    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "opening_balance_reconciliation", entityTable: "billing_accounts", entityId: input.guardianId, metadata: { amount: input.amount } });
+    await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.staffProfileId, action: "opening_balance_reconciliation", entityTable: "billing_accounts", entityId: input.guardianId, metadata: { amount: input.amount } });
     return NextResponse.json({ ok: true, warning, result: call.data });
   }
 
@@ -45,6 +45,6 @@ export async function POST(request: Request) {
     if (call.error) return NextResponse.json({ ok: false, error: call.error.message, paymentId }, { status: 409 });
     results.push(call.data);
   }
-  await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.userId, action: "historical_payment_reconciliation", entityTable: "payments", metadata: { paymentCount: input.paymentIds.length } });
+  await writeSecurityAudit(admin, { organizationId: access.organizationId, actorId: access.staffProfileId, action: "historical_payment_reconciliation", entityTable: "payments", metadata: { paymentCount: input.paymentIds.length } });
   return NextResponse.json({ ok: true, warning, results });
 }

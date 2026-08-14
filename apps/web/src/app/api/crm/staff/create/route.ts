@@ -85,7 +85,20 @@ export async function POST(request: Request) {
     );
     if (membershipError) throw membershipError;
 
-    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.userId, action: "create_staff", entity_table: "org_memberships", entity_id: userId, metadata: { role: input.role, result: "success" } });
+    const { error: identityError } = await (admin.from("staff_auth_identities") as any).insert({
+      organization_id: organizationId,
+      staff_profile_id: userId,
+      auth_user_id: userId,
+      created_by: access.staffProfileId,
+    });
+    if (identityError) {
+      await (admin.from("org_memberships") as any).delete().eq("organization_id", organizationId).eq("user_id", userId);
+      await (admin.from("profiles") as any).delete().eq("id", userId);
+      await admin.auth.admin.deleteUser(userId);
+      throw identityError;
+    }
+
+    await (admin.from("crm_audit_log") as any).insert({ organization_id: organizationId, actor_id: access.staffProfileId, action: "create_staff", entity_table: "org_memberships", entity_id: userId, metadata: { role: input.role, result: "success" } });
 
     return NextResponse.json({ ok: true, userId, temporaryPassword: password });
   } catch (error: any) {

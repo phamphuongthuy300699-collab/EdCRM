@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     p_guardian_id: input.guardianId || null,
     p_student_id: input.studentId || null,
     p_lead_id: input.leadId || null,
-    p_actor_id: access.userId === "demo-user" ? null : access.userId,
+    p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
     p_type: input.type,
     p_result: input.result || null,
     p_summary: input.summary || null,
@@ -60,7 +60,7 @@ export async function PATCH(request: Request) {
   const { data, error } = await (admin.rpc("crm_complete_followup", {
     p_organization_id: access.organizationId,
     p_interaction_id: input.interactionId,
-    p_actor_id: access.userId === "demo-user" ? null : access.userId,
+    p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
   }) as any);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true, result: data, next_action_completed_at: data?.completed_at });

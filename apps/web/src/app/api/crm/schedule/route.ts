@@ -3,6 +3,7 @@ import { crmAdmin, requireCrmStaff } from "../_shared";
 import { materializeRuleOccurrences } from "@/features/scheduling/domain";
 import { enqueueScheduleNotifications } from "@/features/scheduling/server";
 import {
+  databaseUuidSchema,
   scheduleActionSchema,
   scheduleValidationPayload,
 } from "@/features/scheduling/schemas";
@@ -26,6 +27,26 @@ export async function GET(request: Request) {
   if (!access.ok) return access.response;
   const admin = crmAdmin();
   const url = new URL(request.url);
+  const previewTeacherId = url.searchParams.get("previewTeacherId");
+  let previewTeacher: { id: string; name: string } | null = null;
+  if (previewTeacherId) {
+    if (!databaseUuidSchema.safeParse(previewTeacherId).success) {
+      return NextResponse.json({ ok: false, error: "Некорректный преподаватель" }, { status: 400 });
+    }
+    if (!["owner", "admin"].includes(access.role)) {
+      return NextResponse.json({ ok: false, error: "Режим просмотра доступен администратору" }, { status: 403 });
+    }
+    const { data: previewMembership } = await admin.from("org_memberships")
+      .select("user_id, profiles(full_name)")
+      .eq("organization_id", access.organizationId)
+      .eq("user_id", previewTeacherId)
+      .eq("role", "teacher")
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!previewMembership) return NextResponse.json({ ok: false, error: "Преподаватель не найден" }, { status: 404 });
+    const profile = Array.isArray(previewMembership.profiles) ? previewMembership.profiles[0] : previewMembership.profiles;
+    previewTeacher = { id: previewTeacherId, name: profile?.full_name || "Преподаватель" };
+  }
   const dateFrom = url.searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);
   const dateTo = url.searchParams.get("dateTo") || new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10);
   const groupId = url.searchParams.get("groupId");
@@ -46,13 +67,14 @@ export async function GET(request: Request) {
     .lte("lesson_date", dateTo)
     .order("starts_at", { ascending: true });
   if (groupId) query = query.eq("group_id", groupId);
-  if (teacherId) query = query.eq("teacher_id", teacherId);
+  if (previewTeacherId) query = query.eq("teacher_id", previewTeacherId);
+  else if (teacherId) query = query.eq("teacher_id", teacherId);
   if (roomId) query = query.eq("room_id", roomId);
   if (status) query = query.eq("status", status);
   if (sessionKind) query = query.eq("session_kind", sessionKind);
   if (visibleGroupIds) query = visibleGroupIds.length ? query.in("group_id", visibleGroupIds) : query.eq("group_id", "00000000-0000-0000-0000-000000000000");
   if (access.role === "teacher") {
-    query = query.eq("teacher_id", access.userId);
+    query = query.eq("teacher_id", access.staffProfileId);
   }
   const { data: sessions, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -80,7 +102,8 @@ export async function GET(request: Request) {
     return { ...session, studentCount: studentIds.size };
   });
   let groupsQuery = admin.from("groups").select("id, title, branch_id, teacher_id, room_id").eq("organization_id", access.organizationId).eq("status", "active").order("title");
-  if (access.role === "teacher") groupsQuery = groupsQuery.eq("teacher_id", access.userId);
+  if (previewTeacherId) groupsQuery = groupsQuery.eq("teacher_id", previewTeacherId);
+  if (access.role === "teacher") groupsQuery = groupsQuery.eq("teacher_id", access.staffProfileId);
   const [{ data: groups }, { data: teacherMemberships }, { data: branches }, { data: rooms }] = await Promise.all([
     groupsQuery,
     admin.from("org_memberships").select("user_id, profiles(full_name)").eq("organization_id", access.organizationId).eq("role", "teacher").eq("is_active", true),
@@ -89,7 +112,7 @@ export async function GET(request: Request) {
   ]);
   const teachers = (teacherMemberships || []).map((membership: any) => ({ id: membership.user_id, name: Array.isArray(membership.profiles) ? membership.profiles[0]?.full_name : membership.profiles?.full_name })).filter((teacher: any) => teacher.name);
   const { data: botSettings } = await admin.from("bot_settings").select("settings").eq("organization_id", access.organizationId).eq("provider", "max").maybeSingle();
-  return NextResponse.json({ ok: true, sessions: sessionsWithStudentCount, makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
+  return NextResponse.json({ ok: true, sessions: sessionsWithStudentCount, makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], previewTeacher, notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
 }
 
 export async function POST(request: Request) {
@@ -112,7 +135,7 @@ export async function POST(request: Request) {
       const { data, error } = await admin.rpc("transition_lesson_session", {
         p_organization_id: access.organizationId,
         p_session_id: input.sessionId,
-        p_actor_id: access.userId,
+        p_actor_id: access.staffProfileId,
         p_action: input.action === "start_session" ? "start" : "complete",
         p_is_admin: adminRoles.has(access.role),
       });
@@ -304,7 +327,7 @@ export async function POST(request: Request) {
       if (assignment.status === "scheduled" && assignment.target_session_id === target.id) return NextResponse.json({ ok: true, unchanged: true });
       if (!["requested", "approved", "scheduled"].includes(assignment.status)) return NextResponse.json({ ok: false, error: "Эту отработку уже нельзя переназначить" }, { status: 409 });
       if (target.status !== "planned" || new Date(target.starts_at) <= new Date()) return NextResponse.json({ ok: false, error: "Отработку можно назначить только на предстоящее занятие" }, { status: 409 });
-      const { error } = await admin.from("makeup_assignments").update({ target_session_id: target.id, status: "scheduled", notes: input.notes || null, approved_by: access.userId, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", access.organizationId).eq("id", assignment.id);
+      const { error } = await admin.from("makeup_assignments").update({ target_session_id: target.id, status: "scheduled", notes: input.notes || null, approved_by: access.staffProfileId, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", access.organizationId).eq("id", assignment.id);
       if (error) throw error;
       await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "makeup_scheduled", lessonSessionId: target.id, studentId: assignment.student_id, payload: { groupTitle: target.groups?.title, startsAt: target.starts_at } });
       return NextResponse.json({ ok: true });
@@ -313,7 +336,7 @@ export async function POST(request: Request) {
     const { data: saveResult, error: saveError } = await admin.rpc("save_lesson_attendance", {
       p_organization_id: access.organizationId,
       p_session_id: input.sessionId,
-      p_actor_id: access.userId,
+      p_actor_id: access.staffProfileId,
       p_is_admin: adminRoles.has(access.role),
       p_records: input.records.map((record) => ({ student_id: record.studentId, status: record.status, comment: record.comment || null, absence_reason: record.absenceReason || null })),
     });

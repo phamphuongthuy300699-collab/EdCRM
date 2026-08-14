@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const { data, error } = await (admin as any).rpc("settle_manual_invoice", {
     p_organization_id: access.organizationId,
     p_invoice_id: parsed.data.invoiceId,
-    p_actor_id: access.userId,
+    p_actor_id: access.staffProfileId,
   });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
   return NextResponse.json({ ok: true, result: data });

@@ -141,14 +141,14 @@ export async function POST(request: Request) {
   const admin = crmAdmin() as any;
   const input = parsed.data;
   const call = input.action === "adjust"
-    ? await admin.rpc("apply_billing_adjustment", { p_organization_id: access.organizationId, p_guardian_id: input.guardianId, p_amount: input.amount, p_reason: input.reason, p_actor_id: access.userId })
+    ? await admin.rpc("apply_billing_adjustment", { p_organization_id: access.organizationId, p_guardian_id: input.guardianId, p_amount: input.amount, p_reason: input.reason, p_actor_id: access.staffProfileId })
     : input.action === "payroll"
-      ? await admin.rpc("transition_teacher_payroll", { p_organization_id: access.organizationId, p_entry_id: input.entryId, p_status: input.status, p_actor_id: access.userId })
-      : await admin.rpc("transition_teacher_payroll_period", { p_organization_id: access.organizationId, p_teacher_id: input.teacherId, p_month: input.month, p_status: input.status, p_actor_id: access.userId });
+      ? await admin.rpc("transition_teacher_payroll", { p_organization_id: access.organizationId, p_entry_id: input.entryId, p_status: input.status, p_actor_id: access.staffProfileId })
+      : await admin.rpc("transition_teacher_payroll_period", { p_organization_id: access.organizationId, p_teacher_id: input.teacherId, p_month: input.month, p_status: input.status, p_actor_id: access.staffProfileId });
   if (call.error) return NextResponse.json({ ok: false, error: call.error.message }, { status: 409 });
   await writeSecurityAudit(admin, {
     organizationId: access.organizationId,
-    actorId: access.userId,
+    actorId: access.staffProfileId,
     action: input.action === "adjust" ? "billing_manual_adjustment" : "teacher_payroll_transition",
     entityTable: input.action === "adjust" ? "billing_accounts" : "teacher_payroll_entries",
     entityId: input.action === "adjust" ? input.guardianId : input.action === "payroll" ? input.entryId : input.teacherId,

@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
   await writeSecurityAudit(admin, {
     organizationId: access.organizationId,
-    actorId: access.userId,
+    actorId: access.staffProfileId,
     action: "update_max_provider_settings",
     entityTable: "bot_settings",
     metadata: {

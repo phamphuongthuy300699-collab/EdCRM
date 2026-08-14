@@ -53,8 +53,9 @@ describe("staff settings contracts", () => {
     expect(page).toContain("За занятие");
     expect(page).toContain("staffAccessState[person.user_id]");
     expect(page).toContain("Нет доступа в ЛК");
-    expect(listRoute).toContain("admin.auth.admin.listUsers");
-    expect(listRoute).toContain("hasAuthAccount: authUserIds.has(membership.user_id)");
+    expect(listRoute).toContain('.from("staff_auth_identities")');
+    expect(listRoute).not.toContain("admin.auth.admin.listUsers");
+    expect(listRoute).toContain("hasAuthAccount: portalProfileIds.has(membership.user_id)");
   });
 
   it("keeps a newly issued password visible when saving the teacher rate fails", () => {

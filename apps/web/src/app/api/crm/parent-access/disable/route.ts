@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     await writeParentAccessAudit({
       organizationId: parsed.data.organizationId,
-      actorId: access.userId,
+      actorId: access.staffProfileId,
       action: "parent_access_disabled",
       guardianId: parsed.data.guardianId,
       title: guardian.full_name,

@@ -315,6 +315,7 @@ export default function CrmSettingsPage() {
   const [scheduleDraft, setScheduleDraft] = useState<any[]>([]);
   const [rebuildFutureSessions, setRebuildFutureSessions] = useState(true);
   const [staffDraft, setStaffDraft] = useState<any | null>(null);
+  const [staffAccessDraft, setStaffAccessDraft] = useState<{ person: any; loginEmail: string } | null>(null);
   const [staffError, setStaffError] = useState("");
   const [uploadingStaffAvatar, setUploadingStaffAvatar] = useState(false);
   const [uploadingCourseImage, setUploadingCourseImage] = useState(false);
@@ -1148,7 +1149,7 @@ export default function CrmSettingsPage() {
       const response = await fetch("/api/crm/staff/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId: org.id, userId: person.user_id }),
+        body: JSON.stringify({ organizationId: org.id, staffProfileId: person.user_id }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сбросить пароль");
@@ -1158,19 +1159,39 @@ export default function CrmSettingsPage() {
     }
   }
 
-  function explainLegacyStaffAccess(person: any) {
-    setStaffAccessState((current) => ({
-      ...current,
-      [person.user_id]: {
-        error: "Для сотрудника ещё не создан доступ в личный кабинет. Автоматическое связывание legacy-профиля отложено из-за связанных записей; создайте нового сотрудника обычным способом.",
-      },
-    }));
+  async function provisionLegacyStaffAccess(event: React.FormEvent) {
+    event.preventDefault();
+    if (!staffAccessDraft) return;
+    const person = staffAccessDraft.person;
+    const key = person.user_id;
+    try {
+      setStaffAccessState((current) => ({ ...current, [key]: { loading: true } }));
+      const response = await fetch("/api/crm/staff/provision-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: org.id,
+          staffProfileId: person.user_id,
+          loginEmail: staffAccessDraft.loginEmail,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось создать доступ");
+      await loadData();
+      setStaffAccessState((current) => ({
+        ...current,
+        [key]: { message: "Доступ в ЛК создан", temporaryPassword: payload.temporaryPassword },
+      }));
+      setStaffAccessDraft(null);
+    } catch (err: any) {
+      setStaffAccessState((current) => ({ ...current, [key]: { error: err.message || "Не удалось создать доступ" } }));
+    }
   }
 
   async function deactivateStaff(person: any) {
     const allowed = await askAction({
-      title: "Деактивировать доступ",
-      description: `Сотрудник "${person.full_name || person.email}" потеряет доступ к CRM и будет скрыт с сайта.`,
+      title: "Деактивировать сотрудника",
+      description: `Сотрудник "${person.full_name || person.email}" потеряет доступ к CRM. Профиль и история сохранятся.`,
       dangerLevel: "danger",
       confirmText: "Деактивировать",
     });
@@ -1185,7 +1206,7 @@ export default function CrmSettingsPage() {
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось деактивировать доступ");
       if (demo) setStaff((prev) => prev.map((item) => item.user_id === person.user_id ? { ...item, is_active: false, show_on_site: false } : item));
       else await loadData();
-      setNotice("Доступ деактивирован");
+      setNotice("Сотрудник деактивирован");
     } catch (err: any) {
       setError(err.message || "Не удалось деактивировать доступ");
     }
@@ -1767,8 +1788,8 @@ export default function CrmSettingsPage() {
                       </div>
                       <div className="settings-actions">
                         <span className="badge badge-blue">{roleLabels[person.role] || person.role}</span>
-                        <span className={`badge ${person.is_active ? "badge-green" : "badge-gray"}`}>{person.is_active ? "Доступ активен" : "Доступ выключен"}</span>
-                        {!hasAuthAccount && <span className="badge badge-amber">Нет доступа в ЛК</span>}
+                        <span className={`badge ${person.is_active ? "badge-green" : "badge-gray"}`}>{person.is_active ? "Сотрудник активен" : "Сотрудник неактивен"}</span>
+                        {hasAuthAccount ? <span className="badge badge-green">ЛК активен</span> : <span className="badge badge-amber">Нет доступа в ЛК</span>}
                         <span className={`badge ${person.show_on_site ? "badge-green" : "badge-gray"}`}>{person.show_on_site ? "На сайте" : "Скрыт"}</span>
                       </div>
                     </div>
@@ -1805,10 +1826,15 @@ export default function CrmSettingsPage() {
                       >
                         Редактировать
                       </Button>
+                      {person.role === "teacher" && person.is_active && (
+                        <Button type="button" variant="secondary-crm" onClick={() => window.open(`/teacher?previewTeacherId=${encodeURIComponent(person.user_id)}`, "_blank", "noopener,noreferrer")}>
+                          <Eye size={14} /> Открыть кабинет
+                        </Button>
+                      )}
                       {hasAuthAccount ? (
                         <Button type="button" variant="secondary-crm" disabled={accessState.loading} onClick={() => resetStaffPassword(person)}><KeyRound size={14} /> {accessState.loading ? "Сброс..." : "Сбросить пароль"}</Button>
                       ) : (
-                        <Button type="button" variant="secondary-crm" onClick={() => explainLegacyStaffAccess(person)}><KeyRound size={14} /> Создать доступ</Button>
+                        <Button type="button" variant="secondary-crm" onClick={() => setStaffAccessDraft({ person, loginEmail: "" })}><KeyRound size={14} /> Создать доступ</Button>
                       )}
                       <Button type="button" variant="secondary-crm" onClick={() => deactivateStaff(person)}><ShieldCheck size={14} /> Деактивировать</Button>
                     </div>
@@ -2449,6 +2475,31 @@ export default function CrmSettingsPage() {
             <Field label="Внутренний комментарий"><TextArea value={staffDraft.internalComment} onChange={(e) => setStaffDraft({ ...staffDraft, internalComment: e.target.value })} /></Field>
             <Toggle checked={staffDraft.showOnSite} onChange={(checked) => setStaffDraft({ ...staffDraft, showOnSite: checked })} label="Показывать на сайте" />
             <div className="settings-form-actions"><Button type="submit" variant="primary-crm" disabled={saving}>{saving ? "Сохранение..." : "Сохранить сотрудника"}</Button></div>
+          </form>
+        </Modal>
+      )}
+      {staffAccessDraft && (
+        <Modal title="Создать доступ в кабинет" onClose={() => setStaffAccessDraft(null)} width={520}>
+          <form onSubmit={provisionLegacyStaffAccess} className="settings-card-list">
+            <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: 13 }}>
+              Канонический профиль «{staffAccessDraft.person.full_name || "Сотрудник"}» и связанные занятия останутся без изменений. Укажите отдельный логин для Supabase Auth.
+            </p>
+            <Field label="Email / логин для ЛК">
+              <TextInput
+                type="email"
+                required
+                autoFocus
+                value={staffAccessDraft.loginEmail}
+                onChange={(event) => setStaffAccessDraft({ ...staffAccessDraft, loginEmail: event.target.value })}
+                placeholder="teacher.portal@example.ru"
+              />
+            </Field>
+            <div className="settings-form-actions">
+              <Button type="button" variant="secondary-crm" onClick={() => setStaffAccessDraft(null)}>Отмена</Button>
+              <Button type="submit" variant="primary-crm" disabled={staffAccessState[staffAccessDraft.person.user_id]?.loading}>
+                {staffAccessState[staffAccessDraft.person.user_id]?.loading ? "Создание…" : "Создать доступ"}
+              </Button>
+            </div>
           </form>
         </Modal>
       )}

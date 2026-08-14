@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     p_organization_id: access.organizationId,
     p_master_guardian_id: input.masterGuardianId,
     p_duplicate_guardian_id: input.duplicateGuardianId,
-    p_actor_id: access.userId === "demo-user" ? null : access.userId,
+    p_actor_id: access.staffProfileId === "demo-staff" ? null : access.staffProfileId,
   }) as any);
 
   if (error) {

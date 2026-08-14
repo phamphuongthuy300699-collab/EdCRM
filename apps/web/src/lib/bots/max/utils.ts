@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 const staffRoles = new Set(["owner", "admin", "manager"]);
 
@@ -58,15 +59,11 @@ export async function requireBotStaff() {
   if (!user) {
     return { ok: false as const, response: NextResponse.json({ ok: false, error: "Необходима авторизация" }, { status: 401 }) };
   }
-  const { data: membership } = await (supabase.from("org_memberships") as any)
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-  if (!membership?.role || !staffRoles.has(membership.role)) {
+  const context = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
+  if (!context || !staffRoles.has(context.role)) {
     return { ok: false as const, response: NextResponse.json({ ok: false, error: "Недостаточно прав" }, { status: 403 }) };
   }
-  return { ok: true as const, userId: user.id, organizationId: membership.organization_id, role: membership.role };
+  return { ok: true as const, ...context };
 }
 
 export async function canProcessNotificationsWithRequest(request: Request) {

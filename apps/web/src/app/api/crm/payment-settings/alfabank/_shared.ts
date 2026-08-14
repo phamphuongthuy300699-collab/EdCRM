@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
+import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 export async function requirePaymentAdmin() {
   if (isDemoAuthBypassAllowed()) {
-    return { ok: true as const, userId: "demo-user", organizationId: "demo-org" };
+    return { ok: true as const, authUserId: "demo-auth", staffProfileId: "demo-staff", organizationId: "demo-org", role: "admin" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -19,18 +21,14 @@ export async function requirePaymentAdmin() {
     };
   }
 
-  const { data: membership } = await (supabase.from("org_memberships") as any)
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const context = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
 
-  if (!membership || !["owner", "admin"].includes(membership.role)) {
+  if (!context || !["owner", "admin"].includes(context.role)) {
     return {
       ok: false as const,
       response: NextResponse.json({ ok: false, error: "Недостаточно прав" }, { status: 403 }),
     };
   }
 
-  return { ok: true as const, userId: user.id, organizationId: membership.organization_id as string };
+  return { ok: true as const, ...context };
 }

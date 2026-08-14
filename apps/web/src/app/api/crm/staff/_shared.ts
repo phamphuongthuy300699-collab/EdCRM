@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/shared/db/supabase/admin";
 import { createSupabaseServerClient } from "@/shared/db/supabase/server";
 import { isDemoAuthBypassAllowed } from "@/shared/utils/demo-auth";
 import { temporaryPortalPassword } from "@/shared/utils/passwords";
+import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 export const staffRoleSchema = z.enum(["owner", "admin", "manager", "teacher", "accountant"]);
 export const postgresUuidSchema = z.string().regex(
@@ -39,9 +40,18 @@ export const userIdPayloadSchema = z.object({
   organizationId: postgresUuidSchema.optional(),
 }).strict();
 
+export const staffProfileIdPayloadSchema = z.object({
+  staffProfileId: postgresUuidSchema,
+  organizationId: postgresUuidSchema.optional(),
+}).strict();
+
+export const provisionStaffAccessSchema = staffProfileIdPayloadSchema.extend({
+  loginEmail: z.string().trim().email(),
+}).strict();
+
 export async function requireStaffAdmin() {
   if (isDemoAuthBypassAllowed()) {
-    return { ok: true as const, organizationId: "demo-org" };
+    return { ok: true as const, authUserId: "demo-auth", staffProfileId: "demo-staff", organizationId: "demo-org", role: "admin" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -56,20 +66,16 @@ export async function requireStaffAdmin() {
     };
   }
 
-  const { data: membership } = await (supabase.from("org_memberships") as any)
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const context = await loadStaffAuthContext(createSupabaseAdminClient(), user.id);
 
-  if (!membership || !["owner", "admin"].includes(membership.role)) {
+  if (!context || !["owner", "admin"].includes(context.role)) {
     return {
       ok: false as const,
       response: NextResponse.json({ ok: false, error: "Недостаточно прав" }, { status: 403 }),
     };
   }
 
-  return { ok: true as const, userId: user.id, organizationId: membership.organization_id as string, role: membership.role as string };
+  return { ok: true as const, ...context };
 }
 
 export async function resolveOrganizationId(preferred?: string) {
@@ -127,6 +133,7 @@ export async function hasExclusiveStaffIdentityScope(
     (admin.from("org_memberships") as any).select("organization_id").eq("user_id", userId),
     (admin.from("guardian_users") as any).select("organization_id").eq("user_id", userId),
     (admin.from("student_users") as any).select("organization_id").eq("user_id", userId),
+    (admin.from("staff_auth_identities") as any).select("organization_id").eq("auth_user_id", userId),
   ]);
   if (results.some((result) => result.error)) return false;
   return identityOrganizationsAreExclusive(

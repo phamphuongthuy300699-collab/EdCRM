@@ -26,7 +26,7 @@ describe("operational schedule", () => {
   it("applies organization-scoped API filters", () => {
     const route = read("src/app/api/crm/schedule/route.ts");
     for (const field of ["teacherId", "branchId", "roomId", "status", "sessionKind"]) expect(route).toContain(field);
-    expect(route).toContain('.eq("teacher_id", access.userId)');
+    expect(route).toContain('.eq("teacher_id", access.staffProfileId)');
   });
 
   it("blocks rule conflicts independently from future rebuilding", () => {

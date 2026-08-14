@@ -188,7 +188,7 @@ export async function POST(request: Request) {
 
     await writeSecurityAudit(admin, {
       organizationId,
-      actorId: access.userId,
+      actorId: access.staffProfileId,
       action: "update_payment_provider_settings",
       entityTable: "payment_provider_settings",
       metadata: { provider: "alfabank", enabled: input.enabled, mode: input.mode, passwordChanged: Boolean(input.apiPassword?.trim()) },

@@ -18,8 +18,8 @@ describe("representative BOLA defenses", () => {
   it("limits teachers to their own lesson and payroll", () => {
     const lesson = read("app/api/crm/schedule/session/[sessionId]/route.ts");
     const payroll = read("app/api/teacher/payroll/route.ts");
-    expect(lesson).toContain('access.role === "teacher" && session.teacher_id !== access.userId');
-    expect(payroll).toContain('.eq("teacher_id", access.userId)');
+    expect(lesson).toContain('access.role === "teacher" && session.teacher_id !== access.staffProfileId');
+    expect(payroll).toContain('.eq("teacher_id", access.staffProfileId)');
   });
 
   it("derives guardian children/accounts from guardian_users rather than request IDs", () => {

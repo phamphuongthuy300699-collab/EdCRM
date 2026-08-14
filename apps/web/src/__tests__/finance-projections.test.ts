@@ -26,7 +26,7 @@ describe("role-specific finance projections", () => {
     expect(parentRoute).not.toContain("teacher_payroll_entries");
     expect(teacherRoute).toContain('from("teacher_payroll_entries")');
     expect(teacherRoute).toContain("pay_mode");
-    expect(teacherRoute).toContain("access.userId");
+    expect(teacherRoute).toContain("access.staffProfileId");
     expect(parentPage).toContain("Текущий баланс");
     expect(teacherPage).toContain("Мои начисления");
     expect(teacherPage).toContain("Фикс за занятие");
