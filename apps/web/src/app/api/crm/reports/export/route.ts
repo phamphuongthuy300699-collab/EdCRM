@@ -3,6 +3,7 @@ import { csvResponse } from "@/lib/finance/csv";
 import { DEFAULT_ORGANIZATION_TIMEZONE, localDate } from "@/lib/reports/date-range";
 import { buildReportScope, reportFilters } from "@/lib/reports/report-scope";
 import { crmAdmin, requireCrmStaff } from "../../_shared";
+import { loadPayrollTeacherNames } from "@/lib/finance/payroll-teachers";
 
 const roles = new Set(["owner", "admin", "accountant", "manager"]);
 const related = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -42,11 +43,18 @@ export async function GET(request: Request) {
     }
 
     const { data, error } = ids.length
-      ? await admin.from("teacher_payroll_entries").select("pay_mode, attendee_count, rate_snapshot, amount, status, profiles(full_name), lesson_sessions!inner(id, lesson_date, groups(title))").eq("organization_id", access.organizationId).in("lesson_session_id", ids).order("created_at")
+      ? await admin.from("teacher_payroll_entries").select("teacher_id, pay_mode, attendee_count, rate_snapshot, amount, status, lesson_sessions!inner(id, lesson_date, groups(title))").eq("organization_id", access.organizationId).in("lesson_session_id", ids).order("created_at")
       : { data: [], error: null };
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    let teacherNames: Map<string, string>;
+    try {
+      teacherNames = await loadPayrollTeacherNames(admin, access.organizationId, (data || []).map((row: any) => row.teacher_id));
+    } catch (teacherError) {
+      console.error("[crm/reports/export] payroll teacher lookup failed", teacherError);
+      return NextResponse.json({ ok: false, error: "Не удалось выгрузить начисления преподавателям" }, { status: 500 });
+    }
     return csvResponse("payroll.csv", ["Преподаватель", "Дата", "Группа", "Схема", "Посетили", "Ставка", "Начислено", "Статус"], (data || []).map((row: any) => [
-      related(row.profiles)?.full_name || "", related(row.lesson_sessions)?.lesson_date || "", related(related(row.lesson_sessions)?.groups)?.title || "", row.pay_mode === "per_lesson" ? "За занятие" : "За ученика", row.attendee_count, row.rate_snapshot, row.amount, row.status,
+      teacherNames.get(row.teacher_id) || "Преподаватель", related(row.lesson_sessions)?.lesson_date || "", related(related(row.lesson_sessions)?.groups)?.title || "", row.pay_mode === "per_lesson" ? "За занятие" : "За ученика", row.attendee_count, row.rate_snapshot, row.amount, row.status,
     ]));
   }
 

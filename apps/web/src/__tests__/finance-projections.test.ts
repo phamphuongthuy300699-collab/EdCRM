@@ -39,11 +39,12 @@ describe("role-specific finance projections", () => {
     expect(route).not.toContain("student_wallet");
   });
 
-  it("returns real session headcount and includes legacy null student status on dashboard", () => {
+  it("returns real session headcount and counts only canonical active students on dashboard", () => {
     const schedule = read("src/app/api/crm/schedule/route.ts");
     const dashboard = read("src/app/api/crm/dashboard/route.ts");
     expect(schedule).toContain("studentCount");
     expect(schedule).toContain("new Set");
-    expect(dashboard).toContain('or("status.eq.active,status.is.null")');
+    expect(dashboard).toContain('.eq("status", "active")');
+    expect(dashboard).not.toContain('status.is.null');
   });
 });

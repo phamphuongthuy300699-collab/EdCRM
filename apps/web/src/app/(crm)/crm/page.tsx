@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Button } from "@robotics-crm/ui";
 import Link from "next/link";
 import { 
@@ -17,34 +17,38 @@ import {
 } from "lucide-react";
 import { isDemoMode } from "@/shared/utils/demo";
 
+type DashboardStats = {
+  newLeadsCount: number;
+  newLeadsToday: number;
+  overdueAmount: number;
+  overdueCount: number;
+  activeGroupsCount: number;
+  activeStudentsCount: number;
+  withoutGroup: number;
+  totalCapacity: number;
+  enrolledCount: number;
+  todayCompleted: number;
+  todayRemaining: number;
+  parentDebt: number;
+  monthPayroll: number;
+};
+
 export default function CrmDashboard() {
   const demoMode = isDemoMode();
   const [loading, setLoading] = useState(true);
-  const [statsData, setStatsData] = useState({
-    newLeadsCount: 0,
-    newLeadsToday: 0,
-    overdueAmount: 0,
-    overdueCount: 0,
-    activeGroupsCount: 0,
-    activeStudentsCount: 0,
-    withoutGroup: 0,
-    totalCapacity: 0,
-    enrolledCount: 0,
-    todayCompleted: 0,
-    todayRemaining: 0,
-    parentDebt: 0,
-    monthPayroll: 0
-  });
+  const [statsData, setStatsData] = useState<DashboardStats | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [partial, setPartial] = useState(false);
 
   // Lists state (empty by default)
   const [leads, setLeads] = useState<any[]>([]);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
 
-  useEffect(() => {
-    async function loadDashboardData() {
+  const loadDashboardData = useCallback(async () => {
       try {
         setLoading(true);
+        setLoadError("");
 
         if (demoMode) {
           setLeads([
@@ -85,18 +89,35 @@ export default function CrmDashboard() {
         setLeads(payload.leads || []);
         setSchedule(payload.sessions || []);
         setInvoices(payload.invoices || []);
+        setPartial(Boolean(payload.partial));
       } catch (err) {
         console.error("Error loading dashboard data:", err);
-        setLeads([]);
-        setSchedule([]);
-        setInvoices([]);
+        setLoadError(err instanceof Error ? err.message : "Не удалось загрузить данные рабочего стола");
       } finally {
         setLoading(false);
       }
-    }
-
-    loadDashboardData();
   }, [demoMode]);
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, [loadDashboardData]);
+
+  if (!statsData) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <h1 style={{ fontSize: "var(--font-h2)", fontFamily: "var(--font-geologica)" }}>Рабочий стол</h1>
+        {loading ? (
+          <div className="card-crm">Загрузка данных рабочего стола…</div>
+        ) : (
+          <div className="card-crm" role="alert" style={{ display: "grid", gap: 12 }}>
+            <strong>Не удалось загрузить данные рабочего стола</strong>
+            <span>{loadError}</span>
+            <Button variant="primary-crm" onClick={() => void loadDashboardData()}>Повторить</Button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const stats = [
     { name: "Новые заявки", value: String(statsData.newLeadsCount), icon: Inbox, color: "var(--color-primary)", bg: "var(--color-primary-soft)", desc: `+${statsData.newLeadsToday} новые за сегодня` },
@@ -107,6 +128,8 @@ export default function CrmDashboard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      {loadError && <div className="card-crm" role="alert">Не удалось обновить данные. Показаны последние успешно загруженные значения. <Button onClick={() => void loadDashboardData()}>Повторить</Button></div>}
+      {partial && <div className="card-crm" role="status">Часть оперативных списков временно недоступна. Основные показатели рассчитаны корректно.</div>}
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>

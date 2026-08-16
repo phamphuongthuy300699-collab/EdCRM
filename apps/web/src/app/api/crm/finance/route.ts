@@ -3,6 +3,7 @@ import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
 import { databaseUuidSchema } from "@/features/scheduling/schemas";
 import { writeSecurityAudit } from "@/lib/security/audit";
+import { loadPayrollTeacherNames } from "@/lib/finance/payroll-teachers";
 
 const readRoles = new Set(["owner", "admin", "accountant", "manager"]);
 const writeRoles = new Set(["owner", "admin", "accountant"]);
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
     if (view === "payroll") {
       const month = searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
       let query = admin.from("teacher_payroll_entries")
-        .select("id, teacher_id, pay_mode, attendee_count, rate_snapshot, amount, status, created_at, lesson_sessions!inner(lesson_date, starts_at, group_id, groups(title)), profiles(full_name)", { count: "exact" })
+        .select("id, teacher_id, pay_mode, attendee_count, rate_snapshot, amount, status, created_at, lesson_sessions!inner(lesson_date, starts_at, group_id, groups(title))", { count: "exact" })
         .eq("organization_id", access.organizationId).order("created_at", { ascending: false });
       if (dateFrom) query = query.gte("lesson_sessions.lesson_date", dateFrom);
       if (dateTo) query = query.lte("lesson_sessions.lesson_date", dateTo);
@@ -93,8 +94,19 @@ export async function GET(request: Request) {
         query.range(from, to),
         admin.rpc("finance_payroll_month_summary", { p_organization_id: access.organizationId, p_month: month }),
       ]);
-      if (error || summaryCall.error) throw error || summaryCall.error;
-      return NextResponse.json({ ok: true, canManage, view, summary: summaryCall.data || [], ...paged(data, count, page, pageSize) });
+      if (error || summaryCall.error) {
+        console.error("[crm/finance] payroll load failed", error || summaryCall.error);
+        return NextResponse.json({ ok: false, error: "Не удалось загрузить начисления преподавателям" }, { status: 500 });
+      }
+      let teacherNames: Map<string, string>;
+      try {
+        teacherNames = await loadPayrollTeacherNames(admin, access.organizationId, (data || []).map((entry: any) => entry.teacher_id));
+      } catch (teacherError) {
+        console.error("[crm/finance] payroll teacher lookup failed", teacherError);
+        return NextResponse.json({ ok: false, error: "Не удалось загрузить начисления преподавателям" }, { status: 500 });
+      }
+      const items = (data || []).map((entry: any) => ({ ...entry, profiles: { full_name: teacherNames.get(entry.teacher_id) || "Преподаватель" } }));
+      return NextResponse.json({ ok: true, canManage, view, summary: summaryCall.data || [], ...paged(items, count, page, pageSize) });
     }
 
     if (view === "warnings") {

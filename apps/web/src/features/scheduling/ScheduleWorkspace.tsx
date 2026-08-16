@@ -30,12 +30,11 @@ type Makeup = { id: string; student_id: string; target_session_id?: string | nul
 
 const statusLabel: Record<string, string> = { planned: "Запланировано", live: "Идёт", completed: "Проведено", cancelled: "Отменено", moved: "Перенесено" };
 
-function monday(value: Date) {
-  const date = new Date(value);
-  const day = date.getDay() || 7;
-  date.setDate(date.getDate() - day + 1);
-  date.setHours(0, 0, 0, 0);
-  return date;
+function moscowMonday(value: Date) {
+  const current = new Date(`${dateKey(value)}T12:00:00+03:00`);
+  const day = current.getUTCDay() || 7;
+  current.setUTCDate(current.getUTCDate() - day + 1);
+  return current;
 }
 
 function dateKey(date: Date) {
@@ -47,8 +46,8 @@ function moscowDateTimeInput(date: Date) {
 }
 
 export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: boolean; groupId?: string }) {
-  const [week, setWeek] = useState(() => monday(new Date()));
-  const [period, setPeriod] = useState<Period>("today");
+  const [week, setWeek] = useState(() => moscowMonday(new Date()));
+  const [period, setPeriod] = useState<Period>("week");
   const [view, setView] = useState<ScheduleView>("all");
   const [teacherId, setTeacherId] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState(groupId || "");
@@ -215,7 +214,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     <section style={{ display: "flex", flexDirection: "column", gap: 18 }} aria-label="Оперативное расписание">
       <div className="card-crm" style={{ background: "white", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <strong>{period === "today" ? `Сегодня, ${days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}` : `Неделя ${days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} — ${days[days.length - 1].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`}</strong>
+          <strong>{period === "today" ? `Сегодня, ${days[0].toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "long" })}` : `Неделя ${days[0].toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "long" })} — ${days[days.length - 1].toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "long" })}`}</strong>
           <div style={{ color: "var(--color-text-muted)", fontSize: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}><Bell size={13} /> Переносы и отмены создают адресные уведомления MAX</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -264,7 +263,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
                 <label style={{ display: "grid", gap: 4, fontSize: 11, color: "var(--color-text-muted)" }}>Занятие для отработки
                   <select className="form-input" defaultValue={makeup.target_session_id || ""} onChange={(event) => event.target.value && void scheduleMakeup(makeup.id, event.target.value)} style={{ height: 38 }}>
                     <option value="">Выберите занятие</option>
-                    {sessions.filter((session) => session.status === "planned" && new Date(session.starts_at) > new Date()).map((session) => <option key={session.id} value={session.id}>{new Date(session.starts_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {session.groups?.title}</option>)}
+                    {sessions.filter((session) => session.status === "planned" && new Date(session.starts_at) > new Date()).map((session) => <option key={session.id} value={session.id}>{new Date(session.starts_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {session.groups?.title}</option>)}
                   </select>
                 </label>
               </div>
@@ -272,17 +271,17 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
           </div>
         </div>
       )}
-      {error && <div role="alert" className="card-crm" style={{ color: "var(--color-danger)", background: "white" }}>{error}</div>}
+      {error && <div role="alert" className="card-crm" style={{ color: "var(--color-danger)", background: "white", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>{error}<Button variant="secondary-crm" onClick={() => void load()}>Повторить</Button></div>}
       {loading ? <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: 32 }}>Загрузка расписания…</p> : (
         <div style={{ display: "grid", gap: 14 }}>
-          {!sessions.length && <div className="card-crm" style={{ background: "white", textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>В выбранном периоде занятий нет</div>}
+          {!error && !sessions.length && <div className="card-crm" style={{ background: "white", textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>{period === "today" ? "На сегодня занятий нет" : "На этой неделе занятий нет"}</div>}
           {sections.map((section) => (
             <section key={section.key} className="card-crm" style={{ background: "white", padding: 16 }}>
               {view !== "all" && <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>{section.label}</h2>}
               <div style={{ display: "grid", gap: 8 }}>
                 {section.sessions.map((session) => (
                   <article key={session.id} style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr) auto", gap: 12, alignItems: "center", border: "1px solid var(--color-border)", borderRadius: 10, padding: 12, opacity: session.status === "cancelled" || session.status === "moved" ? .65 : 1 }}>
-                    <div><strong style={{ fontSize: 15 }}>{new Date(session.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</strong><div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</div></div>
+                    <div><strong style={{ fontSize: 15 }}>{new Date(session.starts_at).toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow", hour: "2-digit", minute: "2-digit" })}</strong><div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "short" })}</div></div>
                     <div><strong style={{ fontSize: 13 }}>{session.groups?.title || "Без группы"}</strong><div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5, fontSize: 11, color: "var(--color-text-muted)" }}><span><UserRound size={11} /> {session.profiles?.full_name || "Преподаватель не назначен"}</span><span><MapPin size={11} /> {session.rooms?.name || "Кабинет не назначен"}</span><span>{session.session_kind === "regular" ? "Обычное" : session.session_kind === "trial" ? "Пробное" : session.session_kind === "makeup" ? "Отработка" : "Дополнительное"}</span></div>{session.change_reason && <p style={{ fontSize: 11, margin: "5px 0 0" }}>Причина: {session.change_reason}</p>}</div>
                     <div style={{ display: "grid", justifyItems: "end", gap: 7 }}><span className={`badge ${session.status === "cancelled" ? "badge-red" : session.status === "completed" ? "badge-green" : "badge-blue"}`}>{statusLabel[session.status] || session.status}</span><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}><Link href={`/crm/lessons/${session.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>Открыть журнал</Link>{canManage && session.status === "planned" && <button onClick={() => openChange("reschedule", session)} style={{ border: 0, background: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Перенести</button>}{canManage && session.status === "planned" && <button onClick={() => openChange("cancel", session)} style={{ border: 0, background: "none", color: "var(--color-danger)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Отменить</button>}</div></div>
                   </article>
@@ -295,7 +294,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       )}
       <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Уведомления MAX: по группе разворачиваются в отдельное сообщение каждому связанному родителю; отработка — только родителям выбранного ребёнка.</p>
       {change && (
-        <CrmDialog title={change.type === "reschedule" ? "Перенести занятие" : "Отменить занятие"} description={`${change.session.groups?.title} · ${new Date(change.session.starts_at).toLocaleString("ru-RU")}. После сохранения родителям будут созданы уведомления MAX.`} onClose={() => setChange(null)} width={460}>
+        <CrmDialog title={change.type === "reschedule" ? "Перенести занятие" : "Отменить занятие"} description={`${change.session.groups?.title} · ${new Date(change.session.starts_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })}. После сохранения родителям будут созданы уведомления MAX.`} onClose={() => setChange(null)} width={460}>
             <div style={{ display: "grid", gap: 13 }}>
               {change.type === "reschedule" && <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Новые дата и время<input autoFocus type="datetime-local" className="form-input" value={newStartsAt} onChange={(event) => setNewStartsAt(event.target.value)} /></label>}
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Причина<textarea autoFocus={change.type === "cancel"} className="form-input" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} rows={3} placeholder="Например: праздничный день" style={{ height: "auto", padding: 10 }} /></label>

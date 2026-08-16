@@ -3,6 +3,7 @@ import { buildManagementReport } from "@/lib/reports/management";
 import { DEFAULT_ORGANIZATION_TIMEZONE, localDate, timestampBounds } from "@/lib/reports/date-range";
 import { buildReportScope, hasOrganizationalFilter, reportFilters } from "@/lib/reports/report-scope";
 import { crmAdmin, requireCrmStaff } from "../_shared";
+import { loadPayrollTeacherNames } from "@/lib/finance/payroll-teachers";
 
 const roles = new Set(["owner", "admin", "accountant", "manager"]);
 const related = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -55,11 +56,18 @@ export async function GET(request: Request) {
       ? admin.from("billing_ledger_entries").select("entry_type, amount, lesson_session_id, lesson_sessions(group_id)").eq("organization_id", access.organizationId).eq("entry_type", "lesson_debit").in("lesson_session_id", sessionIds)
       : Promise.resolve({ data: [], error: null }),
     sessionIds.length
-      ? admin.from("teacher_payroll_entries").select("teacher_id, lesson_session_id, attendee_count, amount, status, profiles(full_name), lesson_sessions(group_id)").eq("organization_id", access.organizationId).in("lesson_session_id", sessionIds)
+      ? admin.from("teacher_payroll_entries").select("teacher_id, lesson_session_id, attendee_count, amount, status, lesson_sessions(group_id)").eq("organization_id", access.organizationId).in("lesson_session_id", sessionIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
   const dataError = [attendanceResult, paymentsResult, ledgerResult, payrollResult].find((result) => result.error)?.error;
   if (dataError) return NextResponse.json({ ok: false, error: dataError.message }, { status: 500 });
+  let payrollTeacherNames: Map<string, string>;
+  try {
+    payrollTeacherNames = await loadPayrollTeacherNames(admin, access.organizationId, (payrollResult.data || []).map((entry: any) => entry.teacher_id));
+  } catch (teacherError) {
+    console.error("[crm/reports] payroll teacher lookup failed", teacherError);
+    return NextResponse.json({ ok: false, error: "Не удалось загрузить начисления для отчёта" }, { status: 500 });
+  }
 
   const namedGroups = groups.map((group: any) => ({ ...group, teacher_name: related(group.profiles)?.full_name }));
   const report = buildManagementReport({
@@ -68,7 +76,7 @@ export async function GET(request: Request) {
     payments: paymentsResult.data || [],
     ledger: (ledgerResult.data || []).map((entry: any) => ({ ...entry, group_id: related(entry.lesson_sessions)?.group_id || null })),
     accounts: accountsResult.data || [],
-    payroll: (payrollResult.data || []).map((entry: any) => ({ ...entry, teacher_name: related(entry.profiles)?.full_name, group_id: related(entry.lesson_sessions)?.group_id || null })),
+    payroll: (payrollResult.data || []).map((entry: any) => ({ ...entry, teacher_name: payrollTeacherNames.get(entry.teacher_id) || "Преподаватель", group_id: related(entry.lesson_sessions)?.group_id || null })),
     dateFrom: bounds.from, dateTo: bounds.to,
   });
 

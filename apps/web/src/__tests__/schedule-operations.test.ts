@@ -16,9 +16,9 @@ describe("operational schedule", () => {
   it("groups lessons by teacher", () => expect(groupOperationalSessions(sessions, "teacher").map((item) => item.label)).toEqual(["Дарья", "Иван"]));
   it("groups lessons by group", () => expect(groupOperationalSessions(sessions, "group").map((item) => item.label)).toEqual(["LEGO", "Scratch"]));
 
-  it("defaults UI to today and all lessons and exposes composable filters", () => {
+  it("defaults UI to the current week and all lessons and exposes composable filters", () => {
     const source = read("src/features/scheduling/ScheduleWorkspace.tsx");
-    expect(source).toContain('useState<Period>("today")');
+    expect(source).toContain('useState<Period>("week")');
     expect(source).toContain('useState<ScheduleView>("all")');
     for (const filter of ["teacherId", "selectedGroupId", "branchId", "roomId", "status", "sessionKind"]) expect(source).toContain(filter);
   });
