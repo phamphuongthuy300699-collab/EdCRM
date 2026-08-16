@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attendanceCompletionState,
   attendanceStatusLabel,
   buildScheduleNotificationText,
   concreteSessionsForStudent,
@@ -13,6 +14,17 @@ describe("scheduling domain", () => {
     expect(attendanceStatusLabel("unmarked")).toBe("Не отмечено");
     expect(attendanceStatusLabel("present")).toBe("Присутствовал");
     expect(attendanceStatusLabel("absent_excused")).toBe("Пропуск по уважительной причине");
+  });
+
+  it("explains unfinished attendance and pending absence subtype", () => {
+    expect(attendanceCompletionState([
+      { status: "present" },
+      { status: "absent_excused" },
+      { status: "unmarked", pendingAbsence: true },
+      { status: "unmarked" },
+      { status: "late" },
+    ])).toEqual({ complete: false, remaining: 2, pendingAbsence: true, message: "Чтобы завершить занятие, отметьте ещё 2 учеников." });
+    expect(attendanceCompletionState([{ status: "unmarked", pendingAbsence: true }]).pendingAbsence).toBe(true);
   });
 
   it("offers makeup only for an excused absence without an open assignment", () => {

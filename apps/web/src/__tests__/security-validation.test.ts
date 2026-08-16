@@ -17,8 +17,9 @@ describe("privileged mutation input allowlists", () => {
       "app/api/crm/guardians/route.ts",
       "app/api/crm/guardians/merge/route.ts",
       "app/api/crm/bot-settings/max/queue/route.ts",
-      "app/api/crm/finance/teacher-rates/route.ts",
     ];
     for (const route of routes) expect(read(route), route).toContain(".strict()");
+    expect(read("features/finance/teacher-rate-schema.ts")).toContain(".strict()");
+    expect(read("app/api/crm/finance/teacher-rates/route.ts")).toContain("teacherRateSchema.safeParse");
   });
 });

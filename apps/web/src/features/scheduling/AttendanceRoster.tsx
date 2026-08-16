@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { allAttendanceMarked, markAllPresent, type AttendanceStatus } from "./domain";
+import { attendanceCompletionState, markAllPresent, type AttendanceStatus } from "./domain";
 
 export type AttendanceRosterRow = {
   studentId: string;
@@ -28,7 +28,8 @@ export function AttendanceRoster({ rows, disabled = false, onChange, onSave, onC
   const update = (studentId: string, patch: Partial<AttendanceRosterRow>) => onChange(rows.map((row) => row.studentId === studentId ? { ...row, ...patch } : row));
   const marked = rows.filter((row) => row.status !== "unmarked").length;
   const hasPendingAbsence = absenceOpen.size > 0;
-  const canComplete = sessionStatus === "live" && allAttendanceMarked(rows) && !hasPendingAbsence && !saving && !completing;
+  const completion = attendanceCompletionState(rows.map((row) => ({ status: row.status, pendingAbsence: absenceOpen.has(row.studentId) })));
+  const canComplete = sessionStatus === "live" && completion.complete && !saving && !completing;
 
   const bulkPresent = () => {
     if (disabled) return;
@@ -68,13 +69,14 @@ export function AttendanceRoster({ rows, disabled = false, onChange, onSave, onC
               <button type="button" disabled={disabled} aria-label="Нет" aria-pressed={absent} onClick={() => { setAbsenceOpen((current) => new Set(current).add(row.studentId)); update(row.studentId, { status: "unmarked" }); }} style={{ minHeight: 44, padding: "8px 12px", borderRadius: 9, border: absent ? "2px solid var(--color-primary)" : "1px solid var(--color-border)", background: absent ? "var(--color-primary-soft)" : "white", color: absent ? "var(--color-primary-dark)" : "var(--color-text)", fontWeight: 750, cursor: disabled ? "default" : "pointer" }}>Нет</button>
             </div>
             {absent && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7 }}>{statusButton(row, "absent_excused", "Уважительно", "Пропуск уважительный")}{statusButton(row, "absent_unexcused", "Без причины", "Пропуск без причины")}</div>}
+            {absenceOpen.has(row.studentId) && row.status === "unmarked" && <span role="alert" style={{ color: "var(--color-danger)", fontSize: 12, fontWeight: 750 }}>Укажите тип пропуска</span>}
             {absent && <label style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-muted)" }}>Причина (необязательно)<input className="form-input" value={row.absenceReason || ""} disabled={disabled} onChange={(event) => update(row.studentId, { absenceReason: event.target.value })} placeholder="Например: заболел" style={{ minHeight: 44 }} /></label>}
             {!showComment && !disabled && <button type="button" onClick={() => setCommentOpen((current) => new Set(current).add(row.studentId))} style={{ minHeight: 44, justifySelf: "start", border: 0, background: "transparent", color: "var(--color-primary)", fontWeight: 700, cursor: "pointer" }}>+ Комментарий</button>}
             {showComment && <label style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-muted)" }}>Комментарий преподавателя<input className="form-input" value={row.comment} disabled={disabled} onChange={(event) => update(row.studentId, { comment: event.target.value })} placeholder="Что важно передать администратору" style={{ minHeight: 44 }} /></label>}
           </article>
         );
       })}
-      {(onSave || onComplete) && <div className="attendance-sticky-footer" style={{ position: "sticky", bottom: 0, zIndex: 10, margin: "4px -16px -16px", padding: "12px 16px max(12px, env(safe-area-inset-bottom))", borderTop: "1px solid var(--color-border)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(8px)", display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}><strong style={{ fontSize: 12 }}>Отмечено {marked} из {rows.length}</strong>{onSave && <button type="button" disabled={saving || completing || disabled || hasPendingAbsence} onClick={() => void onSave()} style={{ minHeight: 44, padding: "8px 14px", border: "1px solid var(--color-primary)", borderRadius: 9, background: "white", color: "var(--color-primary)", fontWeight: 750 }}>Сохранить</button>}{onComplete && <button type="button" disabled={!canComplete} onClick={() => void onComplete()} style={{ minHeight: 44, padding: "8px 14px", border: 0, borderRadius: 9, background: canComplete ? "var(--color-primary)" : "var(--color-border)", color: canComplete ? "white" : "var(--color-text-muted)", fontWeight: 750 }}>{completing ? "Завершаем…" : "Завершить занятие"}</button>}</div>}
+      {(onSave || onComplete) && <div className="attendance-sticky-footer" style={{ position: "sticky", bottom: 0, zIndex: 10, margin: "4px -16px -16px", padding: "12px 16px max(12px, env(safe-area-inset-bottom))", borderTop: "1px solid var(--color-border)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(8px)", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", gap: 8, alignItems: "center" }}><span><strong style={{ fontSize: 12 }}>Отмечено {marked} из {rows.length}</strong>{onComplete && sessionStatus === "live" && !completion.complete && <small style={{ display: "block", marginTop: 3, color: "var(--color-danger)" }}>{completion.message}</small>}</span>{onSave && <button type="button" disabled={saving || completing || disabled || hasPendingAbsence} onClick={() => void onSave()} style={{ minHeight: 44, padding: "8px 14px", border: "1px solid var(--color-primary)", borderRadius: 9, background: "white", color: "var(--color-primary)", fontWeight: 750 }}>Сохранить</button>}{onComplete && <button type="button" disabled={!canComplete} onClick={() => void onComplete()} style={{ minHeight: 44, padding: "8px 14px", border: 0, borderRadius: 9, background: canComplete ? "var(--color-primary)" : "var(--color-border)", color: canComplete ? "white" : "var(--color-text-muted)", fontWeight: 750 }}>{completing ? "Завершаем…" : "Завершить занятие"}</button>}</div>}
       {message && <div role="status" style={{ color: "var(--color-success)", fontSize: 13, fontWeight: 750 }}>{message}</div>}
       <style jsx>{`@media (max-width: 520px) { .attendance-roster article { scroll-margin-bottom: 132px; } .attendance-sticky-footer { grid-template-columns: 1fr 1fr !important; } .attendance-sticky-footer strong { grid-column: 1 / -1; } }`}</style>
     </div>

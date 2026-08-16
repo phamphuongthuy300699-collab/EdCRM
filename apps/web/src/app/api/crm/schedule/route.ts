@@ -8,6 +8,7 @@ import {
   scheduleValidationPayload,
 } from "@/features/scheduling/schemas";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
+import { mergeTeacherScheduleSessions } from "@/features/scheduling/teacher-portal";
 
 const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
@@ -76,8 +77,21 @@ export async function GET(request: Request) {
   if (access.role === "teacher") {
     query = query.eq("teacher_id", access.staffProfileId);
   }
-  const { data: sessions, error } = await query;
+  const { data: calendarSessions, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  const portalTeacherId = previewTeacherId || (access.role === "teacher" ? access.staffProfileId : null);
+  let unfinishedSessions: any[] = [];
+  if (portalTeacherId) {
+    const { data, error: unfinishedError } = await admin.from("lesson_sessions")
+      .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id), courses(title), profiles(full_name), rooms(name)")
+      .eq("organization_id", access.organizationId)
+      .eq("teacher_id", portalTeacherId)
+      .eq("status", "live")
+      .order("starts_at", { ascending: true });
+    if (unfinishedError) return NextResponse.json({ ok: false, error: unfinishedError.message }, { status: 500 });
+    unfinishedSessions = data || [];
+  }
+  const sessions = mergeTeacherScheduleSessions(calendarSessions || [], unfinishedSessions);
   const { data: allMakeups } = await admin.from("makeup_assignments")
     .select("id, student_id, source_attendance_id, target_session_id, status, notes, students(full_name)")
     .eq("organization_id", access.organizationId)

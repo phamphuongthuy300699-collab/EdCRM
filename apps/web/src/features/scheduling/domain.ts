@@ -49,6 +49,18 @@ export function allAttendanceMarked(rows: Array<{ status: AttendanceStatus }>) {
   return rows.every((row) => row.status !== "unmarked");
 }
 
+export function attendanceCompletionState(rows: Array<{ status: AttendanceStatus; pendingAbsence?: boolean }>) {
+  const remaining = rows.filter((row) => row.status === "unmarked" || row.pendingAbsence).length;
+  return {
+    complete: remaining === 0,
+    remaining,
+    pendingAbsence: rows.some((row) => row.pendingAbsence),
+    message: remaining > 0
+      ? `Чтобы завершить занятие, отметьте ещё ${remaining} ${remaining === 1 ? "ученика" : "учеников"}.`
+      : "",
+  };
+}
+
 export function eligibleForMakeup(input: { attendanceStatus: AttendanceStatus; makeupStatus: MakeupStatus | null }) {
   return input.attendanceStatus === "absent_excused" && !input.makeupStatus;
 }

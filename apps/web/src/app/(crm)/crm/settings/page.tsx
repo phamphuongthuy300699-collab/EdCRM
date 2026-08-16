@@ -1081,7 +1081,8 @@ export default function CrmSettingsPage() {
         if (!rateResponse.ok || !ratePayload.ok) {
           await loadData();
           setStaffDraft((current: any) => current ? { ...current, userId: savedUserId } : current);
-          setStaffError(`Сотрудник сохранён, ставка не сохранена: ${ratePayload.error || "проверьте параметры ставки"}`);
+          const rateFieldError = ratePayload.fieldErrors ? Object.values(ratePayload.fieldErrors)[0] : null;
+          setStaffError(`Сотрудник сохранён, ставка не сохранена: ${String(rateFieldError || ratePayload.error || "проверьте параметры ставки")}`);
           return;
         }
       }

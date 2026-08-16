@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { crmAdmin, requireCrmStaff } from "../_shared";
+import { databaseUuidSchema } from "@/features/scheduling/schemas";
 import { writeSecurityAudit } from "@/lib/security/audit";
 
 const readRoles = new Set(["owner", "admin", "accountant", "manager"]);
@@ -9,7 +10,7 @@ const pageSizeSchema = z.coerce.number().int().min(5).max(100).catch(25);
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("adjust"), guardianId: z.string().uuid(), amount: z.number().refine((value) => value !== 0), reason: z.string().trim().min(3).max(500) }).strict(),
   z.object({ action: z.literal("payroll"), entryId: z.string().uuid(), status: z.enum(["approved", "paid"]) }).strict(),
-  z.object({ action: z.literal("payrollPeriod"), teacherId: z.string().uuid(), month: z.string().date(), status: z.enum(["approved", "paid"]) }).strict(),
+  z.object({ action: z.literal("payrollPeriod"), teacherId: databaseUuidSchema, month: z.string().date(), status: z.enum(["approved", "paid"]) }).strict(),
 ]);
 
 const paged = (items: any[] | null, count: number | null, page: number, pageSize: number) => ({

@@ -27,7 +27,7 @@ describe("secure teacher cabinet preview", () => {
     expect(page).toContain("previewTeacherId");
     expect(page).toContain("readOnlyPreview");
     expect(page).toContain("!readOnlyPreview && selected.status === \"planned\"");
-    expect(page).toContain("disabled={readOnlyPreview || selected.status !== \"live\"}");
+    expect(page).toContain('readOnly={readOnlyPreview || selected.status === "completed"}');
   });
 
   it("offers preview from teacher staff cards", () => {

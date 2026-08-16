@@ -86,7 +86,7 @@ test.describe("operations UX visual baselines", () => {
     test(`teacher attendance fits ${viewport.width}x${viewport.height}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.goto("/teacher", { waitUntil: "domcontentloaded" });
-      await expect(page.getByRole("heading", { level: 1, name: "Сегодня", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Рабочее место преподавателя", exact: true })).toBeVisible();
       const brandLogo = page.getByRole("img", { name: "Робокс" });
       await brandLogo.evaluate((image) => image.dispatchEvent(new Event("error")));
       await expect(brandLogo).toBeHidden();

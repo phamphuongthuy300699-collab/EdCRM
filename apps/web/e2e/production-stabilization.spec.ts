@@ -34,7 +34,7 @@ test.describe("production stabilization evidence", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/teacher", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { level: 1, name: "Сегодня", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Рабочее место преподавателя", exact: true })).toBeVisible();
     await page.screenshot({ path: path.join(output, "teacher-mobile.png"), fullPage: true });
   });
 });

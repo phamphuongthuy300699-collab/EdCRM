@@ -69,7 +69,7 @@ test.describe("finance operational contour", () => {
     await dialog.screenshot({ path: path.join(output, "crm-group-billing.png") });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/teacher", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { level: 1, name: "Сегодня", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Рабочее место преподавателя", exact: true })).toBeVisible();
     await noOverflow(page);
     await page.screenshot({ path: path.join(output, "teacher-mobile.png"), fullPage: true });
     await page.goto("/parent/payments", { waitUntil: "domcontentloaded" });

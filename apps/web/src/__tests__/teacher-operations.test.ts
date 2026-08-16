@@ -67,7 +67,9 @@ describe("lesson session lifecycle", () => {
     expect(page).not.toContain('.from("lesson_sessions").insert');
     expect(page).not.toContain('.from("lesson_sessions").update');
     expect(page).not.toContain("setGroups(demoGroups)");
-    expect(page).toContain('disabled={readOnlyPreview || selected.status !== "live"}');
-    expect(crmLesson).toContain('disabled={session.status !== "live"}');
+    expect(page).toContain('readOnly={readOnlyPreview || selected.status === "completed"}');
+    expect(crmLesson).toContain('readOnly={session.status === "completed"}');
+    expect(page).toContain("LessonConductPanel");
+    expect(crmLesson).toContain("LessonConductPanel");
   });
 });

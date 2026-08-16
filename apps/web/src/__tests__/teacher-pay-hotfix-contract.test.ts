@@ -31,7 +31,9 @@ describe("teacher pay modes and bounded schedules", () => {
 
   it("requires mode in the finance API contract", () => {
     const route = read("src/app/api/crm/finance/teacher-rates/route.ts");
-    expect(route).toContain('mode: z.enum(["per_attendee", "per_lesson"])');
+    const schema = read("src/features/finance/teacher-rate-schema.ts");
+    expect(schema).toContain('mode: z.enum(["per_attendee", "per_lesson"])');
+    expect(schema).toContain("teacherId: databaseUuidSchema");
     expect(route).toContain("p_pay_mode: parsed.data.mode");
   });
 });
