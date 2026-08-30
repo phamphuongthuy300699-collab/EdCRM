@@ -9,6 +9,7 @@ import {
 } from "@/features/scheduling/schemas";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
 import { mergeTeacherScheduleSessions } from "@/features/scheduling/teacher-portal";
+import { trialParticipantDto } from "@/features/trials/server";
 
 const staffRoles = new Set(["owner", "admin", "manager", "teacher"]);
 const adminRoles = new Set(["owner", "admin", "manager"]);
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     visibleGroupIds = (branchGroups || []).map((group: any) => group.id);
   }
   let query = admin.from("lesson_sessions")
-    .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id), courses(title), profiles(full_name), rooms(name)")
+    .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id, capacity), courses(title), profiles(full_name), rooms(name)")
     .eq("organization_id", access.organizationId)
     .gte("lesson_date", dateFrom)
     .lte("lesson_date", dateTo)
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
   let unfinishedSessions: any[] = [];
   if (portalTeacherId) {
     const { data, error: unfinishedError } = await admin.from("lesson_sessions")
-      .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id), courses(title), profiles(full_name), rooms(name)")
+      .select("id, group_id, course_id, teacher_id, room_id, starts_at, ends_at, lesson_date, status, session_kind, change_reason, rescheduled_from_session_id, notification_status, materials_unlocked, groups(title, branch_id, capacity), courses(title), profiles(full_name), rooms(name)")
       .eq("organization_id", access.organizationId)
       .eq("teacher_id", portalTeacherId)
       .eq("status", "live")
@@ -98,6 +99,45 @@ export async function GET(request: Request) {
     .in("status", ["requested", "approved", "scheduled"])
     .order("requested_at", { ascending: true });
   const sessionIds = new Set((sessions || []).map((session: any) => session.id));
+  const sessionIdList = [...sessionIds];
+  const { data: attachedTrialEvents, error: attachedTrialsError } = sessionIdList.length
+    ? await admin.from("trial_events")
+      .select("id, mode, lesson_session_id, trial_participants(id, status)")
+      .eq("organization_id", access.organizationId)
+      .eq("mode", "attached_session")
+      .in("lesson_session_id", sessionIdList)
+    : { data: [] as any[], error: null };
+  if (attachedTrialsError) return NextResponse.json({ ok: false, error: "Не удалось загрузить пробных участников" }, { status: 500 });
+  const trialCountBySession = new Map<string, number>();
+  for (const event of attachedTrialEvents || []) {
+    if (event.mode !== "attached_session" || !event.lesson_session_id) continue;
+    const count = (event.trial_participants || []).filter((participant: any) => participant.status !== "cancelled").length;
+    trialCountBySession.set(event.lesson_session_id, count);
+  }
+
+  let standaloneTrialsQuery = admin.from("trial_events")
+    .select("id, mode, teacher_id, branch_id, room_id, starts_at, ends_at, profiles(full_name), branches(name), rooms(name, capacity), trial_participants(id, trial_event_id, lead_id, student_id, status, result, result_comment, leads(parent_name, child_name), students(full_name))")
+    .eq("organization_id", access.organizationId)
+    .eq("mode", "standalone")
+    .gte("starts_at", `${dateFrom}T00:00:00+03:00`)
+    .lte("starts_at", `${dateTo}T23:59:59+03:00`)
+    .order("starts_at", { ascending: true });
+  const visibleStandaloneTeacherId = previewTeacherId || (access.role === "teacher" ? access.staffProfileId : teacherId);
+  if (visibleStandaloneTeacherId) standaloneTrialsQuery = standaloneTrialsQuery.eq("teacher_id", visibleStandaloneTeacherId);
+  if (branchId) standaloneTrialsQuery = standaloneTrialsQuery.eq("branch_id", branchId);
+  if (roomId) standaloneTrialsQuery = standaloneTrialsQuery.eq("room_id", roomId);
+  const includeStandaloneTrials = !groupId && !status && (!sessionKind || sessionKind === "trial");
+  const { data: standaloneTrialRows, error: standaloneTrialsError } = includeStandaloneTrials
+    ? await standaloneTrialsQuery
+    : { data: [] as any[], error: null };
+  if (standaloneTrialsError) return NextResponse.json({ ok: false, error: "Не удалось загрузить отдельные пробные занятия" }, { status: 500 });
+  const standaloneTrials = (standaloneTrialRows || [])
+    .filter((event: any) => event.mode === "standalone")
+    .map((event: any) => {
+      const participants = (event.trial_participants || []).filter((participant: any) => participant.status !== "cancelled").map(trialParticipantDto);
+      return { ...event, participants, trialParticipantCount: participants.length };
+    })
+    .filter((event: any) => event.trialParticipantCount > 0);
   const makeups = access.role === "teacher"
     ? (allMakeups || []).filter((makeup: any) => makeup.target_session_id && sessionIds.has(makeup.target_session_id))
     : allMakeups || [];
@@ -113,9 +153,9 @@ export async function GET(request: Request) {
   const sessionsWithStudentCount = (sessions || []).map((session: any) => {
     const studentIds = new Set(studentsByGroup.get(session.group_id) || []);
     for (const makeup of allMakeups || []) if (makeup.target_session_id === session.id && makeup.status === "scheduled") studentIds.add(makeup.student_id);
-    return { ...session, studentCount: studentIds.size };
+    return { ...session, studentCount: studentIds.size, trialParticipantCount: trialCountBySession.get(session.id) || 0 };
   });
-  let groupsQuery = admin.from("groups").select("id, title, branch_id, teacher_id, room_id").eq("organization_id", access.organizationId).eq("status", "active").order("title");
+  let groupsQuery = admin.from("groups").select("id, title, branch_id, teacher_id, room_id, capacity").eq("organization_id", access.organizationId).eq("status", "active").order("title");
   if (previewTeacherId) groupsQuery = groupsQuery.eq("teacher_id", previewTeacherId);
   if (access.role === "teacher") groupsQuery = groupsQuery.eq("teacher_id", access.staffProfileId);
   const [{ data: groups }, { data: teacherMemberships }, { data: branches }, { data: rooms }] = await Promise.all([
@@ -126,7 +166,7 @@ export async function GET(request: Request) {
   ]);
   const teachers = (teacherMemberships || []).map((membership: any) => ({ id: membership.user_id, name: Array.isArray(membership.profiles) ? membership.profiles[0]?.full_name : membership.profiles?.full_name })).filter((teacher: any) => teacher.name);
   const { data: botSettings } = await admin.from("bot_settings").select("settings").eq("organization_id", access.organizationId).eq("provider", "max").maybeSingle();
-  return NextResponse.json({ ok: true, sessions: sessionsWithStudentCount, makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], previewTeacher, notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
+  return NextResponse.json({ ok: true, sessions: sessionsWithStudentCount, standaloneTrials, makeups: makeups || [], groups: groups || [], teachers, branches: branches || [], rooms: rooms || [], previewTeacher, notificationEvents: normalizeMaxEvents(botSettings?.settings?.events) });
 }
 
 export async function POST(request: Request) {
@@ -323,7 +363,13 @@ export async function POST(request: Request) {
     if (input.action === "cancel") {
       const session = await loadSession(admin, access.organizationId, input.sessionId);
       if (session.status !== "planned") return NextResponse.json({ ok: false, error: "Отменить можно только предстоящее занятие" }, { status: 409 });
-      const { error } = await admin.from("lesson_sessions").update({ status: "cancelled", change_reason: input.reason, cancelled_at: new Date().toISOString(), notification_status: input.notifyGuardians ? "pending" : "not_required" }).eq("organization_id", access.organizationId).eq("id", session.id);
+      const { error } = await admin.rpc("crm_cancel_lesson_session_with_trials", {
+        p_organization_id: access.organizationId,
+        p_session_id: session.id,
+        p_actor_id: access.staffProfileId,
+        p_reason: input.reason,
+        p_notification_status: input.notifyGuardians ? "pending" : "not_required",
+      });
       if (error) throw error;
       if (input.notifyGuardians) {
         const queued = await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "lesson_cancelled", lessonSessionId: session.id, groupId: session.group_id, payload: { groupTitle: session.groups?.title, startsAt: session.starts_at, reason: input.reason } });
@@ -342,6 +388,7 @@ export async function POST(request: Request) {
       if (!["requested", "approved", "scheduled"].includes(assignment.status)) return NextResponse.json({ ok: false, error: "Эту отработку уже нельзя переназначить" }, { status: 409 });
       if (target.status !== "planned" || new Date(target.starts_at) <= new Date()) return NextResponse.json({ ok: false, error: "Отработку можно назначить только на предстоящее занятие" }, { status: 409 });
       const { error } = await admin.from("makeup_assignments").update({ target_session_id: target.id, status: "scheduled", notes: input.notes || null, approved_by: access.staffProfileId, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", access.organizationId).eq("id", assignment.id);
+      if (error?.message.includes("group_session_capacity_exceeded")) return NextResponse.json({ ok: false, error: "На этом занятии нет свободного места для отработки" }, { status: 409 });
       if (error) throw error;
       await enqueueScheduleNotifications(admin, { organizationId: access.organizationId, templateKey: "makeup_scheduled", lessonSessionId: target.id, studentId: assignment.student_id, payload: { groupTitle: target.groups?.title, startsAt: target.starts_at } });
       return NextResponse.json({ ok: true });
@@ -372,6 +419,22 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true, saved: saveResult?.saved ?? input.records.length });
   } catch (error: any) {
+    if (error?.message?.includes("trial_slot_conflict")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "В это время у преподавателя или в кабинете уже назначено пробное занятие",
+        },
+        { status: 409 },
+      );
+    }
+    if (error?.message?.includes("group_session_capacity_exceeded")) {
+      return NextResponse.json(
+        { ok: false, error: "На этом занятии нет свободных мест" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ ok: false, error: error.message || "Не удалось выполнить операцию расписания" }, { status: 500 });
   }
 }

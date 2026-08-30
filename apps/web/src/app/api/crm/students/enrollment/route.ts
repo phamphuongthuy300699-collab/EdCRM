@@ -16,6 +16,19 @@ export async function POST(request: Request) {
     p_student_id: parsed.data.studentId,
     p_group_id: parsed.data.groupId,
   });
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+  if (error?.message.includes("group_session_capacity_exceeded")) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "В одном из будущих занятий группы нет свободного места",
+      },
+      { status: 409 },
+    );
+  }
+  if (error)
+    return NextResponse.json(
+      { ok: false, error: error.message },
+      { status: 409 },
+    );
   return NextResponse.json({ ok: true, result: data });
 }

@@ -8,6 +8,8 @@ import { allAttendanceMarked } from "@/features/scheduling/domain";
 import { isDemoMode } from "@/shared/utils/demo";
 import { categorizeTeacherSessions, teacherPortalDateRange } from "@/features/scheduling/teacher-portal";
 import { LessonConductPanel } from "@/features/scheduling/LessonConductPanel";
+import { TrialParticipantList } from "@/features/trials/TrialParticipantList";
+import type { TrialParticipantDto } from "@/features/trials/contracts";
 
 type TeacherSession = {
   id: string;
@@ -19,6 +21,16 @@ type TeacherSession = {
   groups?: { title?: string } | null;
   rooms?: { name?: string } | null;
   studentCount?: number;
+};
+
+type StandaloneTrial = {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  profiles?: { full_name?: string } | null;
+  branches?: { name?: string } | null;
+  rooms?: { name?: string } | null;
+  participants: TrialParticipantDto[];
 };
 
 const demoSessions: TeacherSession[] = [
@@ -40,6 +52,7 @@ function dateKey(date = new Date()) {
 export default function TeacherPage() {
   const demo = isDemoMode();
   const [sessions, setSessions] = useState<TeacherSession[]>([]);
+  const [standaloneTrials, setStandaloneTrials] = useState<StandaloneTrial[]>([]);
   const [selected, setSelected] = useState<TeacherSession | null>(null);
   const [rows, setRows] = useState<AttendanceRosterRow[]>([]);
   const [lessonData, setLessonData] = useState<any | null>(null);
@@ -69,6 +82,7 @@ export default function TeacherPage() {
     if (!previewReady) return;
     if (demo) {
       setSessions(demoSessions);
+      setStandaloneTrials([]);
       setLoading(false);
       return;
     }
@@ -80,6 +94,7 @@ export default function TeacherPage() {
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось загрузить занятия");
       setSessions(payload.sessions || []);
+      setStandaloneTrials(payload.standaloneTrials || []);
       setPreviewTeacherName(payload.previewTeacher?.name || "");
       try {
         const payrollResponse = await fetch(`/api/teacher/payroll${previewTeacherId ? `?previewTeacherId=${encodeURIComponent(previewTeacherId)}` : ""}`);
@@ -90,6 +105,7 @@ export default function TeacherPage() {
       }
     } catch (cause) {
       setSessions([]);
+      setStandaloneTrials([]);
       setError((cause as Error).message || "Не удалось загрузить занятия");
     } finally {
       setLoading(false);
@@ -196,9 +212,11 @@ export default function TeacherPage() {
       {sections.unfinished.length > 0 && !selected && <section role="alert" className="card-crm" style={{ background: "var(--color-warning-soft)", borderColor: "var(--color-warning)", display: "grid", gap: 12 }}><strong>Есть незавершённое занятие</strong><span>{new Date(sections.unfinished[0].starts_at).toLocaleDateString("ru-RU")} · {sections.unfinished[0].groups?.title || "Группа"} · {new Date(sections.unfinished[0].starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span><Button variant="primary-crm" onClick={() => void openSession(sections.unfinished[0])}>Продолжить занятие</Button></section>}
       {nextSession && !selected && sections.unfinished.length === 0 && <section className="card-crm" style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)", display: "grid", gap: 14 }}><span style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", textTransform: "uppercase" }}>Следующее занятие</span><div><strong style={{ fontSize: 22 }}>{new Date(nextSession.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })} · {nextSession.groups?.title || "Группа"}</strong><div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, color: "var(--color-text-muted)", fontSize: 13 }}><span><MapPin size={14} /> {nextSession.rooms?.name || "Кабинет не назначен"}</span><span><Users size={14} /> {nextSession.studentCount ?? "—"} учеников</span></div></div><Button variant="primary-crm" onClick={() => void openSession(nextSession)} style={{ minHeight: 48 }}>Открыть занятие</Button></section>}
 
+      {!selected && standaloneTrials.length > 0 && <section className="card-crm" style={{ background: "#faf5ff", borderColor: "#ddd6fe", display: "grid", gap: 12 }}><h2 style={{ margin: 0, fontSize: 18, color: "#6d28d9" }}>Мои отдельные пробные</h2>{standaloneTrials.map((trial) => <details key={trial.id} style={{ background: "white", border: "1px solid #ddd6fe", borderRadius: 10, padding: 12 }}><summary style={{ cursor: "pointer", fontWeight: 750 }}>{new Date(trial.starts_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {trial.rooms?.name || "Кабинет"} · {trial.participants.length} участн.</summary><div style={{ marginTop: 12 }}><TrialParticipantList participants={trial.participants} readOnly={readOnlyPreview} /></div></details>)}</section>}
+
       {!selected && <section style={{ display: "grid", gap: 10 }}><nav aria-label="Разделы занятий" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{([['unfinished', 'Незавершённые'], ['today', 'Сегодня'], ['upcoming', 'Предстоящие'], ['history', 'Прошедшие']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setSection(key)} aria-pressed={section === key} style={{ minHeight: 42, padding: "8px 12px", borderRadius: 9, border: "1px solid var(--color-border)", background: section === key ? "var(--color-primary)" : "white", color: section === key ? "white" : "var(--color-text)", fontWeight: 750, whiteSpace: "nowrap" }}>{label} ({sections[key].length})</button>)}</nav>{visibleSessions.length === 0 && <div className="card-crm" style={{ background: "white", color: "var(--color-text-muted)", textAlign: "center", padding: 28 }}>В этом разделе занятий нет</div>}{visibleSessions.map((session) => <button key={session.id} type="button" onClick={() => void openSession(session)} style={{ width: "100%", minHeight: 76, padding: 14, border: "1px solid var(--color-border)", borderRadius: 12, background: "white", display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 12, alignItems: "center", textAlign: "left", cursor: "pointer" }}><strong style={{ fontSize: 14 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}<br /><Clock size={14} /> {new Date(session.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</strong><span><strong style={{ display: "block" }}>{session.groups?.title || "Группа"}</strong><small style={{ color: "var(--color-text-muted)" }}>{session.rooms?.name || "Кабинет не назначен"}</small></span><span className={`badge ${session.status === "completed" ? "badge-green" : session.status === "live" ? "badge-amber" : "badge-blue"}`}>{session.status === "completed" ? "Завершено" : session.status === "live" ? "Идёт" : "План"}</span></button>)}{section === "history" && <Button variant="secondary-crm" onClick={() => setHistoryDays((days) => days + 90)}>Загрузить ещё 90 дней</Button>}</section>}
 
-      {selected && <section style={{ display: "grid", gap: 14, minWidth: 0 }}><button type="button" onClick={() => { setSelected(null); setRows([]); setLessonData(null); setMessage(""); }} style={{ minHeight: 44, justifySelf: "start", border: 0, background: "transparent", color: "var(--color-primary)", fontWeight: 750, cursor: "pointer" }}>← Все занятия</button><div className="card-crm" style={{ background: "white", display: "grid", gap: 10 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><div><span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{new Date(selected.starts_at).toLocaleDateString("ru-RU")} · {new Date(selected.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span><h2 style={{ margin: "3px 0 0", fontSize: 21 }}>{selected.groups?.title || "Занятие"}</h2></div><span className={`badge ${selected.status === "completed" ? "badge-green" : selected.status === "live" ? "badge-amber" : "badge-blue"}`}>{selected.status === "completed" ? "Завершено" : selected.status === "live" ? "Идёт" : "Запланировано"}</span></div>{!readOnlyPreview && selected.status === "planned" && <Button variant="primary-crm" disabled={starting} onClick={() => void startSession()} style={{ minHeight: 48 }}>{starting ? "Начинаем…" : "Начать занятие"}</Button>}</div>{loadingRoster || !lessonData ? <div className="card-crm">Загрузка панели занятия…</div> : <LessonConductPanel data={{ ...lessonData, session: selected }} rows={rows} readOnly={readOnlyPreview || selected.status === "completed"} onRowsChange={setRows} onSaveAttendance={saveAttendance} onComplete={completeSession} onAssignHomework={lessonData.canAssignHomework ? assignHomework : undefined} saving={saving} completing={completing} message={message} />}</section>}
+      {selected && <section style={{ display: "grid", gap: 14, minWidth: 0 }}><button type="button" onClick={() => { setSelected(null); setRows([]); setLessonData(null); setMessage(""); }} style={{ minHeight: 44, justifySelf: "start", border: 0, background: "transparent", color: "var(--color-primary)", fontWeight: 750, cursor: "pointer" }}>← Все занятия</button><div className="card-crm" style={{ background: "white", display: "grid", gap: 10 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><div><span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{new Date(selected.starts_at).toLocaleDateString("ru-RU")} · {new Date(selected.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span><h2 style={{ margin: "3px 0 0", fontSize: 21 }}>{selected.groups?.title || "Занятие"}</h2></div><span className={`badge ${selected.status === "completed" ? "badge-green" : selected.status === "live" ? "badge-amber" : "badge-blue"}`}>{selected.status === "completed" ? "Завершено" : selected.status === "live" ? "Идёт" : "Запланировано"}</span></div>{!readOnlyPreview && selected.status === "planned" && <Button variant="primary-crm" disabled={starting} onClick={() => void startSession()} style={{ minHeight: 48 }}>{starting ? "Начинаем…" : "Начать занятие"}</Button>}</div>{loadingRoster || !lessonData ? <div className="card-crm">Загрузка панели занятия…</div> : <LessonConductPanel data={{ ...lessonData, session: selected }} rows={rows} readOnly={readOnlyPreview || selected.status === "completed"} trialReadOnly={readOnlyPreview} onRowsChange={setRows} onSaveAttendance={saveAttendance} onComplete={completeSession} onAssignHomework={lessonData.canAssignHomework ? assignHomework : undefined} saving={saving} completing={completing} message={message} />}</section>}
       {!demo && !selected && <section className="card-crm" style={{ background: "white", minWidth: 0 }}><h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Мои начисления</h2>{payroll.length === 0 ? <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: 13 }}>Начисления появятся после завершённых занятий.</p> : payroll.slice(0, 12).map((entry: any) => { const lesson = Array.isArray(entry.lesson_sessions) ? entry.lesson_sessions[0] : entry.lesson_sessions; const group = Array.isArray(lesson?.groups) ? lesson.groups[0] : lesson?.groups; return <div key={entry.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, padding: "11px 0", borderTop: "1px solid var(--color-border)" }}><span><strong>{group?.title || "Занятие"}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{lesson?.lesson_date} · {entry.pay_mode === "per_lesson" ? "Фикс за занятие" : `${entry.attendee_count} посещений × ${Number(entry.rate_snapshot).toLocaleString("ru-RU")} ₽`}</small></span><span style={{ textAlign: "right" }}><strong>{Number(entry.amount).toLocaleString("ru-RU")} ₽</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{entry.status === "paid" ? "выплачено" : entry.status === "approved" ? "подтверждено" : "начислено"}</small></span></div>; })}</section>}
       <style jsx>{`svg { vertical-align: middle; } @media (max-width: 520px) { .teacher-mobile-home { overflow-x: clip; } }`}</style>
     </main>

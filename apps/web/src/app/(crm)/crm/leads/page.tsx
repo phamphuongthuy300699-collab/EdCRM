@@ -26,6 +26,7 @@ import {
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
+import { TrialDialog } from "@/features/trials/TrialDialog";
 
 interface Lead {
   id: string | number;
@@ -115,6 +116,7 @@ export default function CrmLeadsPage() {
   const [convertingLeadId, setConvertingLeadId] = useState<string | number | null>(null);
   const [updatingLeadId, setUpdatingLeadId] = useState<string | number | null>(null);
   const [creatingLead, setCreatingLead] = useState(false);
+  const [trialLead, setTrialLead] = useState<Lead | null>(null);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -754,9 +756,9 @@ export default function CrmLeadsPage() {
                                 Позвонить
                               </button>
                             )}
-                            {(lead.status === "new" || lead.status === "contacted") && (
+                            {lead.status !== "converted" && (
                               <button
-                                onClick={() => handleUpdateStatus(lead.id, "trial_scheduled")}
+                                onClick={() => setTrialLead(lead)}
                                 disabled={updatingLeadId === lead.id || convertingLeadId === lead.id}
                                 style={{
                                   padding: "6px 12px",
@@ -848,6 +850,17 @@ export default function CrmLeadsPage() {
       </div>
 
       {/* Interaction History Drawer (Opens on click) */}
+      {trialLead && (
+        <TrialDialog
+          initialSubjects={[{ leadId: String(trialLead.id) }]}
+          onClose={() => setTrialLead(null)}
+          onSaved={async () => {
+            setLeads((current) => current.map((lead) => lead.id === trialLead.id ? { ...lead, status: "trial_scheduled" } : lead));
+            setSelectedLead((current) => current?.id === trialLead.id ? { ...current, status: "trial_scheduled" } : current);
+            await loadData();
+          }}
+        />
+      )}
       {selectedLead && (
         <aside style={{
           width: "420px",

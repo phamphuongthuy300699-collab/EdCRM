@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { crmAdmin, requireCrmStaff } from "../../../_shared";
 import { databaseUuidSchema } from "@/features/scheduling/schemas";
+import { trialParticipantDto } from "@/features/trials/server";
 
 const roles = new Set(["owner", "admin", "manager", "teacher"]);
 
@@ -34,7 +35,7 @@ export async function GET(request: Request, context: { params: Promise<{ session
   if (previewTeacherId && session.teacher_id !== previewTeacherId) return NextResponse.json({ ok: false, error: "Занятие не найдено" }, { status: 404 });
   if (access.role === "teacher" && session.teacher_id !== access.staffProfileId) return NextResponse.json({ ok: false, error: "Доступно только своё занятие" }, { status: 403 });
 
-  const [{ data: enrollments }, { data: makeups }, { data: attendance }, { data: materials }, { data: homeworkTemplates }, { data: assignments }, { data: payroll }] = await Promise.all([
+  const [{ data: enrollments }, { data: makeups }, { data: attendance }, { data: materials }, { data: homeworkTemplates }, { data: assignments }, { data: payroll }, { data: trialRows }] = await Promise.all([
     admin.from("enrollments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("group_id", session.group_id).eq("status", "active"),
     admin.from("makeup_assignments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("target_session_id", session.id).in("status", ["scheduled", "completed"]),
     admin.from("attendance").select("id, student_id, attendance_status, comment, absence_reason, students(id, full_name)").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id),
@@ -44,6 +45,11 @@ export async function GET(request: Request, context: { params: Promise<{ session
     admin.from("homework_templates").select("id, title, difficulty, course_id, description").eq("organization_id", access.organizationId).eq("status", "published").order("title"),
     admin.from("homework_assignments").select("id, homework_template_id, due_at, status, homework_templates(title)").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id).order("created_at", { ascending: true }),
     admin.from("teacher_payroll_entries").select("id, pay_mode, rate_snapshot, attendee_count, amount, status").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id).maybeSingle(),
+    admin.from("trial_participants")
+      .select("id, trial_event_id, lead_id, student_id, status, result, result_comment, trial_events!inner(lesson_session_id), leads(parent_name, child_name), students(full_name)")
+      .eq("organization_id", access.organizationId)
+      .eq("trial_events.lesson_session_id", session.id)
+      .order("created_at", { ascending: true }),
   ]);
   const attendanceByStudent = new Map((attendance || []).map((row: any) => [row.student_id, row]));
   const students = new Map<string, any>();
@@ -72,6 +78,7 @@ export async function GET(request: Request, context: { params: Promise<{ session
     homeworkTemplates: allowedTemplates,
     assignments: assignments || [],
     payroll: payroll || null,
+    trialParticipants: (trialRows || []).map(trialParticipantDto),
     readOnly: Boolean(previewTeacherId) || session.status === "completed",
     canAssignHomework: !previewTeacherId && ["planned", "live"].includes(session.status)
       && (["owner", "admin"].includes(access.role) || access.role === "teacher"),

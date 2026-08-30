@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@robotics-crm/ui";
 import { AttendanceRoster, type AttendanceRosterRow } from "./AttendanceRoster";
+import { TrialParticipantList } from "@/features/trials/TrialParticipantList";
+import type { TrialParticipantDto } from "@/features/trials/contracts";
 
 type LessonConductData = {
   session: any;
@@ -10,12 +12,14 @@ type LessonConductData = {
   homeworkTemplates: any[];
   assignments: any[];
   payroll?: any | null;
+  trialParticipants?: TrialParticipantDto[];
 };
 
 export function LessonConductPanel({
   data,
   rows,
   readOnly,
+  trialReadOnly = readOnly,
   onRowsChange,
   onSaveAttendance,
   onComplete,
@@ -27,6 +31,7 @@ export function LessonConductPanel({
   data: LessonConductData;
   rows: AttendanceRosterRow[];
   readOnly: boolean;
+  trialReadOnly?: boolean;
   onRowsChange: (rows: AttendanceRosterRow[]) => void;
   onSaveAttendance?: () => void | Promise<void>;
   onComplete?: () => void | Promise<void>;
@@ -72,10 +77,13 @@ export function LessonConductPanel({
         {data.payroll && <section className="card-crm" style={{ background: "white" }}><strong>Начисление: {Number(data.payroll.amount).toLocaleString("ru-RU")} ₽</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{data.payroll.pay_mode === "per_lesson" ? "За занятие" : "За посещение"}</small></section>}
       </div>
 
-      <section className="card-crm" style={{ background: "white", minWidth: 0 }}>
-        <h3 style={{ marginTop: 0 }}>Журнал посещаемости</h3>
-        <AttendanceRoster rows={rows} onChange={onRowsChange} disabled={readOnly || data.session.status !== "live"} onSave={readOnly ? undefined : onSaveAttendance} onComplete={readOnly ? undefined : onComplete} saving={saving} completing={completing} sessionStatus={data.session.status} message={message} />
-      </section>
+      <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
+        {Boolean(data.trialParticipants?.length) && <section className="card-crm" style={{ background: "white", minWidth: 0 }}><TrialParticipantList participants={data.trialParticipants || []} readOnly={trialReadOnly} /></section>}
+        <section className="card-crm" style={{ background: "white", minWidth: 0 }}>
+          <h3 style={{ marginTop: 0 }}>Журнал посещаемости</h3>
+          <AttendanceRoster rows={rows} onChange={onRowsChange} disabled={readOnly || data.session.status !== "live"} onSave={readOnly ? undefined : onSaveAttendance} onComplete={readOnly ? undefined : onComplete} saving={saving} completing={completing} sessionStatus={data.session.status} message={message} />
+        </section>
+      </div>
       <style jsx>{`@media (max-width: 760px) { .lesson-conduct-grid { grid-template-columns: 1fr !important; } }`}</style>
     </div>
   );
