@@ -99,3 +99,26 @@ export function scheduleValidationPayload(error: z.ZodError) {
     fieldErrors,
   };
 }
+
+export function schedulePersistenceErrorPayload(error: { message?: string } | null | undefined) {
+  const message = error?.message || "";
+  const isConflict = [
+    "schedule_resource_conflict",
+    "Schedule rule conflicts with an active group teacher or room",
+    "New schedule conflicts with another lesson",
+  ].some((marker) => message.includes(marker));
+
+  if (isConflict) {
+    return {
+      ok: false as const,
+      code: "SCHEDULE_CONFLICT" as const,
+      error: "Время пересекается с занятием другой группы у преподавателя или в кабинете",
+    };
+  }
+
+  return {
+    ok: false as const,
+    code: "SCHEDULE_SAVE_FAILED" as const,
+    error: "Не удалось сохранить расписание. Проверьте данные и повторите попытку",
+  };
+}

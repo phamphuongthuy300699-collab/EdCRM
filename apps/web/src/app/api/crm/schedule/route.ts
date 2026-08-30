@@ -5,6 +5,7 @@ import { enqueueScheduleNotifications } from "@/features/scheduling/server";
 import {
   databaseUuidSchema,
   scheduleActionSchema,
+  schedulePersistenceErrorPayload,
   scheduleValidationPayload,
 } from "@/features/scheduling/schemas";
 import { normalizeMaxEvents } from "@/lib/bots/max/events";
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
         p_rules: input.rules ?? null,
         p_rebuild_future: input.rebuildFuture,
       });
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+      if (error) return NextResponse.json(schedulePersistenceErrorPayload(error), { status: 409 });
       return NextResponse.json({ ok: true, result: data });
     }
 
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
         p_rules: input.rules,
         p_rebuild_future: input.rebuildFuture,
       });
-      if (error) throw error;
+      if (error) return NextResponse.json(schedulePersistenceErrorPayload(error), { status: 409 });
       return NextResponse.json({ ok: true, result: data });
     }
 

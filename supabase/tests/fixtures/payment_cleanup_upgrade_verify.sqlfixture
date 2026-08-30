@@ -1,0 +1,71 @@
+do $$
+declare
+  org_id constant uuid := '94000000-0000-4000-8000-000000000010';
+begin
+  if (select count(*) from public.guardians where organization_id = org_id) <> 1 then
+    raise exception 'guardian count changed';
+  end if;
+  if (select count(*) from public.students where organization_id = org_id) <> 1 then
+    raise exception 'student count changed';
+  end if;
+  if (select count(*) from public.groups where organization_id = org_id) <> 1 then
+    raise exception 'group count changed';
+  end if;
+  if (select count(*) from public.enrollments where organization_id = org_id) <> 1 then
+    raise exception 'enrollment count changed';
+  end if;
+  if (select count(*) from public.group_schedule_rules where organization_id = org_id) <> 1 then
+    raise exception 'schedule rule count changed';
+  end if;
+  if (select count(*) from public.lesson_sessions where organization_id = org_id) <> 1 then
+    raise exception 'lesson session count changed';
+  end if;
+  if (select count(*) from public.invoices where organization_id = org_id) <> 1 then
+    raise exception 'invoice count changed';
+  end if;
+  if (select count(*) from public.payments where organization_id = org_id) <> 0 then
+    raise exception 'payments were not cleared';
+  end if;
+  if (select count(*) from public.payment_transactions where organization_id = org_id) <> 0 then
+    raise exception 'payment transactions were not cleared';
+  end if;
+  if (select count(*) from public.payment_events where organization_id = org_id) <> 0 then
+    raise exception 'payment events were not cleared';
+  end if;
+  if (select count(*) from public.billing_ledger_entries where organization_id = org_id and payment_id is not null) <> 0 then
+    raise exception 'payment ledger entries were not cleared';
+  end if;
+  if (select count(*) from public.billing_ledger_entries where organization_id = org_id and entry_type = 'manual_debit') <> 1 then
+    raise exception 'non-payment ledger entry changed';
+  end if;
+  if (select balance from public.billing_accounts where organization_id = org_id) <> -200 then
+    raise exception 'billing account was not reconciled';
+  end if;
+  if (select status::text from public.invoices where organization_id = org_id) <> 'issued' then
+    raise exception 'invoice status was not reconciled';
+  end if;
+  if not exists (
+    select 1
+    from pg_trigger trigger
+    join pg_class relation on relation.oid = trigger.tgrelid
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public'
+      and relation.relname = 'billing_ledger_entries'
+      and trigger.tgname = 'billing_ledger_no_update'
+      and trigger.tgenabled = 'O'
+  ) then
+    raise exception 'billing ledger immutability trigger is not enabled';
+  end if;
+end;
+$$;
+
+select jsonb_build_object(
+  'students', (select count(*) from public.students where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'guardians', (select count(*) from public.guardians where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'groups', (select count(*) from public.groups where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'enrollments', (select count(*) from public.enrollments where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'schedule_rules', (select count(*) from public.group_schedule_rules where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'lesson_sessions', (select count(*) from public.lesson_sessions where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'payments', (select count(*) from public.payments where organization_id = '94000000-0000-4000-8000-000000000010'),
+  'account_balance', (select balance from public.billing_accounts where organization_id = '94000000-0000-4000-8000-000000000010')
+) as payment_cleanup_upgrade_evidence;

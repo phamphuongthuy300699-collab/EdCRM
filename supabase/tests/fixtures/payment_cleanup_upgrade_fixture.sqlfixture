@@ -1,0 +1,151 @@
+insert into public.organizations (id, name, slug)
+values ('94000000-0000-4000-8000-000000000010', 'Payment cleanup upgrade', 'payment-cleanup-upgrade');
+
+insert into public.guardians (id, organization_id, full_name)
+values (
+  '94000000-0000-4000-8000-000000000020',
+  '94000000-0000-4000-8000-000000000010',
+  'Payment cleanup guardian'
+);
+
+insert into public.students (id, organization_id, full_name, status)
+values (
+  '94000000-0000-4000-8000-000000000030',
+  '94000000-0000-4000-8000-000000000010',
+  'Payment cleanup student',
+  'active'
+);
+
+insert into public.student_guardians (
+  organization_id, student_id, guardian_id, is_primary, is_billing_contact
+) values (
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000030',
+  '94000000-0000-4000-8000-000000000020',
+  true, true
+);
+
+insert into public.courses (id, organization_id, title, slug)
+values (
+  '94000000-0000-4000-8000-000000000040',
+  '94000000-0000-4000-8000-000000000010',
+  'Payment cleanup course',
+  'payment-cleanup-course'
+);
+
+insert into public.groups (id, organization_id, course_id, title, status)
+values (
+  '94000000-0000-4000-8000-000000000050',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000040',
+  'Payment cleanup group',
+  'active'
+);
+
+insert into public.enrollments (id, organization_id, student_id, group_id)
+values (
+  '94000000-0000-4000-8000-000000000060',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000030',
+  '94000000-0000-4000-8000-000000000050'
+);
+
+insert into public.group_schedule_rules (
+  id, organization_id, group_id, weekday, starts_at, ends_at
+) values (
+  '94000000-0000-4000-8000-000000000070',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000050',
+  6, '15:00', '16:30'
+);
+
+insert into public.lesson_sessions (
+  id, organization_id, group_id, course_id, schedule_rule_id,
+  starts_at, ends_at, lesson_date, status, session_kind
+) values (
+  '94000000-0000-4000-8000-000000000080',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000050',
+  '94000000-0000-4000-8000-000000000040',
+  '94000000-0000-4000-8000-000000000070',
+  '2026-09-05 15:00+03', '2026-09-05 16:30+03', '2026-09-05',
+  'planned', 'regular'
+);
+
+insert into public.invoices (
+  id, organization_id, student_id, guardian_id, status, title, number,
+  amount, due_date, issued_at
+) values (
+  '94000000-0000-4000-8000-000000000090',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000030',
+  '94000000-0000-4000-8000-000000000020',
+  'issued', 'Payment cleanup invoice', 'CLEANUP-1',
+  1000, current_date + 30, now()
+);
+
+insert into public.payments (
+  id, organization_id, invoice_id, student_id, guardian_id,
+  provider, status, amount, paid_at
+) values (
+  '94000000-0000-4000-8000-000000000091',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000090',
+  '94000000-0000-4000-8000-000000000030',
+  '94000000-0000-4000-8000-000000000020',
+  'manual', 'paid', 1000, now()
+);
+
+insert into public.payment_transactions (
+  id, organization_id, payment_id, provider, event_type, payload
+) values (
+  '94000000-0000-4000-8000-000000000092',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000091',
+  'manual', 'paid', '{}'::jsonb
+);
+
+insert into public.payment_events (
+  id, organization_id, payment_id, invoice_id, provider, event_type, payload
+) values (
+  '94000000-0000-4000-8000-000000000093',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000091',
+  '94000000-0000-4000-8000-000000000090',
+  'manual', 'paid', '{}'::jsonb
+);
+
+insert into public.billing_accounts (
+  id, organization_id, guardian_id, balance
+) values (
+  '94000000-0000-4000-8000-000000000094',
+  '94000000-0000-4000-8000-000000000010',
+  '94000000-0000-4000-8000-000000000020',
+  800
+);
+
+insert into public.billing_ledger_entries (
+  id, organization_id, account_id, guardian_id, student_id,
+  entry_type, amount, payment_id, invoice_id, reason
+) values
+  (
+    '94000000-0000-4000-8000-000000000095',
+    '94000000-0000-4000-8000-000000000010',
+    '94000000-0000-4000-8000-000000000094',
+    '94000000-0000-4000-8000-000000000020',
+    '94000000-0000-4000-8000-000000000030',
+    'payment', 1000,
+    '94000000-0000-4000-8000-000000000091',
+    '94000000-0000-4000-8000-000000000090',
+    'Legacy payment credit'
+  ),
+  (
+    '94000000-0000-4000-8000-000000000096',
+    '94000000-0000-4000-8000-000000000010',
+    '94000000-0000-4000-8000-000000000094',
+    '94000000-0000-4000-8000-000000000020',
+    '94000000-0000-4000-8000-000000000030',
+    'manual_debit', -200, null,
+    '94000000-0000-4000-8000-000000000090',
+    'Operational debit that must remain'
+  );

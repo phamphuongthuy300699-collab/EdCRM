@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   databaseUuidSchema,
   scheduleActionSchema,
+  schedulePersistenceErrorPayload,
   scheduleValidationPayload,
 } from "@/features/scheduling/schemas";
 import {
@@ -77,6 +78,25 @@ describe("group legacy teacher hotfix", () => {
       code: "INVALID_SCHEDULE_OPERATION",
       error: "Некорректный преподаватель",
       fieldErrors: { "group.teacherId": "Некорректный преподаватель" },
+    });
+  });
+
+  it("maps database schedule conflicts without exposing raw PostgreSQL errors", () => {
+    expect(schedulePersistenceErrorPayload({
+      message: "schedule_resource_conflict",
+      details: "internal lesson UUID 93000000-0000-4000-8000-000000000042",
+    })).toEqual({
+      ok: false,
+      code: "SCHEDULE_CONFLICT",
+      error: "Время пересекается с занятием другой группы у преподавателя или в кабинете",
+    });
+
+    expect(schedulePersistenceErrorPayload({
+      message: "duplicate key value violates unique constraint lesson_sessions_group_starts_unique",
+    })).toEqual({
+      ok: false,
+      code: "SCHEDULE_SAVE_FAILED",
+      error: "Не удалось сохранить расписание. Проверьте данные и повторите попытку",
     });
   });
 
