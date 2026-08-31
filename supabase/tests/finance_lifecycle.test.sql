@@ -40,15 +40,15 @@ insert into public.groups (
 insert into public.guardians (id, organization_id, full_name) values
   ('90000000-0000-4000-8000-000000000030', '90000000-0000-4000-8000-000000000010', 'Billing guardian'),
   ('90000000-0000-4000-8000-000000000031', '90000000-0000-4000-8000-000000000010', 'Repair guardian');
-insert into public.students (id, organization_id, full_name) values
-  ('90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000010', 'Regular student'),
-  ('90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000010', 'Contact student'),
-  ('90000000-0000-4000-8000-000000000042', '90000000-0000-4000-8000-000000000010', 'Price student'),
-  ('90000000-0000-4000-8000-000000000043', '90000000-0000-4000-8000-000000000010', 'Rate student'),
-  ('90000000-0000-4000-8000-000000000044', '90000000-0000-4000-8000-000000000010', 'Excused student'),
-  ('90000000-0000-4000-8000-000000000045', '90000000-0000-4000-8000-000000000010', 'Unexcused student'),
-  ('90000000-0000-4000-8000-000000000046', '90000000-0000-4000-8000-000000000010', 'Trial student'),
-  ('90000000-0000-4000-8000-000000000047', '90000000-0000-4000-8000-000000000010', 'Makeup student');
+insert into public.students (id, organization_id, full_name, lesson_price) values
+  ('90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000010', 'Regular student', 500),
+  ('90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000010', 'Contact student', 600),
+  ('90000000-0000-4000-8000-000000000042', '90000000-0000-4000-8000-000000000010', 'Price student', null),
+  ('90000000-0000-4000-8000-000000000043', '90000000-0000-4000-8000-000000000010', 'Rate student', 700),
+  ('90000000-0000-4000-8000-000000000044', '90000000-0000-4000-8000-000000000010', 'Excused student', 400),
+  ('90000000-0000-4000-8000-000000000045', '90000000-0000-4000-8000-000000000010', 'Unexcused student', 400),
+  ('90000000-0000-4000-8000-000000000046', '90000000-0000-4000-8000-000000000010', 'Trial student', 800),
+  ('90000000-0000-4000-8000-000000000047', '90000000-0000-4000-8000-000000000010', 'Makeup student', 450);
 insert into public.student_guardians (organization_id, student_id, guardian_id, is_primary, is_billing_contact) values
   ('90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000030', true, true),
   ('90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000031', true, false),
@@ -132,7 +132,7 @@ select is((select count(*)::integer from public.billing_ledger_entries where les
 
 select has_function('public', 'reconcile_lesson_finance', array['uuid','uuid','uuid'], 'lesson reconciliation RPC exists');
 update public.student_guardians set is_billing_contact=true where student_id='90000000-0000-4000-8000-000000000041';
-update public.groups set lesson_price=650 where id='90000000-0000-4000-8000-000000000022';
+update public.students set lesson_price=650 where id='90000000-0000-4000-8000-000000000042';
 do $reconcile$
 begin
   if to_regprocedure('public.reconcile_lesson_finance(uuid,uuid,uuid)') is not null then
@@ -145,7 +145,7 @@ $reconcile$;
 select is((select count(*)::integer from public.billing_ledger_entries where lesson_session_id='90000000-0000-4000-8000-000000000061'), 1, 'billing contact repair creates one debit');
 select ok((select resolved_at is not null from public.finance_warnings where warning_key='billing-contact:90000000-0000-4000-8000-000000000061:90000000-0000-4000-8000-000000000041'), 'billing contact warning is resolved');
 select is((select count(*)::integer from public.billing_ledger_entries where lesson_session_id='90000000-0000-4000-8000-000000000062'), 1, 'lesson price repair creates one debit');
-select ok((select resolved_at is not null from public.finance_warnings where warning_key='lesson-price:90000000-0000-4000-8000-000000000062'), 'lesson price warning is resolved');
+select ok((select resolved_at is not null from public.finance_warnings where warning_key='lesson-price:90000000-0000-4000-8000-000000000062:90000000-0000-4000-8000-000000000042'), 'lesson price warning is resolved');
 
 select public.set_teacher_pay_rate('90000000-0000-4000-8000-000000000010','90000000-0000-4000-8000-000000000002','2026-08-01',125,'90000000-0000-4000-8000-000000000001');
 select is((select amount from public.teacher_payroll_entries where lesson_session_id='90000000-0000-4000-8000-000000000063'), 125.00::numeric, 'teacher rate repair updates accrued payroll snapshot');

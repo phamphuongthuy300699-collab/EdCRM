@@ -75,7 +75,6 @@ export default function CrmGroupsPage() {
   const [editAgeFrom, setEditAgeFrom] = useState("6");
   const [editAgeTo, setEditAgeTo] = useState("9");
   const [editBillingEnabled, setEditBillingEnabled] = useState(false);
-  const [editLessonPrice, setEditLessonPrice] = useState("");
   const [editChargeExcused, setEditChargeExcused] = useState(false);
   const [editChargeUnexcused, setEditChargeUnexcused] = useState(true);
   const [savingGroup, setSavingGroup] = useState(false);
@@ -376,7 +375,6 @@ export default function CrmGroupsPage() {
     setEditAgeFrom(String(group.ageFrom));
     setEditAgeTo(String(group.ageTo));
     setEditBillingEnabled(Boolean(group.billingEnabled));
-    setEditLessonPrice(group.lessonPrice == null ? "" : String(group.lessonPrice));
     setEditChargeExcused(Boolean(group.chargeAbsentExcused));
     setEditChargeUnexcused(group.chargeAbsentUnexcused !== false);
     setShowEditModal(true);
@@ -417,7 +415,7 @@ export default function CrmGroupsPage() {
 
       const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildGroupSaveOperation({
         groupId: editingGroupId,
-        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, lessonPrice: editLessonPrice === "" ? null : Number(editLessonPrice), chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
+        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
         rules: scheduleChanged ? rules : undefined,
         rebuildFuture: rebuildFutureSessions,
       })) });
@@ -1009,7 +1007,7 @@ export default function CrmGroupsPage() {
               <fieldset style={{ border: "1px solid var(--color-border)", borderRadius: 12, padding: 14, display: "grid", gap: 12 }}>
                 <legend style={{ padding: "0 6px", fontWeight: 800 }}>Оплата занятий</legend>
                 <label style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13 }}><input type="checkbox" checked={editBillingEnabled} onChange={(event) => setEditBillingEnabled(event.target.checked)} /><span><strong>Списывать с лицевого счёта</strong><br /><small style={{ color: "var(--color-text-muted)" }}>По умолчанию выключено. Пробные занятия бесплатны.</small></span></label>
-                <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label">Цена одного занятия, ₽</label><input type="number" min="0.01" step="0.01" className="form-input" value={editLessonPrice} onChange={(event) => setEditLessonPrice(event.target.value)} disabled={!editBillingEnabled} placeholder="Например, 750" /></div>
+                <small style={{ color: "var(--color-text-muted)" }}>Цена задаётся персонально в карточке каждого ученика.</small>
                 <label style={{ display: "flex", gap: 8, fontSize: 13 }}><input type="checkbox" checked={editChargeExcused} onChange={(event) => setEditChargeExcused(event.target.checked)} disabled={!editBillingEnabled} /> Списывать за уважительный пропуск</label>
                 <label style={{ display: "flex", gap: 8, fontSize: 13 }}><input type="checkbox" checked={editChargeUnexcused} onChange={(event) => setEditChargeUnexcused(event.target.checked)} disabled={!editBillingEnabled} /> Списывать за неуважительный пропуск</label>
               </fieldset>

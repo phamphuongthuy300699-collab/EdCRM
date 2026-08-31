@@ -11,7 +11,7 @@ const relationFields = {
 const schema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("link").default("link"), studentId: z.string().uuid(), guardianId: z.string().uuid(), ...relationFields }).strict(),
   z.object({ mode: z.literal("createGuardian"), studentId: z.string().uuid(), guardian: z.object({ fullName: z.string().trim().min(1), phone: z.string().optional(), email: z.string().optional() }).strict(), allowDuplicate: z.boolean().default(false), ...relationFields }).strict(),
-  z.object({ mode: z.literal("createStudent"), guardianId: z.string().uuid(), student: z.object({ fullName: z.string().trim().min(1), birthDate: z.string().optional().nullable(), notes: z.string().optional().nullable() }).strict(), ...relationFields }).strict(),
+  z.object({ mode: z.literal("createStudent"), guardianId: z.string().uuid(), student: z.object({ fullName: z.string().trim().min(1), birthDate: z.string().optional().nullable(), notes: z.string().optional().nullable(), lessonPrice: z.number().positive() }).strict(), ...relationFields }).strict(),
 ]);
 
 export async function POST(request: Request) {
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   } else if (input.mode === "createStudent") {
     result = await (admin.rpc("crm_create_student_with_guardians", {
       p_organization_id: access.organizationId,
-      p_student: { full_name: input.student.fullName, birth_date: input.student.birthDate || null, notes: input.student.notes || null, status: "prospect" },
+      p_student: { full_name: input.student.fullName, birth_date: input.student.birthDate || null, notes: input.student.notes || null, status: "prospect", lesson_price: input.student.lessonPrice },
       p_guardians: [{ guardian_id: input.guardianId, relation: input.relation, is_primary: input.isPrimary, is_billing_contact: input.isBillingContact }],
       p_group_id: null,
     }) as any);

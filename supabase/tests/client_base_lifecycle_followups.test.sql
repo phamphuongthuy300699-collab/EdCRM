@@ -24,7 +24,7 @@ select lives_ok($$insert into public.guardians (id,organization_id,full_name,sta
  'guardian lifecycle values and CRM fields are accepted');
 
 select lives_ok($$select public.crm_create_student_with_guardians(
- '92000000-0000-4000-8000-000000000010', jsonb_build_object('full_name','Иван Тестовый','status','prospect'), '[]'::jsonb, null)$$,
+ '92000000-0000-4000-8000-000000000010', jsonb_build_object('full_name','Иван Тестовый','status','prospect','lesson_price',700), '[]'::jsonb, null)$$,
  'student can be created without guardian and group');
 select is((select count(*)::int from public.student_guardians),0,'independent student creates no fake relation');
 select is((select count(*)::int from public.enrollments),0,'independent student creates no fake enrollment');
@@ -72,7 +72,7 @@ select ok((select next_action_completed_at is not null from public.lead_interact
 insert into public.guardians(id,organization_id,full_name,phone,status) values ('92000000-0000-4000-8000-000000000023','92000000-0000-4000-8000-000000000010','Existing guardian','+7 999 000-00-01','prospect');
 insert into public.leads(id,organization_id,parent_name,parent_phone,parent_email,child_name,status) values ('92000000-0000-4000-8000-000000000031','92000000-0000-4000-8000-000000000010','Lead snapshot','89990000001','lead@example.test','Child from lead','contacted');
 insert into public.lead_interactions(organization_id,lead_id,type,summary) values ('92000000-0000-4000-8000-000000000010','92000000-0000-4000-8000-000000000031','call','Before conversion');
-select public.convert_lead_to_student('92000000-0000-4000-8000-000000000031',null);
+select public.convert_lead_to_student('92000000-0000-4000-8000-000000000031',null,700);
 select is((select converted_guardian_id from public.leads where id='92000000-0000-4000-8000-000000000031'),'92000000-0000-4000-8000-000000000023'::uuid,'lead conversion reuses normalized guardian');
 select ok((select guardian_id is not null and student_id is not null from public.lead_interactions where lead_id='92000000-0000-4000-8000-000000000031'),'legacy lead interaction is linked to resulting people');
 select is((select count(*)::int from auth.users),1,'lead conversion does not create an Auth identity');

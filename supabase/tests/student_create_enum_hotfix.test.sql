@@ -21,7 +21,7 @@ values (
 select lives_ok(
   $$select public.crm_create_student_with_guardians(
     '92000000-0000-4000-8000-000000000010',
-    '{"full_name":"Student with existing guardian","status":"active"}'::jsonb,
+    '{"full_name":"Student with existing guardian","status":"active","lesson_price":700}'::jsonb,
     '[{"guardian_id":"92000000-0000-4000-8000-000000000020","relation":"Родитель","is_primary":true,"is_billing_contact":true}]'::jsonb,
     null
   )$$,
@@ -60,7 +60,7 @@ select is(
 select lives_ok(
   $$select public.crm_create_student_with_guardians(
     '92000000-0000-4000-8000-000000000010',
-    '{"full_name":"Student with new guardian","status":"active"}'::jsonb,
+    '{"full_name":"Student with new guardian","status":"active","lesson_price":750}'::jsonb,
     '[{"full_name":"New guardian","relation":"Родитель","is_primary":true,"is_billing_contact":true}]'::jsonb,
     null
   )$$,
@@ -89,7 +89,7 @@ select is(
 select throws_ok(
   $$select public.crm_create_student_with_guardians(
     '92000000-0000-4000-8000-000000000010',
-    '{"full_name":"Invalid status student","status":"not-a-status"}'::jsonb,
+    '{"full_name":"Invalid status student","status":"not-a-status","lesson_price":700}'::jsonb,
     '[{"full_name":"Invalid status guardian","relation":"Родитель","is_primary":true,"is_billing_contact":true}]'::jsonb,
     null
   )$$

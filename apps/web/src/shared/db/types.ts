@@ -315,6 +315,7 @@ export interface Database {
           birth_date: string | null;
           status: 'active' | 'paused' | 'archived';
           notes: string | null;
+          lesson_price: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -325,6 +326,7 @@ export interface Database {
           birth_date?: string | null;
           status?: 'active' | 'paused' | 'archived';
           notes?: string | null;
+          lesson_price?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -335,6 +337,7 @@ export interface Database {
           birth_date?: string | null;
           status?: 'active' | 'paused' | 'archived';
           notes?: string | null;
+          lesson_price?: number | null;
           created_at?: string;
           updated_at?: string;
         };

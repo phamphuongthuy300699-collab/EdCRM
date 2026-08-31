@@ -5,11 +5,18 @@ import { loadStaffAuthContext } from "@/features/staff/auth-context";
 
 export async function POST(request: Request) {
   try {
-    const { leadId, groupId } = await request.json();
+    const { leadId, groupId, lessonPrice } = await request.json();
 
     if (!leadId) {
       return NextResponse.json(
         { ok: false, error: "Не передан leadId" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof lessonPrice !== "number" || !Number.isFinite(lessonPrice) || lessonPrice <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Укажите положительную цену одного занятия" },
         { status: 400 }
       );
     }
@@ -94,7 +101,7 @@ export async function POST(request: Request) {
     // 2. Call the transactional RPC to convert the lead safely
     const { data: rpcResult, error: rpcError } = await supabase.rpc(
       "convert_lead_to_student",
-      { p_lead_id: leadId, p_group_id: groupId || null }
+      { p_lead_id: leadId, p_group_id: groupId || null, p_lesson_price: lessonPrice }
     );
 
     if (rpcError || !rpcResult) {

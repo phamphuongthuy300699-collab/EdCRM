@@ -1,0 +1,27 @@
+do $$
+begin
+  if (select count(*) from public.students where organization_id='99000000-0000-4000-8000-000000000010') <> 3 then
+    raise exception 'student count changed during pricing upgrade';
+  end if;
+  if (select count(*) from public.groups where organization_id='99000000-0000-4000-8000-000000000010') <> 2 then
+    raise exception 'group count changed during pricing upgrade';
+  end if;
+  if (select count(*) from public.enrollments where organization_id='99000000-0000-4000-8000-000000000010') <> 3 then
+    raise exception 'enrollment count changed during pricing upgrade';
+  end if;
+  if (select lesson_price from public.students where id='99000000-0000-4000-8000-000000000030') <> 500 then
+    raise exception 'unambiguous group price was not preserved';
+  end if;
+  if (select lesson_price is not null from public.students where id='99000000-0000-4000-8000-000000000031') then
+    raise exception 'price was invented for a student without a priced group';
+  end if;
+  if (select lesson_price is not null from public.students where id='99000000-0000-4000-8000-000000000032') then
+    raise exception 'ambiguous group prices were guessed';
+  end if;
+  if (select sum(lesson_price) from public.groups where organization_id='99000000-0000-4000-8000-000000000010') <> 1100 then
+    raise exception 'legacy group prices changed during upgrade';
+  end if;
+end;
+$$;
+
+select 'student lesson pricing upgrade preserved all fixtures' as result;

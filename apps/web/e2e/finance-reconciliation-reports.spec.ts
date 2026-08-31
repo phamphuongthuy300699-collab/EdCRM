@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 const output = path.resolve(process.cwd(), "../../docs/media/finance-reconciliation");
 fs.mkdirSync(output, { recursive: true });
 const payment = { id: "20000000-0000-4000-8000-000000000001", amount: 2400, provider: "manual", status: "paid", paid_at: "2026-08-03T10:00:00Z", reflected: false, invoices: { number: "TEST-001" }, guardians: { full_name: "Тестовый плательщик" } };
-const warning = { id: "warning-1", warning_type: "missing_lesson_price", lesson_session_id: "20000000-0000-4000-8000-000000000002", details: { groupId: "20000000-0000-4000-8000-000000000003" }, lesson_sessions: { lesson_date: "2026-08-04", group_id: "20000000-0000-4000-8000-000000000003", groups: { title: "Тестовая группа" } } };
+const warning = { id: "warning-1", warning_type: "missing_lesson_price", lesson_session_id: "20000000-0000-4000-8000-000000000002", student_id: "20000000-0000-4000-8000-000000000004", details: { groupId: "20000000-0000-4000-8000-000000000003" }, lesson_sessions: { lesson_date: "2026-08-04", group_id: "20000000-0000-4000-8000-000000000003", groups: { title: "Тестовая группа" } } };
 
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
@@ -65,8 +65,8 @@ test.describe("finance reconciliation and reports", () => {
     await expect(page.getByText(/учтено/)).toBeVisible();
 
     await page.getByRole("button", { name: "Проблемы" }).click();
-    await expect(page.getByText("Не задана цена занятия")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Настроить стоимость группы" })).toHaveAttribute("href", /crm\/groups/);
+    await expect(page.getByText("Не задан персональный тариф")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Указать тариф ученика" })).toHaveAttribute("href", "/crm/students/20000000-0000-4000-8000-000000000004");
     await page.getByRole("button", { name: "Повторить финансовую обработку" }).click();
     await expect(page.getByText("Открытых финансовых проблем нет.")).toBeVisible();
     await page.screenshot({ path: path.join(output, "finance-problems-repaired.png"), fullPage: true });

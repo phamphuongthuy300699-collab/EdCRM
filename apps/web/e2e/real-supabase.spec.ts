@@ -59,6 +59,7 @@ test.describe("Real Supabase E2E Smoke Test", () => {
     await page.waitForSelector("h3:has-text('Зачислить ученика')");
 
     // Select group and confirm
+    await page.getByLabel("Цена одного занятия, ₽ *").fill("750");
     await page.selectOption("select", { label: "LEGO Start 1" });
     await page.locator('button.btn-primary-crm:has-text("Зачислить")').click();
 

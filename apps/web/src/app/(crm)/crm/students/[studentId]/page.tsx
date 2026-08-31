@@ -61,6 +61,7 @@ export default function StudentDetailPage() {
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editStatus, setEditStatus] = useState<"active" | "paused" | "archived">("active");
   const [editNotes, setEditNotes] = useState("");
+  const [editLessonPrice, setEditLessonPrice] = useState("");
   const [editParentName, setEditParentName] = useState("");
   const [editParentPhone, setEditParentPhone] = useState("");
   const [editParentEmail, setEditParentEmail] = useState("");
@@ -155,6 +156,7 @@ export default function StudentDetailPage() {
         setEditBirthDate(found.birth_date);
         setEditStatus(found.status as any);
         setEditNotes(found.notes || "");
+        setEditLessonPrice((found as any).lessonPrice == null ? "750" : String((found as any).lessonPrice));
         setEditParentName(found.parent);
         setEditParentPhone(found.phone);
         setEditParentEmail(found.email || "");
@@ -179,6 +181,7 @@ export default function StudentDetailPage() {
           birth_date,
           status,
           notes,
+          lesson_price,
           organization_id,
           enrollments (
             group_id,
@@ -240,6 +243,7 @@ export default function StudentDetailPage() {
         level: courseTitle,
         project: s.notes || "Нет проекта",
         notes: s.notes,
+        lessonPrice: s.lesson_price == null ? null : Number(s.lesson_price),
         organization_id: s.organization_id
       });
 
@@ -248,6 +252,7 @@ export default function StudentDetailPage() {
       setEditBirthDate(s.birth_date || "");
       setEditStatus(s.status);
       setEditNotes(s.notes || "");
+      setEditLessonPrice(s.lesson_price == null ? "" : String(s.lesson_price));
       setEditParentName(parentName);
       setEditParentPhone(parentPhone);
       setEditParentEmail(parentEmail);
@@ -345,6 +350,7 @@ export default function StudentDetailPage() {
           birth_date: editBirthDate,
           status: editStatus,
           notes: editNotes,
+          lessonPrice: Number(editLessonPrice),
           project: editNotes || prev.project,
           parent: editParentName,
           phone: editParentPhone,
@@ -363,7 +369,8 @@ export default function StudentDetailPage() {
           full_name: editStudentName,
           birth_date: editBirthDate || null,
           status: editStatus,
-          notes: editNotes
+          notes: editNotes,
+          lesson_price: Number(editLessonPrice)
         })
         .eq("id", student.id);
 
@@ -660,6 +667,12 @@ export default function StudentDetailPage() {
                 <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Курс</span>
                 <div style={{ fontWeight: 700, fontSize: "15px", marginTop: "4px" }}>{student.level || "Не определен"}</div>
               </div>
+              <div>
+                <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Цена одного занятия</span>
+                <div style={{ fontWeight: 700, fontSize: "15px", marginTop: "4px" }}>
+                  {student.lessonPrice == null ? "Тариф не задан" : `${Number(student.lessonPrice).toLocaleString("ru-RU")} ₽`}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -877,6 +890,21 @@ export default function StudentDetailPage() {
                   <option value="paused">На паузе</option>
                   <option value="archived">В архиве</option>
                 </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="edit-student-lesson-price">Цена одного занятия, ₽ *</label>
+                <input
+                  id="edit-student-lesson-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="form-input"
+                  required
+                  value={editLessonPrice}
+                  onChange={(e) => setEditLessonPrice(e.target.value)}
+                />
+                <small style={{ color: "var(--color-text-muted)" }}>Новая цена применяется только к будущим списаниям.</small>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap;
-select plan(13);
+select plan(16);
 
 select ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -27,6 +27,9 @@ select ok(not has_function_privilege('authenticated', 'public.convert_lead_to_st
 select ok(not has_function_privilege('authenticated', 'public.calculate_invoice_status(uuid)', 'EXECUTE'), 'authenticated cannot probe invoice status RPC');
 select ok(not has_function_privilege('authenticated', 'public.sync_invoice_status_from_payments(uuid)', 'EXECUTE'), 'authenticated cannot mutate invoice status RPC');
 select ok(has_function_privilege('service_role', 'public.convert_lead_to_student(uuid,uuid)', 'EXECUTE'), 'service role retains lead conversion');
+select ok(not has_function_privilege('anon', 'public.convert_lead_to_student(uuid,uuid,numeric)', 'EXECUTE'), 'anon cannot execute priced lead conversion');
+select ok(not has_function_privilege('authenticated', 'public.convert_lead_to_student(uuid,uuid,numeric)', 'EXECUTE'), 'authenticated cannot execute service-only priced lead conversion');
+select ok(has_function_privilege('service_role', 'public.convert_lead_to_student(uuid,uuid,numeric)', 'EXECUTE'), 'service role retains priced lead conversion');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values

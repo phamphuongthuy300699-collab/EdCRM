@@ -111,6 +111,7 @@ export default function CrmLeadsPage() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [leadToConvert, setLeadToConvert] = useState<Lead | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [conversionLessonPrice, setConversionLessonPrice] = useState("");
 
   const [convertingLeadId, setConvertingLeadId] = useState<string | number | null>(null);
   const [updatingLeadId, setUpdatingLeadId] = useState<string | number | null>(null);
@@ -277,6 +278,7 @@ export default function CrmLeadsPage() {
   const handleConvertLead = (lead: Lead) => {
     setLeadToConvert(lead);
     setSelectedGroupId("");
+    setConversionLessonPrice("");
     setShowConvertModal(true);
   };
 
@@ -300,7 +302,8 @@ export default function CrmLeadsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           leadId, 
-          groupId: selectedGroupId || undefined 
+          groupId: selectedGroupId || undefined,
+          lessonPrice: Number(conversionLessonPrice),
         }),
       });
 
@@ -1212,6 +1215,21 @@ export default function CrmLeadsPage() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="lead-conversion-lesson-price">Цена одного занятия, ₽ *</label>
+                <input
+                  id="lead-conversion-lesson-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="form-input"
+                  required
+                  value={conversionLessonPrice}
+                  onChange={(e) => setConversionLessonPrice(e.target.value)}
+                  placeholder="Например, 750"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Выберите учебную группу</label>
                 <select 
                   className="form-input" 
@@ -1242,7 +1260,7 @@ export default function CrmLeadsPage() {
                   variant="primary-crm" 
                   style={{ flex: 1 }}
                   onClick={handleConvertLeadConfirm}
-                  disabled={convertingLeadId === leadToConvert.id}
+                  disabled={convertingLeadId === leadToConvert.id || !(Number(conversionLessonPrice) > 0)}
                 >
                   {convertingLeadId === leadToConvert.id ? "Зачисление..." : "Зачислить"}
                 </Button>

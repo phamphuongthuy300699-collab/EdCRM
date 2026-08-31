@@ -31,6 +31,7 @@ interface Student {
   age: number;
   group: string;
   groupId?: string | null;
+  lessonPrice?: number | null;
   parent: string;
   phone: string;
   parentEmail?: string | null;
@@ -58,6 +59,7 @@ export default function CrmStudentsPage() {
   const [newStudentName, setNewStudentName] = useState("");
   const [newBirthDate, setNewBirthDate] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newLessonPrice, setNewLessonPrice] = useState("");
   const [newParentName, setNewParentName] = useState("");
   const [newParentPhone, setNewParentPhone] = useState("");
   const [newParentEmail, setNewParentEmail] = useState("");
@@ -172,6 +174,7 @@ export default function CrmStudentsPage() {
             birth_date,
             status,
             notes,
+            lesson_price,
             enrollments (
               group_id,
               status,
@@ -238,6 +241,7 @@ export default function CrmStudentsPage() {
                 age: ageNum,
                 group: groupTitle,
                 groupId: activeEnroll?.group_id || null,
+                lessonPrice: s.lesson_price == null ? null : Number(s.lesson_price),
                 parent: parentName,
                 phone: parentPhone,
                 parentEmail: parentLink?.email || null,
@@ -504,6 +508,7 @@ export default function CrmStudentsPage() {
           fullName: newStudentName,
           birthDate: newBirthDate || null,
           notes: newNotes || null,
+          lessonPrice: Number(newLessonPrice),
           status: "prospect",
           groupId: selectedGroupId || null,
           guardians: guardianPayloads,
@@ -543,6 +548,7 @@ export default function CrmStudentsPage() {
         age: newBirthDate ? Math.floor((Date.now() - new Date(newBirthDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : 8,
         group: groupTitle,
         groupId: selectedGroupId || null,
+        lessonPrice: Number(newLessonPrice),
         parent: guardian.full_name,
         phone: guardian.phone,
         parentEmail: guardian.email || null,
@@ -563,6 +569,7 @@ export default function CrmStudentsPage() {
       setNewStudentName("");
       setNewBirthDate("");
       setNewNotes("");
+      setNewLessonPrice("");
       setNewParentName("");
       setNewParentPhone("");
       setNewParentEmail("");
@@ -985,6 +992,22 @@ export default function CrmStudentsPage() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="new-student-lesson-price">Цена одного занятия, ₽ *</label>
+                <input
+                  id="new-student-lesson-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="form-input"
+                  placeholder="Например, 750"
+                  required
+                  value={newLessonPrice}
+                  onChange={(e) => setNewLessonPrice(e.target.value)}
+                />
+                <small style={{ color: "var(--color-text-muted)" }}>Персональный тариф ученика; применяется к новым списаниям.</small>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Учебная группа</label>
                 <select 
                   className="form-input" 
@@ -1155,7 +1178,7 @@ export default function CrmStudentsPage() {
 
       {/* Details Drawer */}
       {selectedStudent && (
-        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
+        <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong> · Занятие: <strong>{selectedStudent.lessonPrice == null ? "тариф не задан" : `${selectedStudent.lessonPrice.toLocaleString("ru-RU")} ₽`}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
           <section className="card-crm" style={{padding:14,marginBottom:16,display:"grid",gap:10}}><strong>Добавить родителя</strong><div>{selectedStudent.parent&&selectedStudent.parent!=="Не указан"?selectedStudent.parent:"Родитель пока не указан"}</div><select className="form-input" value={guardianToLink} onChange={event=>setGuardianToLink(event.target.value)}><option value="">Выбрать существующего родителя</option>{guardianOptions.filter(item=>item.status!=="archived").map(item=><option key={item.id} value={item.id}>{item.full_name} · {item.phone||item.email||"без контакта"}</option>)}</select><Button type="button" variant="secondary-crm" disabled={!guardianToLink} onClick={linkGuardian}>Привязать существующего</Button><input className="form-input" placeholder="ФИО нового родителя" value={newLinkedGuardian.fullName} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,fullName:event.target.value})}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><input className="form-input" placeholder="Телефон" value={newLinkedGuardian.phone} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,phone:event.target.value})}/><input className="form-input" placeholder="Email" value={newLinkedGuardian.email} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,email:event.target.value})}/></div><Button type="button" variant="secondary-crm" disabled={!newLinkedGuardian.fullName.trim()} onClick={createAndLinkGuardian}>Создать и привязать</Button></section>
           {/* Student Info Body */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
