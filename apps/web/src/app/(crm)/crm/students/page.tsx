@@ -6,17 +6,9 @@ import {
   Users, 
   Search, 
   UserPlus, 
-  Phone, 
-  CreditCard, 
+  Phone,
   Calendar, 
   MoreVertical,
-  Activity,
-  Award,
-  CheckCircle2,
-  Archive,
-  RotateCcw,
-  ShieldCheck,
-  Trash2
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/shared/db/supabase/browser";
 import { isDemoMode } from "@/shared/utils/demo";
@@ -24,11 +16,14 @@ import { resolveStaffProfileId } from "@/features/staff/browser-auth";
 import { useActionConfirmation } from "@/shared/ui/useActionConfirmation";
 import { studentOperationalState, summarizeStudents } from "@/features/students/domain";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
+import { TrialDialog } from "@/features/trials/TrialDialog";
 
 interface Student {
   id: string | number;
   name: string;
-  age: number;
+  birthDate: string | null;
+  age: number | null;
+  notes: string | null;
   group: string;
   groupId?: string | null;
   lessonPrice?: number | null;
@@ -36,13 +31,17 @@ interface Student {
   phone: string;
   parentEmail?: string | null;
   guardianId?: string | null;
-  paymentStatus: "paid" | "pending" | "overdue";
-  attendance: string; // Rate string (e.g. "95%")
-  attendanceValue: number; // Numeric rate (e.g. 95)
   status: "prospect" | "active" | "paused" | "inactive" | "archived";
-  level: string;
-  project: string;
-  homeworkProgress: number; // Homework score (0-100)
+}
+
+function calculateAge(birthDate: string | null) {
+  if (!birthDate) return null;
+  const today = new Date();
+  const birth = new Date(`${birthDate}T00:00:00`);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDelta = today.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age >= 0 ? age : null;
 }
 
 export default function CrmStudentsPage() {
@@ -95,6 +94,12 @@ export default function CrmStudentsPage() {
   const [enrollmentGroupId, setEnrollmentGroupId] = useState("");
   const [savingStudentOperation, setSavingStudentOperation] = useState(false);
   const [studentOperationMessage, setStudentOperationMessage] = useState("");
+  const [studentInteractions, setStudentInteractions] = useState<any[]>([]);
+  const [editStudentName, setEditStudentName] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editLessonPrice, setEditLessonPrice] = useState("");
+  const [trialStudent, setTrialStudent] = useState<Student | null>(null);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -124,12 +129,12 @@ export default function CrmStudentsPage() {
   };
 
   const initialStudents: Student[] = [
-    { id: 1, name: "Игорь Петров", age: 8, group: "LEGO Start 1", groupId: "g1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Конструктор 2", project: "Робот-сумо", homeworkProgress: 90 },
-    { id: 2, name: "Данил Соловьев", age: 9, group: "LEGO Start 1", groupId: "g1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", paymentStatus: "paid", attendance: "90%", attendanceValue: 90, status: "active", level: "Конструктор 2", project: "Кран-манипулятор", homeworkProgress: 80 },
-    { id: 3, name: "Алиса Волкова", age: 10, group: "Scratch Basic", groupId: "g3", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", paymentStatus: "pending", attendance: "95%", attendanceValue: 95, status: "active", level: "Аниматор Scratch", project: "Лабиринт", homeworkProgress: 85 },
-    { id: 4, name: "Кирилл Семенов", age: 7, group: "Без группы", groupId: null, parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", paymentStatus: "overdue", attendance: "80%", attendanceValue: 80, status: "active", level: "Новичок", project: "Ветряк", homeworkProgress: 60 },
-    { id: 5, name: "Даша Смирнова", age: 9, group: "Scratch Basic", groupId: "g3", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", paymentStatus: "paid", attendance: "100%", attendanceValue: 100, status: "active", level: "Кодер Scratch", project: "Кликер звезд", homeworkProgress: 95 },
-    { id: 6, name: "Максим Козлов", age: 12, group: "Python Junior", groupId: "g4", parent: "Алексей К.", phone: "+7 (980) 444-55-66", paymentStatus: "paid", attendance: "85%", attendanceValue: 85, status: "paused", level: "Разработчик", project: "Чат-бот", homeworkProgress: 75 }
+    { id: 1, name: "Игорь Петров", birthDate: "2018-03-12", age: 8, notes: "Любит конструирование", group: "LEGO Start 1", groupId: "g1", parent: "Анна Петрова", phone: "+7 (905) 555-12-34", status: "active" },
+    { id: 2, name: "Данил Соловьев", birthDate: "2017-05-20", age: 9, notes: null, group: "LEGO Start 1", groupId: "g1", parent: "Михаил С.", phone: "+7 (910) 333-22-11", status: "active" },
+    { id: 3, name: "Алиса Волкова", birthDate: "2016-01-15", age: 10, notes: null, group: "Scratch Basic", groupId: "g3", parent: "Сергей Волков", phone: "+7 (920) 222-33-44", status: "active" },
+    { id: 4, name: "Кирилл Семенов", birthDate: null, age: null, notes: null, group: "Без группы", groupId: null, parent: "Ольга Семенова", phone: "+7 (915) 333-55-66", status: "active" },
+    { id: 5, name: "Даша Смирнова", birthDate: "2017-08-22", age: 9, notes: null, group: "Scratch Basic", groupId: "g3", parent: "Елена Смирнова", phone: "+7 (903) 111-22-33", status: "active" },
+    { id: 6, name: "Максим Козлов", birthDate: "2014-02-02", age: 12, notes: null, group: "Python Junior", groupId: "g4", parent: "Алексей К.", phone: "+7 (980) 444-55-66", status: "paused" }
   ];
 
   useEffect(() => {
@@ -197,12 +202,6 @@ export default function CrmStudentsPage() {
           `)
           .eq("organization_id", organizationId);
 
-        // Fetch attendance
-        const { data: attendanceData } = await supabase
-          .from("attendance")
-          .select("student_id, is_present")
-          .eq("organization_id", organizationId);
-
         const demo = isDemoMode();
 
         if (demo) {
@@ -213,7 +212,6 @@ export default function CrmStudentsPage() {
               // Find active enrollments
               const activeEnroll = s.enrollments?.find((e: any) => e.status === "active" && e.groups) || null;
               const groupTitle = activeEnroll ? activeEnroll.groups.title : "Без группы";
-              const courseTitle = activeEnroll ? activeEnroll.groups.courses?.title : "Робототехника";
 
               // Find primary guardian
               const guardianRelations = Array.isArray(s.student_guardians) ? s.student_guardians : [];
@@ -222,23 +220,12 @@ export default function CrmStudentsPage() {
               const parentName = parentLink ? parentLink.full_name : "Не указан";
               const parentPhone = parentLink ? parentLink.phone : "—";
 
-              // Calculate attendance rate
-              const sAtt = attendanceData?.filter((a: any) => a.student_id === s.id) || [];
-              const totalAtt = sAtt.length;
-              const presentAtt = sAtt.filter((a: any) => a.is_present).length;
-              const attVal = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100;
-
-              // Age calculation
-              let ageNum = 8;
-              if (s.birth_date) {
-                const diffMs = Date.now() - new Date(s.birth_date).getTime();
-                ageNum = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
-              }
-
               return {
                 id: s.id,
                 name: s.full_name,
-                age: ageNum,
+                birthDate: s.birth_date || null,
+                age: calculateAge(s.birth_date),
+                notes: s.notes || null,
                 group: groupTitle,
                 groupId: activeEnroll?.group_id || null,
                 lessonPrice: s.lesson_price == null ? null : Number(s.lesson_price),
@@ -246,13 +233,7 @@ export default function CrmStudentsPage() {
                 phone: parentPhone,
                 parentEmail: parentLink?.email || null,
                 guardianId: parentRelation?.guardian_id || null,
-                paymentStatus: "paid" as const,
-                attendance: `${attVal}%`,
-                attendanceValue: attVal,
                 status: studentOperationalState({ status: s.status, enrollments: s.enrollments }).status,
-                level: courseTitle === "LEGO Start" ? "Конструктор" : "Программист",
-                project: s.notes || "Первый проект",
-                homeworkProgress: attVal > 80 ? 90 : 70
               };
             });
             setStudents(formatted);
@@ -368,10 +349,15 @@ export default function CrmStudentsPage() {
 
   const handleOpenDrawer = async (student: any) => {
     setSelectedStudent(student);
+    setEditStudentName(student.name);
+    setEditBirthDate(student.birthDate || "");
+    setEditNotes(student.notes || "");
+    setEditLessonPrice(student.lessonPrice == null ? "" : String(student.lessonPrice));
     setEnrollmentGroupId(student.groupId || "");
     setStudentOperationMessage("");
     setStudentInvoices([]);
     setStudentAttendance([]);
+    setStudentInteractions([]);
     setParentAccess(null);
     setParentAccessMessage("");
     setTemporaryParentPassword("");
@@ -387,6 +373,7 @@ export default function CrmStudentsPage() {
         { lesson_date: "2026-06-09", is_present: true },
         { lesson_date: "2026-06-02", is_present: true }
       ]);
+      setStudentInteractions([]);
       return;
     }
 
@@ -410,10 +397,53 @@ export default function CrmStudentsPage() {
         .order("lesson_date", { ascending: false });
 
       if (att) setStudentAttendance(att);
+
+      const interactionsResponse = await fetch(`/api/crm/interactions?studentId=${encodeURIComponent(String(student.id))}`);
+      const interactionsPayload = await interactionsResponse.json();
+      if (interactionsResponse.ok && interactionsPayload.ok) {
+        setStudentInteractions(interactionsPayload.interactions || []);
+      } else {
+        setStudentOperationMessage(interactionsPayload.error || "Не удалось загрузить историю взаимодействий");
+      }
     } catch (err) {
       console.error("Error loading drawer details:", err);
+      setStudentOperationMessage("Не удалось загрузить часть данных карточки ученика");
     } finally {
       setLoadingDrawer(false);
+    }
+  };
+
+  const saveStudentDetails = async () => {
+    if (!selectedStudent || typeof selectedStudent.id === "number" || savingStudentOperation) return;
+    try {
+      setSavingStudentOperation(true);
+      setStudentOperationMessage("");
+      const response = await fetch(`/api/crm/students/${selectedStudent.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fullName: editStudentName,
+          birthDate: editBirthDate || null,
+          notes: editNotes.trim() || null,
+          lessonPrice: Number(editLessonPrice),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось сохранить данные ученика");
+      const patch = {
+        name: payload.student.fullName,
+        birthDate: payload.student.birthDate,
+        age: calculateAge(payload.student.birthDate),
+        notes: payload.student.notes,
+        lessonPrice: payload.student.lessonPrice,
+      };
+      setStudents((current) => current.map((student) => student.id === selectedStudent.id ? { ...student, ...patch } : student));
+      setSelectedStudent((current: Student | null) => current ? { ...current, ...patch } : current);
+      setStudentOperationMessage("Данные ученика сохранены");
+    } catch (cause) {
+      setStudentOperationMessage((cause as Error).message);
+    } finally {
+      setSavingStudentOperation(false);
     }
   };
 
@@ -533,19 +563,18 @@ export default function CrmStudentsPage() {
 
       // 4. Enroll in group if group selected
       let groupTitle = "Без группы";
-      let level = "Робототехника";
       if (selectedGroupId) {
         const selGroup = groups.find(g => g.id === selectedGroupId);
         groupTitle = selGroup ? selGroup.title : "Без группы";
-        level = "Активный ученик";
-
       }
 
       // 5. Append student to local state list
       const newStudentObj: Student = {
         id: student.id,
         name: student.full_name,
-        age: newBirthDate ? Math.floor((Date.now() - new Date(newBirthDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : 8,
+        birthDate: newBirthDate || null,
+        age: calculateAge(newBirthDate || null),
+        notes: newNotes.trim() || null,
         group: groupTitle,
         groupId: selectedGroupId || null,
         lessonPrice: Number(newLessonPrice),
@@ -553,13 +582,7 @@ export default function CrmStudentsPage() {
         phone: guardian.phone,
         parentEmail: guardian.email || null,
         guardianId: guardian.id,
-        paymentStatus: "paid",
-        attendance: "100%",
-        attendanceValue: 100,
         status: "prospect",
-        level,
-        project: student.notes || "Первый проект",
-        homeworkProgress: 100
       };
 
       setStudents([newStudentObj, ...students]);
@@ -607,8 +630,10 @@ export default function CrmStudentsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "prospect": return <span className="badge badge-blue">Потенциальный</span>;
       case "active": return <span className="badge badge-green">Активен</span>;
       case "paused": return <span className="badge badge-amber">На паузе</span>;
+      case "inactive": return <span className="badge badge-gray">Неактивен</span>;
       case "archived": return <span className="badge badge-gray">В архиве</span>;
       default: return <span className="badge badge-gray">{status}</span>;
     }
@@ -758,44 +783,19 @@ export default function CrmStudentsPage() {
             </div>
           </div>
         ) : (
-          <table style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            textAlign: "left",
-            fontSize: "var(--font-small)"
-          }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "var(--font-small)" }}>
             <thead>
-              <tr style={{
-                background: "var(--color-bg)",
-                borderBottom: "1px solid var(--color-border)",
-                fontWeight: 700,
-                color: "var(--color-text)",
-                height: "48px"
-              }}>
+              <tr style={{ background: "var(--color-bg)", borderBottom: "1px solid var(--color-border)", fontWeight: 700, color: "var(--color-text)", height: "48px" }}>
                 <th style={{ padding: "0 24px" }}>Ученик</th>
-                <th>Учебная группа / EdTech Прогресс</th>
-                <th>Успеваемость (Посещаемость + ДЗ)</th>
+                <th>Учебная группа</th>
                 <th>Родитель</th>
-                <th>Телефон</th>
-                <th>Оплата</th>
                 <th>Статус</th>
                 <th style={{ padding: "0 24px", textAlign: "right" }}>Действия</th>
               </tr>
             </thead>
             <tbody>
-              {filteredStudents.map((student) => {
-                // Calculate combined progress index
-                const combinedScore = Math.round(student.attendanceValue * 0.6 + student.homeworkProgress * 0.4);
-                let progressColor = "var(--color-success)";
-                if (combinedScore < 75) progressColor = "var(--color-warning)";
-                if (combinedScore < 60) progressColor = "var(--color-danger)";
-
-                return (
-                  <tr key={student.id} style={{
-                    borderBottom: "1px solid var(--color-border)",
-                    height: "72px",
-                    transition: "background 0.2s"
-                  }} className="table-row">
+              {filteredStudents.map((student) => (
+                  <tr key={student.id} style={{ borderBottom: "1px solid var(--color-border)", height: "72px", transition: "background 0.2s" }} className="table-row">
                     <td style={{ padding: "0 24px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <div style={{
@@ -814,73 +814,17 @@ export default function CrmStudentsPage() {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{student.name}</span>
-                          <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{student.age} лет</span>
+                          <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{student.age === null ? "Возраст не указан" : `${student.age} лет`}</span>
                         </div>
                       </div>
                     </td>
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{student.group}</span>
-                        <span style={{ fontSize: "11px", color: "var(--color-primary-dark)", fontWeight: 500 }}>
-                          {student.level} · Проект: {student.project}
-                        </span>
-                      </div>
-                    </td>
-                    
-                    {/* Visual Progress Score */}
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "160px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 700 }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-                            <Activity size={10} style={{ color: "var(--color-text-muted)" }} />
-                            <span>Прогресс:</span>
-                          </span>
-                          <span style={{ color: progressColor }}>{combinedScore}%</span>
-                        </div>
-                        {/* Progress Bar Container */}
-                        <div style={{ width: "100%", height: "6px", background: "var(--color-border)", borderRadius: "3px", overflow: "hidden" }}>
-                          <div style={{ width: `${combinedScore}%`, height: "100%", background: progressColor, borderRadius: "3px", transition: "width 0.3s" }} />
-                        </div>
-                        <span style={{ fontSize: "9px", color: "var(--color-text-muted)" }}>
-                          Посещ: {student.attendance} · ДЗ: {student.homeworkProgress}%
-                        </span>
-                      </div>
-                    </td>
-
-                    <td>{student.parent}</td>
-                    <td>{student.phone}</td>
-                    <td>{getPaymentStatusBadge(student.paymentStatus)}</td>
+                    <td><strong>{student.group}</strong></td>
+                    <td><span style={{ display: "block", fontWeight: 650 }}>{student.parent}</span><small style={{ color: "var(--color-text-muted)" }}>{student.phone !== "—" ? student.phone : "Телефон не указан"}</small></td>
                     <td>{getStatusBadge(student.status)}</td>
                     <td style={{ padding: "0 24px", textAlign: "right" }}>
                       <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                        <button title="Контакты" style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-border)",
-                          background: "white",
-                          color: "var(--color-text)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}>
-                          <Phone size={14} />
-                        </button>
-                        <button title="История оплат" style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-border)",
-                          background: "white",
-                          color: "var(--color-text)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}>
-                          <CreditCard size={14} />
-                        </button>
+                        {student.phone && student.phone !== "—" && <a href={`tel:${student.phone}`} aria-label={`Позвонить родителю ${student.parent}`} title="Позвонить" style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--color-border)", background: "white", color: "var(--color-text)", display: "flex", alignItems: "center", justifyContent: "center" }}><Phone size={14} /></a>}
+                        {student.status !== "archived" && <button type="button" onClick={() => setTrialStudent(student)} title="Записать на пробное" aria-label={`Записать ${student.name} на пробное`} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--color-border)", background: "white", color: "#6d28d9", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Calendar size={14} /></button>}
                         <button onClick={() => handleOpenDrawer(student)} title="Подробнее" style={{
                           width: "32px",
                           height: "32px",
@@ -895,75 +839,25 @@ export default function CrmStudentsPage() {
                         }}>
                           <MoreVertical size={14} />
                         </button>
-                        {student.status === "archived" ? (
-                          <button onClick={() => handleStudentLifecycle(student, "restore")} title="Восстановить" style={{
-                            width: "32px",
-                            height: "32px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--color-border)",
-                            background: "white",
-                            color: "var(--color-text)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer"
-                          }}>
-                            <RotateCcw size={14} />
-                          </button>
-                        ) : (
-                          <button onClick={() => handleStudentLifecycle(student, "archive")} title="Архивировать" style={{
-                            width: "32px",
-                            height: "32px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--color-border)",
-                            background: "white",
-                            color: "var(--color-text)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer"
-                          }}>
-                            <Archive size={14} />
-                          </button>
-                        )}
-                        <button onClick={() => handleStudentLifecycle(student, "anonymize")} title="Анонимизировать ПДн" style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-border)",
-                          background: "white",
-                          color: "#B45309",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}>
-                          <ShieldCheck size={14} />
-                        </button>
-                        <button onClick={() => handleStudentLifecycle(student, "delete")} title="Удалить" style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-border)",
-                          background: "white",
-                          color: "#DC2626",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer"
-                        }}>
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     </td>
                   </tr>
-                );
-              })}
+              ))}
             </tbody>
           </table>
         )}
       </div>
       {actionModal}
+      {trialStudent && (
+        <TrialDialog
+          initialSubjects={[{ studentId: String(trialStudent.id) }]}
+          onClose={() => setTrialStudent(null)}
+          onSaved={async () => {
+            setReloadKey((value) => value + 1);
+            if (selectedStudent?.id === trialStudent.id) await handleOpenDrawer({ ...selectedStudent });
+          }}
+        />
+      )}
       {/* Add Student Modal */}
       {showAddModal && (
         <CrmDialog title="Добавить ученика вручную" description="Родителя и группу можно добавить позже" onClose={() => setShowAddModal(false)} width={620}>
@@ -1179,6 +1073,23 @@ export default function CrmStudentsPage() {
       {/* Details Drawer */}
       {selectedStudent && (
         <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong> · Занятие: <strong>{selectedStudent.lessonPrice == null ? "тариф не задан" : `${selectedStudent.lessonPrice.toLocaleString("ru-RU")} ₽`}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
+          {selectedStudent.status !== "archived" ? <section className="card-crm" style={{ padding: 14, marginBottom: 16, display: "grid", gap: 10, background: "white" }}>
+            <strong>Редактировать данные ученика</strong>
+            <label style={{ display: "grid", gap: 5, fontSize: 12 }}>ФИО
+              <input className="form-input" value={editStudentName} onChange={(event) => setEditStudentName(event.target.value)} disabled={savingStudentOperation} />
+            </label>
+            <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Дата рождения
+              <input className="form-input" type="date" value={editBirthDate} onChange={(event) => setEditBirthDate(event.target.value)} disabled={savingStudentOperation} />
+            </label>
+            <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Заметки
+              <textarea className="form-input" rows={4} value={editNotes} onChange={(event) => setEditNotes(event.target.value)} disabled={savingStudentOperation} style={{ height: "auto", padding: 10 }} />
+            </label>
+            <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Цена одного занятия, ₽
+              <input className="form-input" type="number" min="0.01" step="0.01" value={editLessonPrice} onChange={(event) => setEditLessonPrice(event.target.value)} disabled={savingStudentOperation} required />
+            </label>
+            <Button type="button" variant="primary-crm" disabled={savingStudentOperation || !editStudentName.trim() || !(Number(editLessonPrice) > 0)} onClick={saveStudentDetails}>Сохранить данные</Button>
+            <Button type="button" variant="secondary-crm" onClick={() => setTrialStudent(selectedStudent)}><Calendar size={15} /> Записать на пробное</Button>
+          </section> : <section className="card-crm" style={{ padding: 14, marginBottom: 16, background: "white", color: "var(--color-text-muted)" }}>Для архивного ученика редактирование основных данных и назначение пробного недоступны. Сначала восстановите ученика.</section>}
           <section className="card-crm" style={{padding:14,marginBottom:16,display:"grid",gap:10}}><strong>Добавить родителя</strong><div>{selectedStudent.parent&&selectedStudent.parent!=="Не указан"?selectedStudent.parent:"Родитель пока не указан"}</div><select className="form-input" value={guardianToLink} onChange={event=>setGuardianToLink(event.target.value)}><option value="">Выбрать существующего родителя</option>{guardianOptions.filter(item=>item.status!=="archived").map(item=><option key={item.id} value={item.id}>{item.full_name} · {item.phone||item.email||"без контакта"}</option>)}</select><Button type="button" variant="secondary-crm" disabled={!guardianToLink} onClick={linkGuardian}>Привязать существующего</Button><input className="form-input" placeholder="ФИО нового родителя" value={newLinkedGuardian.fullName} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,fullName:event.target.value})}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><input className="form-input" placeholder="Телефон" value={newLinkedGuardian.phone} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,phone:event.target.value})}/><input className="form-input" placeholder="Email" value={newLinkedGuardian.email} onChange={(event)=>setNewLinkedGuardian({...newLinkedGuardian,email:event.target.value})}/></div><Button type="button" variant="secondary-crm" disabled={!newLinkedGuardian.fullName.trim()} onClick={createAndLinkGuardian}>Создать и привязать</Button></section>
           {/* Student Info Body */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -1191,11 +1102,15 @@ export default function CrmStudentsPage() {
                 </select>
               </label>
               <Button type="button" variant="primary-crm" disabled={savingStudentOperation || enrollmentGroupId === (selectedStudent.groupId || "")} onClick={saveEnrollment}>{selectedStudent.groupId ? "Перевести / убрать из группы" : "Назначить группу"}</Button>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "active"} onClick={() => saveStudentStatus("active")}>Активировать</Button>
-                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "paused"} onClick={() => saveStudentStatus("paused")}>Приостановить</Button>
-                <Button type="button" variant="secondary-site" disabled={savingStudentOperation || selectedStudent.status === "archived"} onClick={() => saveStudentStatus("archived")}>Архивировать</Button>
-              </div>
+              <label style={{ display: "grid", gap: 6, fontSize: 12 }}>Статус ученика
+                <select className="form-input" value={selectedStudent.status} disabled={savingStudentOperation} onChange={(event) => void saveStudentStatus(event.target.value as Student["status"])}>
+                  <option value="prospect">Потенциальный</option>
+                  <option value="active">Активный</option>
+                  <option value="paused">Приостановлен</option>
+                  <option value="inactive">Неактивный</option>
+                  <option value="archived">Архив</option>
+                </select>
+              </label>
               {studentOperationMessage && <span role="status" style={{ fontSize: 12, fontWeight: 700, color: studentOperationMessage.includes("Не удалось") ? "var(--color-danger)" : "var(--color-success)" }}>{studentOperationMessage}</span>}
             </div>
             {/* Guardian Card Info */}
@@ -1277,17 +1192,6 @@ export default function CrmStudentsPage() {
               </div>
             </div>
 
-            {/* Performance progress */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)" }}>Успеваемость и прогресс ДЗ</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ flex: 1, height: "8px", background: "var(--color-border)", borderRadius: "4px", overflow: "hidden" }}>
-                  <div style={{ width: `${selectedStudent.homeworkProgress}%`, height: "100%", background: "var(--color-primary)" }} />
-                </div>
-                <span style={{ fontWeight: 700 }}>{selectedStudent.homeworkProgress}%</span>
-              </div>
-            </div>
-
             {/* Invoices List */}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>История Счетов</span>
@@ -1336,6 +1240,26 @@ export default function CrmStudentsPage() {
               ) : (
                 <span style={{ fontSize: "12px", color: "var(--color-text-muted)", fontStyle: "italic" }}>Нет отметок посещаемости</span>
               )}
+            </div>
+
+            <div style={{ display: "grid", gap: 10, borderTop: "1px solid var(--color-border)", paddingTop: 16 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>История взаимодействий</span>
+              {studentInteractions.length === 0 ? <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Взаимодействий пока нет</span> : studentInteractions.map((interaction: any) => (
+                <div key={interaction.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 10, display: "grid", gap: 4 }}>
+                  <strong style={{ fontSize: 12 }}>{interaction.summary || "Взаимодействие"}</strong>
+                  <small style={{ color: "var(--color-text-muted)" }}>{new Date(interaction.created_at).toLocaleString("ru-RU")} · {interaction.type}</small>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, borderTop: "1px solid var(--color-border)", paddingTop: 16 }}>
+              {selectedStudent.status === "archived" ? (
+                <Button type="button" variant="secondary-crm" onClick={() => void handleStudentLifecycle(selectedStudent, "restore")}>Восстановить из архива</Button>
+              ) : (
+                <Button type="button" variant="secondary-crm" onClick={() => void handleStudentLifecycle(selectedStudent, "archive")}>Архивировать</Button>
+              )}
+              <Button type="button" variant="secondary-crm" onClick={() => void handleStudentLifecycle(selectedStudent, "anonymize")}>Анонимизировать ПДн</Button>
+              <Button type="button" variant="secondary-crm" onClick={() => void handleStudentLifecycle(selectedStudent, "delete")} style={{ color: "var(--color-danger)" }}>Удалить</Button>
             </div>
           </div>
         </CrmDialog>

@@ -6,6 +6,10 @@ import { Button } from "@robotics-crm/ui";
 import { Bell, ChevronLeft, ChevronRight, MapPin, Plus, RefreshCw, UserRound } from "lucide-react";
 import { CrmDialog } from "@/shared/ui/CrmDialog";
 import { groupOperationalSessions, type ScheduleView } from "./domain";
+import { TrialDialog } from "@/features/trials/TrialDialog";
+import { TrialParticipantList } from "@/features/trials/TrialParticipantList";
+import { scheduleCapacityLabel } from "@/features/trials/domain";
+import type { TrialParticipantDto } from "@/features/trials/contracts";
 
 type Period = "today" | "week";
 
@@ -20,10 +24,27 @@ type Session = {
   session_kind?: string;
   change_reason?: string | null;
   notification_status?: string;
-  groups?: { title?: string; branch_id?: string | null } | null;
+  groups?: { title?: string; branch_id?: string | null; capacity?: number | null } | null;
   courses?: { title?: string } | null;
   profiles?: { full_name?: string } | null;
   rooms?: { name?: string } | null;
+  studentCount?: number;
+  trialParticipantCount?: number;
+};
+
+type StandaloneTrial = {
+  id: string;
+  mode: "standalone";
+  teacher_id: string;
+  branch_id: string;
+  room_id: string | null;
+  starts_at: string;
+  ends_at: string;
+  profiles?: { full_name?: string } | null;
+  branches?: { name?: string } | null;
+  rooms?: { name?: string; capacity?: number | null } | null;
+  participants: TrialParticipantDto[];
+  trialParticipantCount: number;
 };
 
 type Makeup = { id: string; student_id: string; target_session_id?: string | null; status: string; notes?: string | null; students?: { full_name?: string } | null };
@@ -56,7 +77,8 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
   const [status, setStatus] = useState("");
   const [sessionKind, setSessionKind] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [groups, setGroups] = useState<Array<{ id: string; title: string; branch_id?: string; teacher_id?: string; room_id?: string }>>([]);
+  const [standaloneTrials, setStandaloneTrials] = useState<StandaloneTrial[]>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; title: string; branch_id?: string; teacher_id?: string; room_id?: string; capacity?: number | null }>>([]);
   const [teachers, setTeachers] = useState<Array<{ id: string; name: string }>>([]);
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [rooms, setRooms] = useState<Array<{ id: string; name: string; branch_id?: string }>>([]);
@@ -72,12 +94,21 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
   const [createGroupId, setCreateGroupId] = useState(groupId || "");
   const [createStartsAt, setCreateStartsAt] = useState("");
   const [createEndsAt, setCreateEndsAt] = useState("");
-  const [createKind, setCreateKind] = useState<"regular" | "extra" | "trial">("extra");
+  const [createKind, setCreateKind] = useState<"regular" | "extra">("extra");
   const [createReason, setCreateReason] = useState("");
   const [savingCreate, setSavingCreate] = useState(false);
   const [notifyCreate, setNotifyCreate] = useState(true);
   const [notifyChange, setNotifyChange] = useState(true);
   const [notificationEvents, setNotificationEvents] = useState<Record<string, boolean>>({});
+  const [showTrialDialog, setShowTrialDialog] = useState(false);
+  const [trialChange, setTrialChange] = useState<{ type: "update" | "cancel"; trial: StandaloneTrial } | null>(null);
+  const [trialTeacherId, setTrialTeacherId] = useState("");
+  const [trialBranchId, setTrialBranchId] = useState("");
+  const [trialRoomId, setTrialRoomId] = useState("");
+  const [trialStartsAt, setTrialStartsAt] = useState("");
+  const [trialEndsAt, setTrialEndsAt] = useState("");
+  const [trialReason, setTrialReason] = useState("");
+  const [savingTrialChange, setSavingTrialChange] = useState(false);
   const days = useMemo(() => period === "today" ? [new Date()] : Array.from({ length: 7 }, (_, index) => new Date(week.getTime() + index * 86400000)), [period, week]);
 
   const load = useCallback(async () => {
@@ -95,6 +126,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось загрузить расписание");
       setSessions(data.sessions || []);
+      setStandaloneTrials(data.standaloneTrials || []);
       setGroups(data.groups || []);
       setTeachers(data.teachers || []);
       setBranches(data.branches || []);
@@ -201,6 +233,43 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
     }
   };
 
+  const openTrialChange = (type: "update" | "cancel", trial: StandaloneTrial) => {
+    setTrialChange({ type, trial });
+    setTrialTeacherId(trial.teacher_id);
+    setTrialBranchId(trial.branch_id);
+    setTrialRoomId(trial.room_id || "");
+    setTrialStartsAt(moscowDateTimeInput(new Date(trial.starts_at)));
+    setTrialEndsAt(moscowDateTimeInput(new Date(trial.ends_at)));
+    setTrialReason("");
+  };
+
+  const submitTrialChange = async () => {
+    if (!trialChange || savingTrialChange) return;
+    setSavingTrialChange(true);
+    setError("");
+    try {
+      const body = trialChange.type === "cancel"
+        ? { action: "cancel", reason: trialReason.trim() }
+        : {
+          action: "update",
+          teacherId: trialTeacherId,
+          branchId: trialBranchId,
+          roomId: trialRoomId || null,
+          startsAt: new Date(`${trialStartsAt}:00+03:00`).toISOString(),
+          endsAt: new Date(`${trialEndsAt}:00+03:00`).toISOString(),
+        };
+      const response = await fetch(`/api/crm/trials/${trialChange.trial.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Не удалось изменить пробное занятие");
+      setTrialChange(null);
+      await load();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setSavingTrialChange(false);
+    }
+  };
+
   const sections = groupOperationalSessions(sessions.map((session) => ({
     ...session,
     startsAt: session.starts_at,
@@ -249,6 +318,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
           </label>
           <Button variant="primary-crm" disabled={!materializeGroupId} onClick={() => void materialize()}>Сформировать на 12 недель</Button>
           <Button variant="secondary-crm" onClick={openCreate}><Plus size={15} /> Добавить занятие</Button>
+          <Button variant="secondary-crm" onClick={() => setShowTrialDialog(true)}><Plus size={15} /> Записать на пробное</Button>
           <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Повторный запуск безопасен: существующие даты и время не дублируются.</span>
         </div>
       )}
@@ -274,7 +344,7 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
       {error && <div role="alert" className="card-crm" style={{ color: "var(--color-danger)", background: "white", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>{error}<Button variant="secondary-crm" onClick={() => void load()}>Повторить</Button></div>}
       {loading ? <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: 32 }}>Загрузка расписания…</p> : (
         <div style={{ display: "grid", gap: 14 }}>
-          {!error && !sessions.length && <div className="card-crm" style={{ background: "white", textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>{period === "today" ? "На сегодня занятий нет" : "На этой неделе занятий нет"}</div>}
+          {!error && !sessions.length && !standaloneTrials.length && <div className="card-crm" style={{ background: "white", textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>{period === "today" ? "На сегодня занятий нет" : "На этой неделе занятий нет"}</div>}
           {sections.map((section) => (
             <section key={section.key} className="card-crm" style={{ background: "white", padding: 16 }}>
               {view !== "all" && <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>{section.label}</h2>}
@@ -282,13 +352,30 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
                 {section.sessions.map((session) => (
                   <article key={session.id} style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr) auto", gap: 12, alignItems: "center", border: "1px solid var(--color-border)", borderRadius: 10, padding: 12, opacity: session.status === "cancelled" || session.status === "moved" ? .65 : 1 }}>
                     <div><strong style={{ fontSize: 15 }}>{new Date(session.starts_at).toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow", hour: "2-digit", minute: "2-digit" })}</strong><div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "short" })}</div></div>
-                    <div><strong style={{ fontSize: 13 }}>{session.groups?.title || "Без группы"}</strong><div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5, fontSize: 11, color: "var(--color-text-muted)" }}><span><UserRound size={11} /> {session.profiles?.full_name || "Преподаватель не назначен"}</span><span><MapPin size={11} /> {session.rooms?.name || "Кабинет не назначен"}</span><span>{session.session_kind === "regular" ? "Обычное" : session.session_kind === "trial" ? "Пробное" : session.session_kind === "makeup" ? "Отработка" : "Дополнительное"}</span></div>{session.change_reason && <p style={{ fontSize: 11, margin: "5px 0 0" }}>Причина: {session.change_reason}</p>}</div>
+                    <div><strong style={{ fontSize: 13 }}>{session.groups?.title || "Без группы"}</strong><div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5, fontSize: 11, color: "var(--color-text-muted)" }}><span><UserRound size={11} /> {session.profiles?.full_name || "Преподаватель не назначен"}</span><span><MapPin size={11} /> {session.rooms?.name || "Кабинет не назначен"}</span><span>{session.session_kind === "regular" ? "Обычное" : session.session_kind === "trial" ? "Пробное (legacy)" : session.session_kind === "makeup" ? "Отработка" : "Дополнительное"}</span><span>{scheduleCapacityLabel({ studentCount: session.studentCount || 0, trialParticipantCount: session.trialParticipantCount || 0, capacity: session.groups?.capacity })}</span></div>{session.change_reason && <p style={{ fontSize: 11, margin: "5px 0 0" }}>Причина: {session.change_reason}</p>}</div>
                     <div style={{ display: "grid", justifyItems: "end", gap: 7 }}><span className={`badge ${session.status === "cancelled" ? "badge-red" : session.status === "completed" ? "badge-green" : "badge-blue"}`}>{statusLabel[session.status] || session.status}</span><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}><Link href={`/crm/lessons/${session.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>Открыть журнал</Link>{canManage && session.status === "planned" && <button onClick={() => openChange("reschedule", session)} style={{ border: 0, background: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Перенести</button>}{canManage && session.status === "planned" && <button onClick={() => openChange("cancel", session)} style={{ border: 0, background: "none", color: "var(--color-danger)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Отменить</button>}</div></div>
                   </article>
                 ))}
               </div>
             </section>
           ))}
+          {standaloneTrials.length > 0 && (
+            <section className="card-crm" style={{ background: "#faf5ff", borderColor: "#ddd6fe", padding: 16 }}>
+              <h2 style={{ fontSize: 16, margin: "0 0 12px", color: "#6d28d9" }}>Отдельные пробные занятия</h2>
+              <div style={{ display: "grid", gap: 10 }}>
+                {standaloneTrials.map((trial) => (
+                  <article key={trial.id} style={{ border: "1px solid #ddd6fe", borderRadius: 10, background: "white", padding: 12, display: "grid", gap: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                      <div><strong>{new Date(trial.starts_at).toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow", hour: "2-digit", minute: "2-digit" })}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{new Date(trial.starts_at).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", day: "numeric", month: "short" })}</small></div>
+                      <div><strong>Отдельное пробное · {trial.trialParticipantCount} участн.</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{trial.profiles?.full_name || "Преподаватель"} · {trial.branches?.name || "Филиал"} · {trial.rooms?.name || "Кабинет"}</small></div>
+                      {canManage && <div style={{ display: "flex", gap: 8 }}><button type="button" onClick={() => openTrialChange("update", trial)} style={{ border: 0, background: "transparent", color: "var(--color-primary)", cursor: "pointer", fontWeight: 700 }}>Изменить</button><button type="button" onClick={() => openTrialChange("cancel", trial)} style={{ border: 0, background: "transparent", color: "var(--color-danger)", cursor: "pointer", fontWeight: 700 }}>Отменить</button></div>}
+                    </div>
+                    <details><summary style={{ cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Участники и результаты</summary><div style={{ marginTop: 10 }}><TrialParticipantList participants={trial.participants} /></div></details>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
           <style jsx>{`@media (max-width: 640px) { article { grid-template-columns: 64px minmax(0, 1fr) !important; } article > div:last-child { grid-column: 1 / -1; justify-items: start !important; } .schedule-filter-toolbar select { width: 100%; } }`}</style>
         </div>
       )}
@@ -305,19 +392,42 @@ export function ScheduleWorkspace({ canManage = true, groupId }: { canManage?: b
         </CrmDialog>
       )}
       {creating && (
-        <CrmDialog title="Добавить занятие" description="Подходит для дополнительного урока, пробного занятия или разовой замены. После сохранения родители группы получат MAX-уведомление." onClose={() => setCreating(false)} width={520}>
+        <CrmDialog title="Добавить занятие" description="Подходит для дополнительного урока или разовой замены. Пробные записи создаются отдельной кнопкой." onClose={() => setCreating(false)} width={520}>
             <div style={{ display: "grid", gap: 12 }}>
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Группа<select className="form-input" value={createGroupId} onChange={(event) => setCreateGroupId(event.target.value)}>{groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
                 <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Начало<input type="datetime-local" className="form-input" value={createStartsAt} onChange={(event) => setCreateStartsAt(event.target.value)} /></label>
                 <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Окончание<input type="datetime-local" className="form-input" value={createEndsAt} onChange={(event) => setCreateEndsAt(event.target.value)} /></label>
               </div>
-              <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Тип<select className="form-input" value={createKind} onChange={(event) => setCreateKind(event.target.value as "regular" | "extra" | "trial")}><option value="extra">Дополнительное</option><option value="trial">Пробное</option><option value="regular">Обычное</option></select></label>
+              <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Тип<select className="form-input" value={createKind} onChange={(event) => setCreateKind(event.target.value as "regular" | "extra")}><option value="extra">Дополнительное</option><option value="regular">Обычное</option></select></label>
               <label style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 650 }}>Комментарий для родителей<input className="form-input" value={createReason} onChange={(event) => setCreateReason(event.target.value)} placeholder="Например: дополнительная подготовка к соревнованиям" /></label>
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={notifyCreate} onChange={(event) => setNotifyCreate(event.target.checked)} /> Уведомить родителей в MAX</label>
               <div style={{ padding: 10, borderRadius: 8, background: "var(--color-primary-soft)", fontSize: 11 }}>Перед созданием система проверит пересечение преподавателя и кабинета. Уведомление получат все связанные родители активных учеников группы.</div>
               <div className="crm-dialog-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setCreating(false)}>Отмена</Button><Button variant="primary-crm" disabled={savingCreate || !createGroupId || !createStartsAt || !createEndsAt} onClick={() => void submitCreate()}>{savingCreate ? "Добавление…" : "Добавить занятие"}</Button></div>
             </div>
+        </CrmDialog>
+      )}
+      {showTrialDialog && <TrialDialog onClose={() => setShowTrialDialog(false)} onSaved={load} />}
+      {trialChange && (
+        <CrmDialog title={trialChange.type === "cancel" ? "Отменить отдельное пробное" : "Изменить отдельное пробное"} description="Изменение проверяется на пересечения и вместимость внутри транзакции." onClose={() => setTrialChange(null)} width={560}>
+          <div style={{ display: "grid", gap: 12 }}>
+            {trialChange.type === "cancel" ? (
+              <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Причина отмены<textarea className="form-input" rows={3} value={trialReason} onChange={(event) => setTrialReason(event.target.value)} style={{ height: "auto", padding: 10 }} /></label>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+                  <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Преподаватель<select className="form-input" value={trialTeacherId} onChange={(event) => setTrialTeacherId(event.target.value)}>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>
+                  <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Филиал<select className="form-input" value={trialBranchId} onChange={(event) => { setTrialBranchId(event.target.value); setTrialRoomId(""); }}>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
+                  <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Кабинет (необязательно)<select className="form-input" value={trialRoomId} onChange={(event) => setTrialRoomId(event.target.value)}><option value="">Без кабинета</option>{rooms.filter((room) => room.branch_id === trialBranchId).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Начало<input type="datetime-local" className="form-input" value={trialStartsAt} onChange={(event) => setTrialStartsAt(event.target.value)} /></label>
+                  <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Окончание<input type="datetime-local" className="form-input" value={trialEndsAt} onChange={(event) => setTrialEndsAt(event.target.value)} /></label>
+                </div>
+              </>
+            )}
+            <div className="crm-dialog-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Button variant="secondary-crm" onClick={() => setTrialChange(null)}>Назад</Button><Button variant="primary-crm" disabled={savingTrialChange || (trialChange.type === "cancel" ? !trialReason.trim() : !trialTeacherId || !trialBranchId || !trialStartsAt || !trialEndsAt)} onClick={() => void submitTrialChange()}>{savingTrialChange ? "Сохраняем…" : trialChange.type === "cancel" ? "Отменить запись" : "Сохранить"}</Button></div>
+          </div>
         </CrmDialog>
       )}
     </section>
