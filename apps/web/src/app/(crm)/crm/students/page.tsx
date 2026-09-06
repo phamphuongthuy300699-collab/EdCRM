@@ -1071,7 +1071,7 @@ export default function CrmStudentsPage() {
       )}
 
       {/* Details Drawer */}
-      {selectedStudent && (
+      {selectedStudent && !trialStudent && (
         <CrmDialog title={<span style={{ display: "flex", alignItems: "center", gap: 10 }}>{selectedStudent.name} {getStatusBadge(selectedStudent.status)}</span>} description={<>Статус: <strong>{selectedStudent.status === "active" ? "Активен" : selectedStudent.status === "paused" ? "Приостановлен" : "Архив"}</strong> · Группа: <strong>{selectedStudent.group || "Без группы"}</strong> · Занятие: <strong>{selectedStudent.lessonPrice == null ? "тариф не задан" : `${selectedStudent.lessonPrice.toLocaleString("ru-RU")} ₽`}</strong></>} onClose={closeDrawer} width={520} variant="drawer">
           {selectedStudent.status !== "archived" ? <section className="card-crm" style={{ padding: 14, marginBottom: 16, display: "grid", gap: 10, background: "white" }}>
             <strong>Редактировать данные ученика</strong>

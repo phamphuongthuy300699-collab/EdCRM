@@ -117,7 +117,7 @@ export async function GET(request: Request) {
   }
 
   let standaloneTrialsQuery = admin.from("trial_events")
-    .select("id, mode, teacher_id, branch_id, room_id, starts_at, ends_at, profiles(full_name), branches(name), rooms(name, capacity), trial_participants(id, trial_event_id, lead_id, student_id, status, result, result_comment, leads(parent_name, child_name), students(full_name))")
+    .select("id, mode, teacher_id, branch_id, room_id, starts_at, ends_at, profiles!trial_events_teacher_id_fkey(full_name), branches(name), rooms(name, capacity), trial_participants(id, trial_event_id, lead_id, student_id, status, result, result_comment, leads(parent_name, child_name), students(full_name))")
     .eq("organization_id", access.organizationId)
     .eq("mode", "standalone")
     .gte("starts_at", `${dateFrom}T00:00:00+03:00`)
