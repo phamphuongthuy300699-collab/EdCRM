@@ -29,7 +29,7 @@ test.describe("group status edit hotfix", () => {
     });
     await dialog.locator("select").first().evaluate((select) => select.removeAttribute("required"));
     await status.selectOption("draft");
-    await dialog.locator("input").nth(1).fill("Вт / Чт 13:00");
+    await dialog.getByLabel("Расписание (дни и время)").fill("Вт / Чт 13:00");
     await dialog.screenshot({ path: path.join(output, "legacy-group-edit.png") });
 
     page.once("dialog", (alert) => alert.accept());

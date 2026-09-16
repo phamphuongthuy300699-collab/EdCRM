@@ -14,33 +14,10 @@ import {
   groupStatusLabel,
   normalizeGroupStatus,
   parseScheduleText,
+  formatScheduleRules,
   type GroupStatus,
 } from "@/features/scheduling/group-editor";
 import { buildGroupSaveOperation } from "@/features/scheduling/group-save-contract";
-
-const weekdaysRu = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-
-function formatScheduleRules(rules: any[]) {
-  if (!rules || rules.length === 0) return "Не задано";
-  const sorted = [...rules].sort((a, b) => {
-    if (a.weekday !== b.weekday) return a.weekday - b.weekday;
-    return a.starts_at.localeCompare(b.starts_at);
-  });
-  
-  const timeGroups: Record<string, number[]> = {};
-  sorted.forEach(r => {
-    const time = r.starts_at.slice(0, 5);
-    if (!timeGroups[time]) timeGroups[time] = [];
-    timeGroups[time].push(r.weekday);
-  });
-
-  return Object.entries(timeGroups)
-    .map(([time, days]) => {
-      const daysStr = days.map(d => weekdaysRu[d - 1]).join(" / ");
-      return `${daysStr} ${time}`;
-    })
-    .join(", ");
-}
 
 export default function CrmGroupsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,6 +34,8 @@ export default function CrmGroupsPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newCourseId, setNewCourseId] = useState("");
   const [newSchedule, setNewSchedule] = useState("");
+  const [newStartsOn, setNewStartsOn] = useState("");
+  const [newEndsOn, setNewEndsOn] = useState("");
   const [newTeacherId, setNewTeacherId] = useState("");
   const [newCapacity, setNewCapacity] = useState("8");
   const [newAgeFrom, setNewAgeFrom] = useState("6");
@@ -68,6 +47,8 @@ export default function CrmGroupsPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editCourseId, setEditCourseId] = useState("");
   const [editSchedule, setEditSchedule] = useState("");
+  const [editStartsOn, setEditStartsOn] = useState("");
+  const [editEndsOn, setEditEndsOn] = useState("");
   const [initialEditSchedule, setInitialEditSchedule] = useState("");
   const [editTeacherId, setEditTeacherId] = useState("");
   const [editStatus, setEditStatus] = useState<GroupStatus>("active");
@@ -183,6 +164,8 @@ export default function CrmGroupsPage() {
           title,
           course_id,
           teacher_id,
+          starts_on,
+          ends_on,
           capacity,
           age_from,
           age_to,
@@ -220,6 +203,8 @@ export default function CrmGroupsPage() {
             courseName: g.courses?.title || "Не указан",
             courseId: g.course_id,
             teacherId: g.teacher_id,
+            startsOn: g.starts_on,
+            endsOn: g.ends_on,
             schedule: formatScheduleRules(g.group_schedule_rules),
             teacherName: resolveTeacherName(g.teacher_id, staffDirectory, g.profiles?.full_name),
             ageRange: `${g.age_from || 6}–${g.age_to || 14} лет`,
@@ -335,7 +320,7 @@ export default function CrmGroupsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildGroupSaveOperation({
-            group: { title: newTitle, courseId: newCourseId, teacherId: newTeacherId || null, capacity: parseInt(newCapacity, 10), ageFrom: parseInt(newAgeFrom, 10), ageTo: parseInt(newAgeTo, 10), status: "active" },
+            group: { title: newTitle, courseId: newCourseId, teacherId: newTeacherId || null, startsOn: newStartsOn || null, endsOn: newEndsOn || null, capacity: parseInt(newCapacity, 10), ageFrom: parseInt(newAgeFrom, 10), ageTo: parseInt(newAgeTo, 10), status: "active" },
             rules,
             rebuildFuture: rebuildFutureSessions,
           })),
@@ -343,8 +328,8 @@ export default function CrmGroupsPage() {
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить группу и расписание");
         await loadData();
-        const counts = result.result?.schedule || {};
-        setGroupNotice(`Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}`);
+        const counts = result.result?.schedule;
+        setGroupNotice(counts ? `Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}` : "Группа сохранена. Расписание не изменялось.");
       }
       setShowAddModal(false);
       
@@ -352,6 +337,8 @@ export default function CrmGroupsPage() {
       setNewTitle("");
       setNewCourseId("");
       setNewSchedule("");
+      setNewStartsOn("");
+      setNewEndsOn("");
       setNewTeacherId("");
       setNewCapacity("8");
     } catch (err: any) {
@@ -368,6 +355,8 @@ export default function CrmGroupsPage() {
     setEditTitle(group.title);
     setEditCourseId(group.courseId || "");
     setEditSchedule(group.schedule);
+    setEditStartsOn(group.startsOn || "");
+    setEditEndsOn(group.endsOn || "");
     setInitialEditSchedule(group.schedule);
     setEditTeacherId(group.teacherId || "");
     setEditStatus(normalizeGroupStatus(group.status));
@@ -400,6 +389,8 @@ export default function CrmGroupsPage() {
           courseName: selCourse ? selCourse.title : "Не указан",
           courseId: editCourseId,
           teacherId: editTeacherId,
+          startsOn: editStartsOn || null,
+          endsOn: editEndsOn || null,
           status: editStatus,
           schedule: scheduleChanged ? formatScheduleRules(rules) : g.schedule,
           teacherName: selTeacher ? selTeacher.full_name : "Не назначен",
@@ -415,7 +406,7 @@ export default function CrmGroupsPage() {
 
       const response = await fetch("/api/crm/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildGroupSaveOperation({
         groupId: editingGroupId,
-        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
+        group: { title: editTitle, courseId: editCourseId, teacherId: editTeacherId || null, startsOn: editStartsOn || null, endsOn: editEndsOn || null, status: editStatus, capacity: parseInt(editCapacity, 10), ageFrom: parseInt(editAgeFrom, 10), ageTo: parseInt(editAgeTo, 10), billingEnabled: editBillingEnabled, chargeAbsentExcused: editChargeExcused, chargeAbsentUnexcused: editChargeUnexcused },
         rules: scheduleChanged ? rules : undefined,
         rebuildFuture: rebuildFutureSessions,
       })) });
@@ -427,8 +418,8 @@ export default function CrmGroupsPage() {
 
       await loadData();
       setShowEditModal(false);
-      const counts = result.result?.schedule || {};
-      setGroupNotice(`Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}`);
+      const counts = result.result?.schedule;
+      setGroupNotice(counts ? `Группа сохранена. Правил: ${counts.rules || 0}, удалено занятий: ${counts.deleted || 0}, создано: ${counts.created || 0}` : "Группа сохранена. Расписание не изменялось.");
     } catch (err: any) {
       console.error(err);
       setGroupFormError(err.message || "Не удалось обновить группу");
@@ -736,6 +727,15 @@ export default function CrmGroupsPage() {
                 </select>
               </div>
 
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label className="form-group">Начало занятий
+                  <input aria-label="Начало занятий" className="form-input" type="date" value={newStartsOn} onChange={event => setNewStartsOn(event.target.value)} />
+                </label>
+                <label className="form-group">Окончание занятий
+                  <input aria-label="Окончание занятий" className="form-input" type="date" min={newStartsOn || undefined} value={newEndsOn} onChange={event => setNewEndsOn(event.target.value)} />
+                </label>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>Пустая дата окончания — без ограничения. Будущие занятия создаются на 12 недель в пределах этих дат.</p>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Расписание (дни и время) *</label>
                 <input 
@@ -743,6 +743,7 @@ export default function CrmGroupsPage() {
                   className="form-input" 
                   placeholder="Сб / Вс 13:00" 
                   required 
+                  aria-label="Расписание (дни и время)"
                   value={newSchedule}
                   onChange={(e) => setNewSchedule(e.target.value)}
                 />
@@ -944,15 +945,26 @@ export default function CrmGroupsPage() {
                 </span>
               </div>
 
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label className="form-group">Начало занятий
+                  <input aria-label="Начало занятий" className="form-input" type="date" value={editStartsOn} onChange={event => setEditStartsOn(event.target.value)} />
+                </label>
+                <label className="form-group">Окончание занятий
+                  <input aria-label="Окончание занятий" className="form-input" type="date" min={editStartsOn || undefined} value={editEndsOn} onChange={event => setEditEndsOn(event.target.value)} />
+                </label>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>Пустая дата окончания — без ограничения. Будущие занятия создаются на 12 недель в пределах этих дат.</p>
+              {editEndsOn && editEndsOn < new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) && <p role="alert" style={{ color: "var(--color-danger)", fontSize: 12 }}>Дата окончания группы истекла. Для будущих занятий укажите актуальную дату или очистите её.</p>}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Расписание (дни и время)</label>
                 <input 
                   type="text" 
                   className="form-input" 
+                  aria-label="Расписание (дни и время)"
                   value={editSchedule}
                   onChange={(e) => setEditSchedule(e.target.value)}
                 />
-                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Переносы конкретных дат сохраняются и не перезаписываются.</span>
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Можно указать разное время по дням: Ср 18:00–19:00, Сб 11:30–13:00. Переносы конкретных дат сохраняются.</span>
               </div>
               <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12 }}>
                 <input type="checkbox" checked={rebuildFutureSessions} onChange={(event) => setRebuildFutureSessions(event.target.checked)} />

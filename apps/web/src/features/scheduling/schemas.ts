@@ -102,6 +102,14 @@ export function scheduleValidationPayload(error: z.ZodError) {
 
 export function schedulePersistenceErrorPayload(error: { message?: string } | null | undefined) {
   const message = error?.message || "";
+  if (message.includes("group_schedule_expired")) return {
+    ok: false as const, code: "GROUP_SCHEDULE_EXPIRED" as const,
+    error: "Дата окончания группы истекла. Укажите актуальную дату окончания или очистите её, затем пересчитайте будущие занятия.",
+  };
+  if (message.includes("group_date_range_invalid")) return {
+    ok: false as const, code: "GROUP_DATE_RANGE_INVALID" as const,
+    error: "Дата окончания группы должна быть не раньше даты начала.",
+  };
   const isConflict = [
     "schedule_resource_conflict",
     "Schedule rule conflicts with an active group teacher or room",
