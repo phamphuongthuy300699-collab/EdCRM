@@ -1,3 +1,4 @@
+import { loadSessionBatches } from "@/features/scheduling/load-session-batches";
 import { NextResponse } from "next/server";
 import { crmAdmin, requireCrmStaff } from "../_shared";
 import { materializeRuleOccurrences } from "@/features/scheduling/domain";
@@ -101,13 +102,11 @@ export async function GET(request: Request) {
     .order("requested_at", { ascending: true });
   const sessionIds = new Set((sessions || []).map((session: any) => session.id));
   const sessionIdList = [...sessionIds];
-  const { data: attachedTrialEvents, error: attachedTrialsError } = sessionIdList.length
-    ? await admin.from("trial_events")
+  const { data: attachedTrialEvents, error: attachedTrialsError } = await loadSessionBatches<any>(sessionIdList, ids => admin.from("trial_events")
       .select("id, mode, lesson_session_id, trial_participants(id, status)")
       .eq("organization_id", access.organizationId)
       .eq("mode", "attached_session")
-      .in("lesson_session_id", sessionIdList)
-    : { data: [] as any[], error: null };
+      .in("lesson_session_id", ids));
   if (attachedTrialsError) return NextResponse.json({ ok: false, error: "Не удалось загрузить пробных участников" }, { status: 500 });
   const trialCountBySession = new Map<string, number>();
   for (const event of attachedTrialEvents || []) {
