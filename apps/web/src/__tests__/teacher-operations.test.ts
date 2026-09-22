@@ -67,7 +67,7 @@ describe("lesson session lifecycle", () => {
     expect(page).not.toContain('.from("lesson_sessions").insert');
     expect(page).not.toContain('.from("lesson_sessions").update');
     expect(page).not.toContain("setGroups(demoGroups)");
-    expect(page).toContain('readOnly={readOnlyPreview || selected.status === "completed"}');
+    expect(page).toContain('readOnly={readOnlyPreview}');
     expect(crmLesson).toContain('readOnly={session.status === "completed"}');
     expect(page).toContain("LessonConductPanel");
     expect(crmLesson).toContain("LessonConductPanel");

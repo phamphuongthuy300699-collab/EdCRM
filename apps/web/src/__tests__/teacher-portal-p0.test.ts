@@ -27,7 +27,7 @@ describe("P0 teacher portal and legacy rate contracts", () => {
     expect(new Set(result.unfinished.map((item) => item.id))).toEqual(new Set(["live-old", "live-yesterday"]));
     expect(result.today.map((item) => item.id)).toEqual(["today"]);
     expect(result.upcoming.map((item) => item.id)).toEqual(["upcoming"]);
-    expect(result.history.map((item) => item.id)).toEqual(["history"]);
+    expect(result.history.map((item) => item.id)).toEqual(["live-yesterday", "history", "live-old"]);
   });
 
   it("shows a live lesson in both unresolved and today when it belongs to today", () => {

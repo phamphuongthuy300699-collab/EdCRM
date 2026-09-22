@@ -6,8 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AttendanceRosterRow } from "@/features/scheduling/AttendanceRoster";
 import { allAttendanceMarked } from "@/features/scheduling/domain";
 import { isDemoMode } from "@/shared/utils/demo";
-import { categorizeTeacherSessions, teacherPortalDateRange } from "@/features/scheduling/teacher-portal";
+import { categorizeTeacherSessions, teacherPortalDateRange, canEditLessonAttendance } from "@/features/scheduling/teacher-portal";
 import { LessonConductPanel } from "@/features/scheduling/LessonConductPanel";
+import { TeacherTrialDialog } from "@/features/trials/TeacherTrialDialog";
 import { TrialParticipantList } from "@/features/trials/TrialParticipantList";
 import type { TrialParticipantDto } from "@/features/trials/contracts";
 
@@ -60,7 +61,8 @@ export default function TeacherPage() {
   const [loading, setLoading] = useState(true);
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [starting, setStarting] = useState(false);
+  const [showAddTrial, setShowAddTrial] = useState(false);
+  const [clockNow, setClockNow] = useState(() => new Date());
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -112,6 +114,8 @@ export default function TeacherPage() {
     }
   }, [demo, historyDays, previewReady, previewTeacherId]);
 
+  useEffect(() => { const timer = setInterval(() => setClockNow(new Date()), 15_000); return () => clearInterval(timer); }, []);
+
   useEffect(() => { if (previewReady) void loadSessions(); }, [loadSessions, previewReady]);
 
   const openSession = async (session: TeacherSession) => {
@@ -146,29 +150,21 @@ export default function TeacherPage() {
     return payload;
   };
 
-  const startSession = async () => {
-    if (!selected || starting || selected.status !== "planned") return;
-    setStarting(true); setError(""); setMessage("");
-    try {
-      if (!demo) await postAction({ action: "start_session", sessionId: selected.id });
-      const live = { ...selected, status: "live" as const };
-      setSelected(live);
-      setSessions((current) => current.map((session) => session.id === live.id ? live : session));
-      setMessage("Занятие начато. Материалы открыты ученикам.");
-    } catch (cause) { setError((cause as Error).message); } finally { setStarting(false); }
-  };
-
   const saveAttendance = async () => {
     if (!selected || saving || completing) return;
     setSaving(true); setError(""); setMessage("");
     try {
       if (!demo) await postAction({ action: "save_attendance", sessionId: selected.id, records: rows.map((row) => ({ studentId: row.studentId, status: row.status, comment: row.comment, absenceReason: row.absenceReason || "" })) });
-      setMessage("Посещаемость сохранена");
+      if (selected.status === "planned") {
+        const live = { ...selected, status: "live" as const };
+        setSelected(live); setSessions(current => current.map(item => item.id === live.id ? live : item));
+      }
+      setMessage(selected.status === "completed" ? "Посещаемость исправлена. Списания и начисления не изменялись." : "Посещаемость сохранена");
     } catch (cause) { setError((cause as Error).message); throw cause; } finally { setSaving(false); }
   };
 
   const completeSession = async () => {
-    if (!selected || completing || saving || selected.status !== "live" || !allAttendanceMarked(rows)) return;
+    if (!selected || completing || saving || (selected.status === "completed" || !canEditLessonAttendance(selected)) || !allAttendanceMarked(rows)) return;
     setCompleting(true); setError(""); setMessage("");
     try {
       if (!demo) {
@@ -196,7 +192,7 @@ export default function TeacherPage() {
     setMessage("Домашнее задание назначено");
   };
 
-  const sections = useMemo(() => categorizeTeacherSessions(sessions, dateKey()), [sessions]);
+  const sections = useMemo(() => categorizeTeacherSessions(sessions, dateKey(clockNow)), [sessions, clockNow]);
   const visibleSessions = sections[section];
   const nextSession = useMemo(() => sections.unfinished[0] || sections.today.find((session) => session.status === "planned") || sections.upcoming[0], [sections]);
   const todayLabel = new Date().toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow", weekday: "long", day: "numeric", month: "long" });
@@ -216,7 +212,16 @@ export default function TeacherPage() {
 
       {!selected && <section style={{ display: "grid", gap: 10 }}><nav aria-label="Разделы занятий" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{([['unfinished', 'Незавершённые'], ['today', 'Сегодня'], ['upcoming', 'Предстоящие'], ['history', 'Прошедшие']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setSection(key)} aria-pressed={section === key} style={{ minHeight: 42, padding: "8px 12px", borderRadius: 9, border: "1px solid var(--color-border)", background: section === key ? "var(--color-primary)" : "white", color: section === key ? "white" : "var(--color-text)", fontWeight: 750, whiteSpace: "nowrap" }}>{label} ({sections[key].length})</button>)}</nav>{visibleSessions.length === 0 && <div className="card-crm" style={{ background: "white", color: "var(--color-text-muted)", textAlign: "center", padding: 28 }}>В этом разделе занятий нет</div>}{visibleSessions.map((session) => <button key={session.id} type="button" onClick={() => void openSession(session)} style={{ width: "100%", minHeight: 76, padding: 14, border: "1px solid var(--color-border)", borderRadius: 12, background: "white", display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 12, alignItems: "center", textAlign: "left", cursor: "pointer" }}><strong style={{ fontSize: 14 }}>{new Date(session.starts_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}<br /><Clock size={14} /> {new Date(session.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</strong><span><strong style={{ display: "block" }}>{session.groups?.title || "Группа"}</strong><small style={{ color: "var(--color-text-muted)" }}>{session.rooms?.name || "Кабинет не назначен"}</small></span><span className={`badge ${session.status === "completed" ? "badge-green" : session.status === "live" ? "badge-amber" : "badge-blue"}`}>{session.status === "completed" ? "Завершено" : session.status === "live" ? "Идёт" : "План"}</span></button>)}{section === "history" && <Button variant="secondary-crm" onClick={() => setHistoryDays((days) => days + 90)}>Загрузить ещё 90 дней</Button>}</section>}
 
-      {selected && <section style={{ display: "grid", gap: 14, minWidth: 0 }}><button type="button" onClick={() => { setSelected(null); setRows([]); setLessonData(null); setMessage(""); }} style={{ minHeight: 44, justifySelf: "start", border: 0, background: "transparent", color: "var(--color-primary)", fontWeight: 750, cursor: "pointer" }}>← Все занятия</button><div className="card-crm" style={{ background: "white", display: "grid", gap: 10 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><div><span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{new Date(selected.starts_at).toLocaleDateString("ru-RU")} · {new Date(selected.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span><h2 style={{ margin: "3px 0 0", fontSize: 21 }}>{selected.groups?.title || "Занятие"}</h2></div><span className={`badge ${selected.status === "completed" ? "badge-green" : selected.status === "live" ? "badge-amber" : "badge-blue"}`}>{selected.status === "completed" ? "Завершено" : selected.status === "live" ? "Идёт" : "Запланировано"}</span></div>{!readOnlyPreview && selected.status === "planned" && <Button variant="primary-crm" disabled={starting} onClick={() => void startSession()} style={{ minHeight: 48 }}>{starting ? "Начинаем…" : "Начать занятие"}</Button>}</div>{loadingRoster || !lessonData ? <div className="card-crm">Загрузка панели занятия…</div> : <LessonConductPanel data={{ ...lessonData, session: selected }} rows={rows} readOnly={readOnlyPreview || selected.status === "completed"} trialReadOnly={readOnlyPreview} onRowsChange={setRows} onSaveAttendance={saveAttendance} onComplete={completeSession} onAssignHomework={lessonData.canAssignHomework ? assignHomework : undefined} saving={saving} completing={completing} message={message} />}</section>}
+      {selected && <section style={{ display: "grid", gap: 14, minWidth: 0 }}><button type="button" onClick={() => { setSelected(null); setRows([]); setLessonData(null); setMessage(""); }} style={{ minHeight: 44, justifySelf: "start", border: 0, background: "transparent", color: "var(--color-primary)", fontWeight: 750, cursor: "pointer" }}>← Все занятия</button><div className="card-crm" style={{ background: "white", display: "grid", gap: 10 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><div><span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{new Date(selected.starts_at).toLocaleDateString("ru-RU")} · {new Date(selected.starts_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span><h2 style={{ margin: "3px 0 0", fontSize: 21 }}>{selected.groups?.title || "Занятие"}</h2></div><span className={`badge ${selected.status === "completed" ? "badge-green" : selected.status === "live" ? "badge-amber" : "badge-blue"}`}>{selected.status === "completed" ? "Завершено" : selected.status === "live" ? "Идёт" : "Запланировано"}</span></div>{selected.status === "planned" && <p style={{ margin: 0, fontSize: 13 }}>{canEditLessonAttendance(selected, clockNow) ? "Занятие уже началось по расписанию. Можно заполнить посещаемость." : "Занятие начнётся автоматически по расписанию."}</p>}</div>{loadingRoster || !lessonData ? <div className="card-crm">Загрузка панели занятия…</div> : <LessonConductPanel data={{ ...lessonData, session: selected }} rows={rows} readOnly={readOnlyPreview} attendanceEditable={canEditLessonAttendance(selected, clockNow)} onAddTrial={!demo && !readOnlyPreview && ["planned", "live"].includes(selected.status) ? () => setShowAddTrial(true) : undefined} trialReadOnly={readOnlyPreview} onRowsChange={setRows} onSaveAttendance={saveAttendance} onComplete={completeSession} onAssignHomework={lessonData.canAssignHomework ? assignHomework : undefined} saving={saving} completing={completing} message={message} />}</section>}
+      {showAddTrial && selected && !readOnlyPreview && <TeacherTrialDialog sessionId={selected.id} onClose={() => setShowAddTrial(false)} onSaved={async () => {
+        try {
+          const response = await fetch(`/api/crm/schedule/session/${selected.id}`);
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error("Участник добавлен. Обновите карточку, чтобы увидеть его.");
+          setLessonData((current: any) => current ? { ...current, trialParticipants: payload.trialParticipants } : current);
+          setMessage("Пробный участник добавлен");
+        } catch (cause) { setError((cause as Error).message); }
+      }} />}
       {!demo && !selected && <section className="card-crm" style={{ background: "white", minWidth: 0 }}><h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Мои начисления</h2>{payroll.length === 0 ? <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: 13 }}>Начисления появятся после завершённых занятий.</p> : payroll.slice(0, 12).map((entry: any) => { const lesson = Array.isArray(entry.lesson_sessions) ? entry.lesson_sessions[0] : entry.lesson_sessions; const group = Array.isArray(lesson?.groups) ? lesson.groups[0] : lesson?.groups; return <div key={entry.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, padding: "11px 0", borderTop: "1px solid var(--color-border)" }}><span><strong>{group?.title || "Занятие"}</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{lesson?.lesson_date} · {entry.pay_mode === "per_lesson" ? "Фикс за занятие" : `${entry.attendee_count} посещений × ${Number(entry.rate_snapshot).toLocaleString("ru-RU")} ₽`}</small></span><span style={{ textAlign: "right" }}><strong>{Number(entry.amount).toLocaleString("ru-RU")} ₽</strong><small style={{ display: "block", color: "var(--color-text-muted)" }}>{entry.status === "paid" ? "выплачено" : entry.status === "approved" ? "подтверждено" : "начислено"}</small></span></div>; })}</section>}
       <style jsx>{`svg { vertical-align: middle; } @media (max-width: 520px) { .teacher-mobile-home { overflow-x: clip; } }`}</style>
     </main>

@@ -20,6 +20,8 @@ export function LessonConductPanel({
   rows,
   readOnly,
   trialReadOnly = readOnly,
+  attendanceEditable,
+  onAddTrial,
   onRowsChange,
   onSaveAttendance,
   onComplete,
@@ -32,6 +34,8 @@ export function LessonConductPanel({
   rows: AttendanceRosterRow[];
   readOnly: boolean;
   trialReadOnly?: boolean;
+  attendanceEditable?: boolean;
+  onAddTrial?: () => void;
   onRowsChange: (rows: AttendanceRosterRow[]) => void;
   onSaveAttendance?: () => void | Promise<void>;
   onComplete?: () => void | Promise<void>;
@@ -78,10 +82,12 @@ export function LessonConductPanel({
       </div>
 
       <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
+        {onAddTrial && !trialReadOnly && <Button variant="secondary-crm" onClick={onAddTrial}>Добавить пробного участника</Button>}
         {Boolean(data.trialParticipants?.length) && <section className="card-crm" style={{ background: "white", minWidth: 0 }}><TrialParticipantList participants={data.trialParticipants || []} readOnly={trialReadOnly} /></section>}
         <section className="card-crm" style={{ background: "white", minWidth: 0 }}>
           <h3 style={{ marginTop: 0 }}>Журнал посещаемости</h3>
-          <AttendanceRoster rows={rows} onChange={onRowsChange} disabled={readOnly || data.session.status !== "live"} onSave={readOnly ? undefined : onSaveAttendance} onComplete={readOnly ? undefined : onComplete} saving={saving} completing={completing} sessionStatus={data.session.status} message={message} />
+          {attendanceEditable && data.session.status === "completed" && <p style={{ fontSize: 13 }}>Изменения посещаемости не пересчитывают списания и начисления преподавателю.</p>}
+          <AttendanceRoster rows={rows} onChange={onRowsChange} disabled={readOnly || !(attendanceEditable ?? data.session.status === "live")} onSave={readOnly ? undefined : onSaveAttendance} onComplete={readOnly || data.session.status === "completed" ? undefined : onComplete} saving={saving} completing={completing} sessionStatus={data.session.status} message={message} />
         </section>
       </div>
       <style jsx>{`@media (max-width: 760px) { .lesson-conduct-grid { grid-template-columns: 1fr !important; } }`}</style>

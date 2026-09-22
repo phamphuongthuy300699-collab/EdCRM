@@ -29,7 +29,7 @@ export function categorizeTeacherSessions<T extends TeacherPortalSession>(sessio
   const todaySessions = visible.filter((session) => moscowDateKey(session.starts_at) === today);
   const upcoming = visible.filter((session) => session.status === "planned" && moscowDateKey(session.starts_at) > today);
   const history = visible
-    .filter((session) => session.status === "completed" && moscowDateKey(session.starts_at) < today)
+    .filter((session) => moscowDateKey(session.starts_at) < today)
     .sort((left, right) => right.starts_at.localeCompare(left.starts_at));
   return { unfinished, today: todaySessions, upcoming, history };
 }
@@ -40,4 +40,9 @@ export function teacherPortalDateRange(today = new Date(), historyDays = 90) {
   const to = new Date(today);
   to.setUTCDate(to.getUTCDate() + 30);
   return { dateFrom: moscowDateKey(from), dateTo: moscowDateKey(to) };
+}
+
+export function canEditLessonAttendance(session: { status: string; starts_at: string }, now = new Date()) {
+  return ["planned", "live", "completed"].includes(session.status)
+    && new Date(session.starts_at).getTime() <= now.getTime();
 }

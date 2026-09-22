@@ -29,7 +29,7 @@ export function AttendanceRoster({ rows, disabled = false, onChange, onSave, onC
   const marked = rows.filter((row) => row.status !== "unmarked").length;
   const hasPendingAbsence = absenceOpen.size > 0;
   const completion = attendanceCompletionState(rows.map((row) => ({ status: row.status, pendingAbsence: absenceOpen.has(row.studentId) })));
-  const canComplete = sessionStatus === "live" && completion.complete && !saving && !completing;
+  const canComplete = ["planned", "live"].includes(sessionStatus || "") && !disabled && completion.complete && !saving && !completing;
 
   const bulkPresent = () => {
     if (disabled) return;

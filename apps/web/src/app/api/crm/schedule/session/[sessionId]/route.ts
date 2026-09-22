@@ -1,3 +1,4 @@
+import { canEditLessonAttendance } from "@/features/scheduling/teacher-portal";
 import { NextResponse } from "next/server";
 import { crmAdmin, requireCrmStaff } from "../../../_shared";
 import { databaseUuidSchema } from "@/features/scheduling/schemas";
@@ -35,7 +36,7 @@ export async function GET(request: Request, context: { params: Promise<{ session
   if (previewTeacherId && session.teacher_id !== previewTeacherId) return NextResponse.json({ ok: false, error: "Занятие не найдено" }, { status: 404 });
   if (access.role === "teacher" && session.teacher_id !== access.staffProfileId) return NextResponse.json({ ok: false, error: "Доступно только своё занятие" }, { status: 403 });
 
-  const [{ data: enrollments }, { data: makeups }, { data: attendance }, { data: materials }, { data: homeworkTemplates }, { data: assignments }, { data: payroll }, { data: trialRows }] = await Promise.all([
+  const results = await Promise.all([
     admin.from("enrollments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("group_id", session.group_id).eq("status", "active"),
     admin.from("makeup_assignments").select("student_id, students(id, full_name)").eq("organization_id", access.organizationId).eq("target_session_id", session.id).in("status", ["scheduled", "completed"]),
     admin.from("attendance").select("id, student_id, attendance_status, comment, absence_reason, students(id, full_name)").eq("organization_id", access.organizationId).eq("lesson_session_id", session.id),
@@ -51,6 +52,10 @@ export async function GET(request: Request, context: { params: Promise<{ session
       .eq("trial_events.lesson_session_id", session.id)
       .order("created_at", { ascending: true }),
   ]);
+  if (results.some(result => "error" in result && result.error)) {
+    return NextResponse.json({ ok: false, error: "Не удалось загрузить журнал занятия. Повторите попытку." }, { status: 500 });
+  }
+  const [{ data: enrollments }, { data: makeups }, { data: attendance }, { data: materials }, { data: homeworkTemplates }, { data: assignments }, { data: payroll }, { data: trialRows }] = results;
   const attendanceByStudent = new Map((attendance || []).map((row: any) => [row.student_id, row]));
   const students = new Map<string, any>();
   for (const mark of attendance || []) {
@@ -79,7 +84,7 @@ export async function GET(request: Request, context: { params: Promise<{ session
     assignments: assignments || [],
     payroll: payroll || null,
     trialParticipants: (trialRows || []).map(trialParticipantDto),
-    readOnly: Boolean(previewTeacherId) || session.status === "completed",
+    readOnly: Boolean(previewTeacherId) || !canEditLessonAttendance(session),
     canAssignHomework: !previewTeacherId && ["planned", "live"].includes(session.status)
       && (["owner", "admin"].includes(access.role) || access.role === "teacher"),
   });
